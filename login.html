@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Sign in · SPAR Malta Hub</title>
+<link rel="stylesheet" href="spar.css">
+<style>
+  body{display:grid;place-items:center;min-height:100vh;padding-bottom:24px}
+  .box{width:100%;max-width:400px}
+  .brand{margin-bottom:22px}
+  h1{font-weight:700;font-size:28px;margin:0}
+  .sub{color:var(--muted);font-size:14px;margin-top:2px}
+  .panel{padding:22px}
+  .panel h2{font-weight:600;font-size:21px;margin:0 0 14px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px}
+  .btn-primary{width:100%;margin-top:4px}
+  .foot{margin-top:16px;font-size:13px;color:var(--muted);text-align:center}
+</style>
+<script>try{var t=localStorage.getItem("sparHubTheme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<main class="box">
+  <div class="brand">
+    <div class="mark" aria-hidden="true">SP<span class="dot"></span></div>
+    <div>
+      <h1>SPAR Malta Hub</h1>
+      <div class="sub">Shop management tools</div>
+    </div>
+  </div>
+
+  <form class="panel" id="signin" novalidate>
+    <h2 id="formTitle">Sign in</h2>
+    <div id="msg" role="status" aria-live="polite"></div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" inputmode="email" required>
+    </div>
+    <div class="field" id="pwField">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-primary" id="go" type="submit">Sign in</button>
+    <div class="row">
+      <button type="button" class="linklike" id="toggle">Forgot or new password?</button>
+    </div>
+  </form>
+  <p class="foot">Access is by invitation. Ask a hub admin if you need a login.</p>
+</main>
+
+<script src="firebase-config.js"></script>
+<script type="module">
+  const V = "10.12.2", FB = `https://www.gstatic.com/firebasejs/${V}/`;
+  const $ = (id) => document.getElementById(id);
+  const msg = (text, kind = "err") => {
+    $("msg").innerHTML = "";
+    if (!text) return;
+    const d = document.createElement("p");
+    d.className = "msg " + kind; d.textContent = text; $("msg").appendChild(d);
+  };
+
+  const params = new URLSearchParams(location.search);
+  // Only allow returning to a page on this same site.
+  let next = params.get("next") || "./";
+  if (!/^\/(?!\/)/.test(next) && next !== "./") next = "./";
+
+  const cfg = window.SPAR_FIREBASE_CONFIG;
+  if (!cfg || /PASTE/.test(cfg.apiKey || "PASTE")) {
+    msg("This site isn't connected to Firebase yet — see SETUP.md, step 3.");
+    $("go").disabled = true;
+  } else {
+    const { initializeApp } = await import(FB + "firebase-app.js");
+    const A = await import(FB + "firebase-auth.js");
+    const app = initializeApp(cfg);
+    const auth = A.getAuth(app);
+    await A.setPersistence(auth, A.browserLocalPersistence);
+
+    let resetMode = false;
+    $("toggle").onclick = () => {
+      resetMode = !resetMode;
+      $("pwField").hidden = resetMode;
+      $("formTitle").textContent = resetMode ? "Set or reset your password" : "Sign in";
+      $("go").textContent = resetMode ? "Email me a link" : "Sign in";
+      $("toggle").textContent = resetMode ? "Back to sign in" : "Forgot or new password?";
+      msg(resetMode ? "Enter your email and we'll send you a link to choose a password." : "", "ok");
+    };
+
+    A.onAuthStateChanged(auth, (u) => { if (u && !resetMode && !$("go").dataset.busy) location.replace(next); });
+
+    const friendly = (e) => ({
+      "auth/invalid-credential": "That email and password don't match.",
+      "auth/wrong-password": "That email and password don't match.",
+      "auth/user-not-found": "That email and password don't match.",
+      "auth/invalid-email": "That doesn't look like an email address.",
+      "auth/too-many-requests": "Too many attempts. Wait a few minutes, or reset your password.",
+      "auth/network-request-failed": "No connection. Check your internet and try again.",
+      "auth/user-disabled": "This login has been switched off. Ask a hub admin."
+    }[e.code] || "Couldn't sign in (" + (e.code || e.message) + ").");
+
+    $("signin").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const email = $("email").value.trim().toLowerCase();
+      if (!email) { msg("Enter your email."); return; }
+      $("go").disabled = true; $("go").dataset.busy = "1";
+      try {
+        if (resetMode) {
+          await A.sendPasswordResetEmail(auth, email);
+          msg("If that email has a login, a link is on its way. Check your inbox (and junk folder).", "ok");
+        } else {
+          await A.signInWithEmailAndPassword(auth, email, $("password").value);
+          location.replace(next);
+          return;
+        }
+      } catch (e) {
+        msg(resetMode && e.code !== "auth/invalid-email"
+          ? "If that email has a login, a link is on its way. Check your inbox (and junk folder)."
+          : friendly(e), resetMode && e.code !== "auth/invalid-email" ? "ok" : "err");
+      }
+      $("go").disabled = false; delete $("go").dataset.busy;
+    });
+  }
+</script>
+</body>
+</html>

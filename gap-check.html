@@ -1,0 +1,745 @@
+<!doctype html><html><head><meta charset=utf8><meta name="spar-tool" content="gap-check"><meta name="robots" content="noindex,nofollow"><script src="firebase-config.js"></script><script src="spar-runtime.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Gap Check Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky store bar + view tabs, one working column; tables scroll inside their own frames */
+:root{
+  --bg:#F2F4F1; --surface:#FFFFFF; --ink:#17201C; --muted:#5A6761; --line:#DAE1DC; --soft:#E7EEEA;
+  --accent:#0E6A4E; --accent-ink:#FFFFFF;
+  --crit:#B42318; --crit-bg:#FCEBE8; --warn:#9A5605; --warn-bg:#FCF1DE; --ok:#1E7537; --ok-bg:#E3F3E6; --info:#2D5BA6; --info-bg:#E6EDF9;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1412; --surface:#161D1A; --ink:#E5ECE8; --muted:#97A59E; --line:#29332F; --soft:#1C2622;
+  --accent:#4BC395; --accent-ink:#05231A;
+  --crit:#FF8C7C; --crit-bg:#3A1713; --warn:#F1B45B; --warn-bg:#33250F; --ok:#6DCF89; --ok-bg:#142E1C; --info:#8FB3F2; --info-bg:#172238; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1412; --surface:#161D1A; --ink:#E5ECE8; --muted:#97A59E; --line:#29332F; --soft:#1C2622;
+  --accent:#4BC395; --accent-ink:#05231A;
+  --crit:#FF8C7C; --crit-bg:#3A1713; --warn:#F1B45B; --warn-bg:#33250F; --ok:#6DCF89; --ok-bg:#142E1C; --info:#8FB3F2; --info-bg:#172238; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+header.top .wrap{padding-block:0}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-block:14px 10px}
+h1{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.01em;margin:0;flex:1 1 auto}
+h1 small{display:block;font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0}
+h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:15px;margin:0}
+.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:4px 9px;font-size:12.5px}
+.btn:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stores{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:thin}
+.chip{font:inherit;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.chip .no{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] .no{color:inherit;opacity:.7}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.chip .dot.stale{background:var(--warn)} .chip .dot.none{background:var(--line)}
+.tabs{display:flex;gap:2px;overflow-x:auto}
+.tab{font:inherit;font-family:var(--f-display);font-weight:600;font-size:14.5px;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+main{display:flex;flex-direction:column;gap:20px;padding-top:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;justify-content:space-between}
+.hint{color:var(--muted);font-size:13px;margin:0;max-width:72ch}
+.banner{border-radius:8px;padding:10px 14px;font-size:13.5px;background:var(--info-bg);color:var(--ink);border:1px solid var(--line)}
+.banner.warn{background:var(--warn-bg)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-family:var(--f-display);font-weight:700;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.kpi.crit .v{color:var(--crit)} .kpi.warn .v{color:var(--warn)} .kpi.ok .v{color:var(--ok)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--soft);position:sticky;top:0;white-space:nowrap}
+th.sortable{cursor:pointer} th.sortable:hover{color:var(--ink)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--soft)}
+.code{font-family:var(--f-mono);font-size:12.5px;white-space:nowrap}
+.desc{min-width:220px}
+.sub{color:var(--muted);font-size:12px}
+.ticket+.sub{white-space:nowrap}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--soft);color:var(--muted)}
+.pill.new{background:var(--info-bg);color:var(--info)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.crit{background:var(--crit-bg);color:var(--crit)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+/* shelf-edge ticket for days out */
+.ticket{display:inline-flex;align-items:baseline;gap:3px;font-family:var(--f-mono);font-weight:600;font-size:13px;border:1px solid var(--line);border-left:4px solid var(--muted);padding:1px 7px 1px 6px;border-radius:2px;background:var(--surface);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ticket small{font-weight:400;font-size:10.5px;color:var(--muted)}
+.ticket.new{border-left-color:var(--info)} .ticket.warn{border-left-color:var(--warn)} .ticket.crit{border-left-color:var(--crit)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar input[type=search],.toolbar select{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:0}
+.toolbar input[type=search]{flex:1 1 200px}
+.toolbar label{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.count{font-size:12.5px;color:var(--muted);margin-left:auto}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:20px}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 40px;gap:10px;align-items:center;font-size:13px}
+.bar .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{height:12px;background:var(--soft);border-radius:3px;overflow:hidden;display:flex}
+.bar .fill{height:100%;background:var(--accent)}
+.bar .fill.disc{background:var(--muted);opacity:.55}
+.bar .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-body);font-size:11px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty strong{color:var(--ink);font-family:var(--f-display);font-size:17px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--muted)}
+body.dragging .drop{border-color:var(--accent);background:var(--soft)}
+.pending{display:flex;flex-direction:column;gap:10px}
+.pend{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.pend .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.pend select,.pend input,.inv-form select,.inv-form input,.inv-form textarea{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:0}
+.pend .acts{display:flex;gap:6px}
+@media (max-width:560px){.pend{grid-template-columns:1fr}}
+.inv-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:6px 0}
+.inv-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.inv-form .wide{grid-column:1/-1}
+.inv-form textarea{min-height:60px;resize:vertical}
+.inv-form .acts{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}
+tr.editing td{background:var(--soft)}
+.storetag{font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+.mini{display:flex;flex-wrap:wrap;gap:4px}
+details.how summary{cursor:pointer;font-weight:600}
+details.how ol{margin:8px 0 0;padding-left:20px;max-width:75ch;color:var(--muted)}
+.itemlink{font:inherit;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.itemlink:hover{text-decoration-color:var(--accent);color:var(--accent)}
+.backdrop{position:fixed;inset:0;background:rgba(10,16,13,.35);z-index:10}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:11;overflow-y:auto;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
+.drawer-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.strip{display:flex;gap:3px;flex-wrap:wrap}
+.strip span{width:20px;height:20px;border-radius:3px;border:1px solid var(--line);background:var(--surface)}
+.strip span.out{background:var(--crit);border-color:var(--crit)}
+.strip span.with{background:var(--warn);border-color:var(--warn)}
+.strip span.ok{background:var(--ok-bg);border-color:var(--ok-bg)}
+.strip-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start}
+.strip-dates{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
+textarea.brief{width:100%;font-family:var(--f-mono);font-size:12.5px;line-height:1.5;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--ink);padding:10px;resize:vertical}
+.sup-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px 0}
+.sup-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.sup-form input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:0}
+.sup-form .wide{grid-column:1/-1}
+.sup-form .acts{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:13.5px;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.toast{animation:up .2s ease-out}@keyframes up{from{transform:translate(-50%,8px);opacity:.4}}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <h1>Gap Check Tracker<small id="subtitle">Daily 1pm gap checks · 6 stores</small></h1>
+      <button class="btn primary" id="importBtn" type="button">Import gap check</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden>
+    </div>
+    <div class="stores" id="stores" role="group" aria-label="Store"></div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+  </div>
+</header>
+<div class="wrap"><main id="main"><div class="empty"><strong>Loading gap checks…</strong></div></main></div>
+<div id="drawer"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const STORES = [["61","Paceville"],["63","Balluta"],["65","Valletta"],["68","Steps"],["71","Wembley"],["73","Voco"]];
+const STORE_NAME = Object.fromEntries(STORES);
+const TABS = [["overview","Overview"],["brief","Daily brief"],["out","Out of stock"],["system","Stock on system"],["suppliers","Suppliers"],["cross","Across stores"],["history","Uploads"]];
+const RESULTS = ["Pending","Found – all","Found – part","Not found"];
+const CAUSES = ["Not yet investigated","Admin / system error","Delivery scanned wrong","Wrong waste scan","Till scanning error","Suspected theft","Supplier short delivery","Item was misplaced","Other"];
+const HISTORY_DAYS = 180;
+const LS_UI = "gapTracker.ui", LS_DATA = "gapTracker.local";
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MON = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const pad = n => String(n).padStart(2,"0");
+const iso = (y,m,d) => `${y}-${pad(m+1)}-${pad(d)}`;
+function todayISO(){const d=new Date();return iso(d.getFullYear(),d.getMonth(),d.getDate());}
+function addDays(s,n){const [y,m,d]=s.split("-").map(Number);const t=new Date(Date.UTC(y,m-1,d+n));return iso(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate());}
+function dayDiff(a,b){const p=s=>{const [y,m,d]=s.split("-").map(Number);return Date.UTC(y,m-1,d)};return Math.round((p(b)-p(a))/864e5);}
+function toISO(v){
+  if(v==null||v==="") return null;
+  if(v instanceof Date && !isNaN(v)){const t=new Date(v.getTime()+12*36e5);return iso(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate());}
+  if(typeof v==="number"){const t=new Date(Date.UTC(1899,11,30)+v*864e5);return iso(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate());}
+  const s=String(v).trim();let m;
+  if((m=s.match(/^(\d{1,2})[-\s/]([A-Za-z]{3})[A-Za-z]*[-\s/](\d{2,4})/))){const mo=MON[m[2].toLowerCase()];if(mo!=null){let y=+m[3];if(y<100)y+=2000;return iso(y,mo,+m[1]);}}
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return iso(+m[1],+m[2]-1,+m[3]);
+  if((m=s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})/))){let y=+m[3];if(y<100)y+=2000;return iso(y,+m[2]-1,+m[1]);}
+  return null;
+}
+const fmtDate = s => { if(!s) return "–"; const [y,m,d]=s.split("-").map(Number); return `${d} ${"Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")[m-1]}`; };
+const fmtDateY = s => s ? fmtDate(s)+" "+s.slice(0,4) : "–";
+const plural = (n,w) => `${n} ${w}${n===1?"":"s"}`;
+const storeLabel = c => STORE_NAME[c] ? `${c} ${STORE_NAME[c]}` : `Store ${c}`;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,3200);}
+function lsGet(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f;}catch{return f;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch{return false;}}
+
+/* ---------- state ---------- */
+const ui = Object.assign({store:"all",tab:"overview",q:"",supplier:"",dept:"",disc:"all",minDays:0,sort:"days",sysFilter:"all",briefDays:3,item:null}, lsGet(LS_UI,{}));
+ui.item=null;
+const data = { checks:new Map(), inv:new Map(), sup:new Map(), mode:"loading", ready:{checks:false,inv:false} };
+const supId = name => "sup_"+String(name).replace(/[^A-Za-z0-9_\-.~]/g,"_").slice(0,150);
+let db=null, downloads=null, pending=[], editing=null, drafts={}, confirmDel=null, memo=null;
+const saveUI = () => lsSet(LS_UI,{store:ui.store,tab:ui.tab});
+
+/* ---------- storage ---------- */
+async function initStorage(){
+  try{ db = window.claude?.use ? await window.claude.use("db") : null; }catch{ db=null; }
+  try{ downloads = window.claude?.use ? await window.claude.use("downloads") : null; }catch{ downloads=null; }
+  if(!db){
+    data.mode="local";
+    const l=lsGet(LS_DATA,{checks:{},inv:{}});
+    data.checks=new Map(Object.entries(l.checks||{})); data.inv=new Map(Object.entries(l.inv||{})); data.sup=new Map(Object.entries(l.sup||{}));
+    data.ready={checks:true,inv:true}; changed(); return;
+  }
+  data.mode="db";
+  db.collection("checks").where("date",">=",addDays(todayISO(),-HISTORY_DAYS)).onSnapshot(snap=>{
+    data.checks=new Map(snap.docs.map(d=>[d.id,d.data()])); data.ready.checks=true; changed();
+  }, e=>{ data.ready.checks=true; toast("Could not load saved checks: "+(e?.message||e?.code||"error")); changed(); });
+  db.collection("investigations").onSnapshot(snap=>{
+    data.inv=new Map(snap.docs.map(d=>[d.id,d.data()])); data.ready.inv=true; changed();
+  }, e=>{ data.ready.inv=true; changed(); });
+  db.collection("suppliers").onSnapshot(snap=>{
+    data.sup=new Map(snap.docs.map(d=>[d.id,d.data()])); changed();
+  }, ()=>{});
+}
+async function putSup(id,doc){
+  if(data.mode==="db") await db.collection("suppliers").doc(id).set(doc);
+  else { data.sup.set(id,doc); persistLocal(); changed(); }
+}
+function persistLocal(){
+  if(data.mode!=="local") return;
+  if(!lsSet(LS_DATA,{checks:Object.fromEntries(data.checks),inv:Object.fromEntries(data.inv),sup:Object.fromEntries(data.sup)})) toast("This browser's storage is full. Older checks were not saved.");
+}
+async function putCheck(id,doc){
+  if(data.mode==="db") await db.collection("checks").doc(id).set(doc);
+  else { data.checks.set(id,doc); persistLocal(); changed(); }
+}
+async function removeCheck(id){
+  if(data.mode==="db") await db.collection("checks").doc(id).delete();
+  else { data.checks.delete(id); persistLocal(); changed(); }
+}
+async function putInv(id,doc){
+  if(data.mode==="db") await db.collection("investigations").doc(id).set(doc);
+  else { data.inv.set(id,doc); persistLocal(); changed(); }
+}
+
+/* ---------- parsing ---------- */
+const COLS = {code:["item code"],dept:["department description","department"],cat:["category description","category"],sup:["supplier name","supplier"],desc:["item description","description"],stock:["total stock","stock","system stock"],disc:["discontinued"],extra:["actual stock","reason for no stock"]};
+function parseWorkbook(buf,filename){
+  const wb = XLSX.read(buf,{type:"array",cellDates:true});
+  let store=null,date=null; const res={withStock:[],noStock:[]};
+  for(const name of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+    let h=-1;
+    rows.slice(0,15).forEach((r,i)=>{
+      const a=String(r[0]??"").trim().toLowerCase();
+      if(a==="company"&&r[1]!=null&&!store) store=String(r[1]).trim().replace(/\.0$/,"");
+      if(a.startsWith("date")&&r[1]!=null&&!date) date=toISO(r[1]);
+      if(h<0&&a==="item code") h=i;
+    });
+    if(h<0) continue;
+    const title=(String(rows[0]?.[0]??"")+" "+name).toLowerCase();
+    const kind=/without|no stock|0 stock/.test(title)?"noStock":/with/.test(title)?"withStock":null;
+    if(!kind) continue;
+    const H=rows[h].map(x=>String(x??"").trim().toLowerCase());
+    const ix={}; for(const [k,names] of Object.entries(COLS)) ix[k]=H.findIndex(x=>names.includes(x));
+    const seen=new Set();
+    for(const r of rows.slice(h+1)){
+      const code=String(r[ix.code]??"").trim().replace(/\.0$/,"");
+      if(!code||seen.has(code)) continue; seen.add(code);
+      const g=k=>ix[k]>=0?r[ix[k]]:null;
+      const st=Number(g("stock")); const ex=g("extra");
+      res[kind].push([code,String(g("dept")??"").trim(),String(g("cat")??"").trim(),String(g("sup")??"").trim(),String(g("desc")??"").trim(),isFinite(st)?st:null,String(g("disc")??"").trim().toUpperCase().startsWith("Y")?"YES":"NO",ex==null?"":String(ex).trim()]);
+    }
+  }
+  if(!store){const m=filename.match(/\b(61|63|65|68|71|73)\b/);if(m)store=m[1];}
+  return {filename,store:store||"",date:date||todayISO(),withStock:res.withStock,noStock:res.noStock};
+}
+async function handleFiles(files){
+  for(const f of files){
+    try{
+      if(/\.csv$/i.test(f.name)) throw new Error("CSV can't hold both sheets. Import the .xlsx export.");
+      const p=parseWorkbook(new Uint8Array(await f.arrayBuffer()),f.name);
+      if(!p.withStock.length&&!p.noStock.length) throw new Error("No 'Item Code' table found on either sheet.");
+      pending.push(p);
+    }catch(e){ toast(`${f.name}: ${e.message}`); }
+  }
+  if(pending.length){ ui.tab = ui.tab; render(); window.scrollTo({top:0}); }
+}
+
+/* ---------- analysis ---------- */
+const rowObj = r => ({code:r[0],dept:r[1],cat:r[2],sup:r[3]||"(no supplier)",desc:r[4],stock:r[5],disc:r[6]==="YES",extra:r[7]});
+function changed(){ memo=null; render(); }
+function analyse(){
+  if(memo) return memo;
+  const byStore={};
+  for(const [id,c] of data.checks){ (byStore[c.store]=byStore[c.store]||[]).push({id,...c}); }
+  const out={};
+  for(const [code] of STORES.concat(Object.keys(byStore).filter(k=>!STORE_NAME[k]).map(k=>[k]))){
+    const cs=(byStore[code]||[]).sort((a,b)=>a.date<b.date?-1:1);
+    const noSets=cs.map(c=>new Set((c.noStock||[]).map(r=>r[0])));
+    const wSets=cs.map(c=>new Set((c.withStock||[]).map(r=>r[0])));
+    const n=cs.length, latest=cs[n-1]||null, prev=cs[n-2]||null;
+    const streak=(sets,code,from)=>{let i=from;while(i>=0&&sets[i].has(code))i--;return i+1;};
+    const times=(sets,code)=>sets.reduce((a,s)=>a+(s.has(code)?1:0),0);
+    const outRows=[],withRows=[],back=[];
+    if(latest){
+      for(const r of latest.noStock||[]){
+        const o=rowObj(r); const si=streak(noSets,o.code,n-1);
+        o.since=cs[si].date; o.days=dayDiff(o.since,latest.date)+1; o.isNew=!prev||!noSets[n-2].has(o.code);
+        o.times=times(noSets,o.code); o.store=code; o.firstSeen=cs[noSets.findIndex(s=>s.has(o.code))].date;
+        o.alsoWith=times(wSets,o.code); outRows.push(o);
+      }
+      for(const r of latest.withStock||[]){
+        const o=rowObj(r); const si=streak(wSets,o.code,n-1);
+        o.since=cs[si].date; o.days=dayDiff(o.since,latest.date)+1; o.isNew=!prev||!wSets[n-2].has(o.code);
+        o.times=times(wSets,o.code); o.store=code; withRows.push(o);
+      }
+      if(prev) for(const r of prev.noStock||[]) if(!noSets[n-1].has(r[0])){
+        const o=rowObj(r); const si=streak(noSets,o.code,n-2);
+        o.wasOut=dayDiff(cs[si].date,prev.date)+1; o.nowWith=wSets[n-1].has(o.code); o.store=code; back.push(o);
+      }
+    }
+    const series=cs.map(c=>({date:c.date,no:(c.noStock||[]).length,disc:(c.noStock||[]).filter(r=>r[6]==="YES").length,w:(c.withStock||[]).length}));
+    out[code]={code,checks:cs,latest,prev,outRows,withRows,back,series};
+  }
+  return memo=out;
+}
+function selected(){ const a=analyse(); return ui.store==="all"?Object.values(a):[a[ui.store]||{code:ui.store,checks:[],outRows:[],withRows:[],back:[],series:[]}]; }
+const ageClass = o => o.isNew?"new":o.days>=14?"crit":o.days>=7?"warn":"";
+const agePill = o => o.isNew?'<span class="pill new">New today</span>':o.days>=14?'<span class="pill crit">Chronic</span>':o.days>=7?'<span class="pill warn">Over a week</span>':'<span class="pill">Ongoing</span>';
+const ticket = o => `<span class="ticket ${ageClass(o)}">${o.days}<small>${o.days===1?"day":"days"}</small></span>`;
+const invId = (store,code) => `s${store}_${code}`;
+const itemBtn = o => `<button type="button" class="itemlink" data-item="${esc(o.code)}">${esc(o.desc)}</button>`;
+
+/* ---------- rendering ---------- */
+function render(){
+  const a = data.ready.checks ? analyse() : null;
+  const today=todayISO();
+  $("#stores").innerHTML = [["all","All stores"]].concat(STORES).map(([c,n])=>{
+    let dot="";
+    if(c!=="all"&&a){const l=a[c]?.latest; dot=`<span class="dot ${!l?"none":l.date<today?"stale":""}" title="${l?"Last check "+fmtDate(l.date):"No checks yet"}"></span>`;}
+    return `<button type="button" class="chip" data-store="${c}" aria-pressed="${ui.store===c}">${dot}${c==="all"?n:`<span class="no">${c}</span>${n}`}</button>`;
+  }).join("");
+  $("#tabs").innerHTML = TABS.map(([k,n])=>`<button type="button" role="tab" class="tab" data-tab="${k}" aria-selected="${ui.tab===k}">${n}</button>`).join("");
+  const act=document.activeElement, fid=act?.id, sel=[act?.selectionStart,act?.selectionEnd];
+  if(!a){ $("#main").innerHTML='<div class="empty"><strong>Loading gap checks…</strong></div>'; return; }
+  let html = pendingHTML();
+  if(data.mode==="local") html += `<div class="banner warn">Saved in this browser only. Open the published page while signed in to keep checks across devices.</div>`;
+  if(!data.checks.size) html += emptyHTML();
+  else html += ({overview:viewOverview,brief:viewBrief,out:viewOut,system:viewSystem,suppliers:viewSuppliers,cross:viewCross,history:viewHistory}[ui.tab]||viewOverview)();
+  $("#main").innerHTML = html;
+  const sub=$("#subtitle"); sub.textContent = ui.store==="all" ? "Daily 1pm gap checks · 6 stores" : `SPAR ${storeLabel(ui.store)} · ${a[ui.store]?.latest?"last check "+fmtDateY(a[ui.store].latest.date):"no checks yet"}`;
+  if(fid){const el=document.getElementById(fid); if(el){el.focus(); try{if(sel[0]!=null)el.setSelectionRange(sel[0],sel[1]);}catch{}}}
+  wireCharts();
+  $("#drawer").innerHTML = ui.item ? drawerHTML(ui.item) : "";
+}
+function emptyHTML(){
+  return `<section class="panel"><div class="empty"><strong>No gap checks saved yet</strong>
+  <p class="hint">Import today's gap check export (the .xlsx with the “With Stock” and “Without Stock” sheets). The store and date are read from the Company and Date Started cells. Import a file every day and each item gets a running count of how long it has been on the shelf as a gap.</p>
+  <div class="drop">Drop .xlsx files here, or <button type="button" class="btn sm" data-act="pick">choose files</button></div></div></section>`;
+}
+function pendingHTML(){
+  if(!pending.length) return `<div class="drop" ${data.checks.size?"":"hidden"}>Drop the day's gap check files anywhere on this page, or use <b>Import gap check</b>. Several stores at once is fine.</div>`;
+  const opts = v => `<option value="">Pick store…</option>`+STORES.map(([c,n])=>`<option value="${c}" ${c===v?"selected":""}>${c} ${n}</option>`).join("");
+  return `<section class="panel"><div class="panel-head"><h2>Ready to import</h2><div class="acts" style="display:flex;gap:6px"><button class="btn" data-act="discard-all">Discard all</button><button class="btn primary" data-act="save-all">Save ${plural(pending.filter(Boolean).length,"check")}</button></div></div>
+  <div class="pending">${pending.map((p,i)=>{
+    if(!p) return "";
+    const id=`s${p.store}_${p.date}`; const exists=p.store&&data.checks.has(id);
+    return `<div class="pend"><div class="meta"><b>${esc(p.filename)}</b>
+      <select id="pstore${i}" data-pend="${i}" data-field="store" aria-label="Store">${opts(p.store)}</select>
+      <input id="pdate${i}" type="date" data-pend="${i}" data-field="date" value="${p.date}" aria-label="Check date">
+      <span class="sub">${plural(p.noStock.length,"gap")} without stock · ${plural(p.withStock.length,"gap")} with stock</span>
+      ${exists?'<span class="pill warn">Replaces the check already saved for this day</span>':""}
+      ${!p.store?'<span class="pill crit">Store not detected</span>':""}</div>
+      <div class="acts"><button class="btn sm" data-act="discard" data-i="${i}">Discard</button><button class="btn sm primary" data-act="save" data-i="${i}">Save</button></div></div>`;}).join("")}</div></section>`;
+}
+
+/* Overview */
+function viewOverview(){
+  const S=selected(); const all=ui.store==="all"; const today=todayISO();
+  const out=S.flatMap(s=>s.outRows), w=S.flatMap(s=>s.withRows), back=S.flatMap(s=>s.back);
+  const openInv=[...data.inv.values()].filter(v=>v.status!=="Closed"&&(all||v.store===ui.store)).length;
+  const k=(v,l,s,c="")=>`<div class="kpi ${c}"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${s}</span></div>`;
+  let h=`<div class="kpis">
+   ${k(out.length,"Gaps, no stock",`${out.filter(o=>o.disc).length} discontinued`)}
+   ${k(out.filter(o=>o.isNew).length,"New since last check","went to 0 stock","")}
+   ${k(back.length,"Back on shelf",`were out at the previous check`,"ok")}
+   ${k(out.filter(o=>!o.disc&&o.days>=7).length,"Out 7+ days","still orderable, not discontinued",out.some(o=>!o.disc&&o.days>=14)?"crit":"warn")}
+   ${k(w.length,"Gaps with stock","system shows stock, shelf empty")}
+   ${k(openInv,"Open investigations","stock not found on shelf")}
+  </div>`;
+  if(all){
+    h+=`<section class="panel"><div class="panel-head"><h2>Stores at their latest check</h2><p class="hint">Click a store to open it. Amber dot = no check imported today. Imports shows how many of the last 14 days have a gap check, so you can see which stores skip it.</p></div><div class="tbl-wrap"><table><thead><tr><th>Store</th><th>Last check</th><th class="num">No stock</th><th class="num">Discontinued</th><th class="num">New</th><th class="num">Back</th><th class="num">7+ days</th><th class="num">With stock</th><th class="num">Imports, last 14 days</th></tr></thead><tbody>
+    ${S.filter(s=>STORE_NAME[s.code]).map(s=>`<tr class="click" data-store="${s.code}"><td><span class="storetag">${s.code}</span> ${esc(STORE_NAME[s.code])}</td><td>${s.latest?fmtDate(s.latest.date)+(s.latest.date<today?` <span class="pill warn">${dayDiff(s.latest.date,today)}d ago</span>`:' <span class="pill ok">Today</span>'):'<span class="sub">No checks</span>'}</td>
+      <td class="num">${s.outRows.length}</td><td class="num">${s.outRows.filter(o=>o.disc).length}</td><td class="num">${s.outRows.filter(o=>o.isNew).length}</td><td class="num">${s.back.length}</td><td class="num">${s.outRows.filter(o=>!o.disc&&o.days>=7).length}</td><td class="num">${s.withRows.length}</td><td class="num">${(()=>{const n=new Set(s.checks.filter(c=>dayDiff(c.date,today)<14).map(c=>c.date)).size;return n>=12?n+"/14":`<span class="pill ${n<7?"crit":"warn"}">${n}/14</span>`;})()}</td></tr>`).join("")}
+    </tbody></table></div></section>`;
+  } else {
+    h+=`<section class="panel"><div class="panel-head"><h2>Gaps per check</h2><div class="legend"><span><i style="background:var(--accent)"></i>No stock</span><span><i style="background:var(--muted);opacity:.6"></i>of which discontinued</span><span><i style="background:var(--info)"></i>With stock</span></div></div>${chartSVG(S[0].series)}</section>`;
+  }
+  const longest=out.filter(o=>!o.disc).sort((a,b)=>b.days-a.days||b.times-a.times).slice(0,12);
+  const sup=supplierAgg(out).slice(0,8); const max=Math.max(1,...sup.map(s=>s.items));
+  h+=`<div class="grid2"><section class="panel"><div class="panel-head"><h2>Longest gaps still orderable</h2><button class="btn sm" data-tab="out">See all</button></div>
+  ${longest.length?`<div class="tbl-wrap"><table><thead><tr>${all?"<th>Store</th>":""}<th>Item</th><th>Supplier</th><th>Out for</th></tr></thead><tbody>${longest.map(o=>`<tr>${all?`<td class="storetag">${o.store}</td>`:""}<td class="desc">${itemBtn(o)}<div class="sub code">${esc(o.code)}</div></td><td>${esc(o.sup)}</td><td>${ticket(o)}<div class="sub">since ${fmtDate(o.since)}</div></td></tr>`).join("")}</tbody></table></div>`:'<p class="hint">No gaps without stock at the latest check.</p>'}</section>
+  <section class="panel"><div class="panel-head"><h2>Suppliers with most gaps</h2><button class="btn sm" data-tab="suppliers">See all</button></div>
+  <div class="legend"><span><i style="background:var(--accent)"></i>Orderable</span><span><i style="background:var(--muted);opacity:.55"></i>Discontinued</span></div>
+  <div class="bars">${sup.map(s=>`<div class="bar"><span class="t" title="${esc(s.sup)}">${esc(s.sup)}</span><span class="track"><span class="fill" style="width:${(s.items-s.disc)/max*100}%"></span><span class="fill disc" style="width:${s.disc/max*100}%"></span></span><span class="n">${s.items}</span></div>`).join("")||'<p class="hint">Nothing to show yet.</p>'}</div></section></div>`;
+  h+=`<details class="how panel"><summary>How the day counts work</summary><ol>
+   <li>Each import is saved per store and date. Re-importing the same store and date replaces it.</li>
+   <li><b>Out for</b> counts calendar days from the first check in an unbroken run where the item was on the “Without Stock” list, to the latest check. A day with no import does not break the run.</li>
+   <li><b>New today</b> means the item was not on the list at the previous check. <b>Back on shelf</b> means it was on the previous list and is not on the latest one.</li>
+   <li><b>Times listed</b> counts every check (last ${HISTORY_DAYS} days) the item appeared on, so items that keep coming back stand out.</li></ol></details>`;
+  return h;
+}
+function chartSVG(series){
+  if(!series.length) return '<p class="hint">No checks yet for this store.</p>';
+  const W=1000,H=240,L=40,R=14,T=12,B=30, iw=W-L-R, ih=H-T-B;
+  const maxV=Math.max(5,...series.map(s=>Math.max(s.no,s.w))); const step=Math.pow(10,Math.floor(Math.log10(maxV)));
+  const nice=[1,2,2.5,5,10].map(m=>m*step).find(v=>maxV/v<=5)||step*10; const top=Math.ceil(maxV/nice)*nice;
+  const n=series.length, x=i=>L+(n===1?iw/2:i*iw/(n-1)), y=v=>T+ih-v/top*ih;
+  const line=(k,c,o=1)=>n>1?`<polyline fill="none" stroke="${c}" stroke-opacity="${o}" stroke-width="2" points="${series.map((s,i)=>`${x(i).toFixed(1)},${y(s[k]).toFixed(1)}`).join(" ")}"/>`:"";
+  const dots=(k,c,o=1)=>series.map((s,i)=>`<circle cx="${x(i)}" cy="${y(s[k])}" r="${i===n-1?4:2.5}" fill="${c}" fill-opacity="${o}"><title>${fmtDate(s.date)}: ${s[k]}</title></circle>`).join("");
+  let g=""; for(let v=0;v<=top;v+=nice) g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  const ticks=n===1?[0]:[...new Set([0,Math.floor((n-1)/2),n-1])];
+  const xl=ticks.map(i=>`<text x="${x(i)}" y="${H-8}" text-anchor="${n===1?"middle":i===0?"start":i===n-1?"end":"middle"}">${fmtDate(series[i].date)}</text>`).join("");
+  const last=series[n-1];
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gaps per check over time">${g}${xl}
+   ${line("disc","var(--muted)",.6)}${line("no","var(--accent)")}${line("w","var(--info)")}${dots("disc","var(--muted)",.6)}${dots("no","var(--accent)")}${dots("w","var(--info)")}
+   <text x="${Math.min(x(n-1)+6,W-R)}" y="${y(last.no)-8}" text-anchor="end" style="fill:var(--accent);font-weight:600">${last.no}</text></svg></div>
+   ${n===1?'<p class="hint">Only one check saved so far. The trend fills in as you import each day.</p>':""}`;
+}
+function wireCharts(){}
+
+/* Out of stock */
+function filterOut(rows){
+  const q=ui.q.trim().toLowerCase();
+  return rows.filter(o=>(!q||o.desc.toLowerCase().includes(q)||o.code.includes(q)||o.sup.toLowerCase().includes(q))
+    &&(!ui.supplier||o.sup===ui.supplier)&&(!ui.dept||o.dept===ui.dept)
+    &&(ui.disc==="all"||(ui.disc==="yes")===o.disc)&&o.days>=ui.minDays);
+}
+function sortRows(rows){
+  const f={days:(a,b)=>b.days-a.days||b.times-a.times,times:(a,b)=>b.times-a.times,sup:(a,b)=>a.sup.localeCompare(b.sup)||b.days-a.days,desc:(a,b)=>a.desc.localeCompare(b.desc),dept:(a,b)=>a.dept.localeCompare(b.dept)||a.cat.localeCompare(b.cat)}[ui.sort]||((a,b)=>b.days-a.days);
+  return rows.slice().sort(f);
+}
+function toolbar(rows,extra=""){
+  const sups=[...new Set(rows.map(o=>o.sup))].sort(), depts=[...new Set(rows.map(o=>o.dept).filter(Boolean))].sort();
+  return `<div class="toolbar"><input type="search" id="q" placeholder="Search item, code or supplier" value="${esc(ui.q)}" aria-label="Search">
+   <select id="fSup" aria-label="Supplier"><option value="">All suppliers</option>${sups.map(s=>`<option ${s===ui.supplier?"selected":""}>${esc(s)}</option>`).join("")}</select>
+   <select id="fDept" aria-label="Department"><option value="">All departments</option>${depts.map(s=>`<option ${s===ui.dept?"selected":""}>${esc(s)}</option>`).join("")}</select>
+   <select id="fDisc" aria-label="Discontinued"><option value="all">Discontinued: all</option><option value="no" ${ui.disc==="no"?"selected":""}>Orderable only</option><option value="yes" ${ui.disc==="yes"?"selected":""}>Discontinued only</option></select>
+   <select id="fMin" aria-label="Minimum days"><option value="0">Any age</option>${[2,7,14,30].map(d=>`<option value="${d}" ${ui.minDays===d?"selected":""}>Out ${d}+ days</option>`).join("")}</select>${extra}</div>`;
+}
+function viewOut(){
+  const S=selected(), all=ui.store==="all";
+  const rows=S.flatMap(s=>s.outRows); const shown=sortRows(filterOut(rows));
+  const back=S.flatMap(s=>s.back);
+  const th=(k,l,cls="")=>`<th class="sortable ${cls}" data-sort="${k}">${l}${ui.sort===k?" ▾":""}</th>`;
+  let h=`<section class="panel"><div class="panel-head"><h2>Gaps without stock</h2><div style="display:flex;gap:6px;align-items:center">${downloads?`<button class="btn sm" data-act="export-out">Download .xlsx</button>`:""}</div></div>
+  <p class="hint">Items on the latest “Without Stock” list${all?" of each store":""}. Discontinued items should have their facing removed or replaced; orderable items out for a week or more need chasing with the supplier.</p>
+  ${toolbar(rows,`<span class="count">${shown.length} of ${rows.length}</span>`)}
+  <div class="tbl-wrap"><table><thead><tr>${all?"<th>Store</th>":""}<th>Code</th>${th("desc","Item")}${th("dept","Department")}${th("sup","Supplier")}<th>Disc.</th>${th("days","Out for")}<th>Status</th>${th("times","Times listed","num")}</tr></thead><tbody>
+  ${shown.map(o=>`<tr>${all?`<td class="storetag">${o.store}</td>`:""}<td class="code">${esc(o.code)}</td><td class="desc">${itemBtn(o)}${o.alsoWith?`<div class="sub">Also on the with-stock list ${plural(o.alsoWith,"time")}</div>`:""}</td><td>${esc(o.dept)}<div class="sub">${esc(o.cat)}</div></td><td>${esc(o.sup)}</td>
+   <td>${o.disc?'<span class="pill">Yes</span>':'<span class="sub">No</span>'}</td><td>${ticket(o)}<div class="sub">since ${fmtDate(o.since)}</div></td><td>${o.disc?'<span class="pill">Remove facing</span>':agePill(o)}</td><td class="num">${o.times}</td></tr>`).join("")||`<tr><td colspan="9" class="sub">No items match these filters.</td></tr>`}
+  </tbody></table></div></section>`;
+  h+=`<section class="panel"><div class="panel-head"><h2>Back on shelf since the previous check</h2><span class="count">${back.length}</span></div>
+  <p class="hint">On the previous “Without Stock” list, not on the latest. If it moved to the “With Stock” list, the delivery arrived but has not been put out yet.</p>
+  ${back.length?`<div class="tbl-wrap"><table><thead><tr>${all?"<th>Store</th>":""}<th>Code</th><th>Item</th><th>Supplier</th><th class="num">Was out</th><th>Now</th></tr></thead><tbody>${back.sort((a,b)=>b.wasOut-a.wasOut).map(o=>`<tr>${all?`<td class="storetag">${o.store}</td>`:""}<td class="code">${esc(o.code)}</td><td class="desc">${itemBtn(o)}</td><td>${esc(o.sup)}</td><td class="num">${plural(o.wasOut,"day")}</td><td>${o.nowWith?'<span class="pill warn">Stock in, shelf empty</span>':'<span class="pill ok">Off the gap list</span>'}</td></tr>`).join("")}</tbody></table></div>`:'<p class="hint">Needs two checks for the same store to compare.</p>'}</section>`;
+  return h;
+}
+
+/* Stock on system (gaps with stock) */
+function viewSystem(){
+  const S=selected(), all=ui.store==="all";
+  const rows=S.flatMap(s=>s.withRows);
+  const onList=new Set(rows.map(o=>invId(o.store,o.code)));
+  const invs=[...data.inv.entries()].filter(([id,v])=>all||v.store===ui.store);
+  const extra=invs.filter(([id,v])=>!onList.has(id)&&v.status!=="Closed").map(([id,v])=>({...v,store:v.store,code:v.code,desc:v.desc,sup:v.sup,stock:v.systemStock,offList:true,days:0,times:0,since:v.firstListed}));
+  const list=rows.concat(extra).filter(o=>{const v=data.inv.get(invId(o.store,o.code));const st=v?.status||"Open";return ui.sysFilter==="all"||(ui.sysFilter==="open"?st!=="Closed":st==="Closed");});
+  // cause summary
+  const causes={}; let varTot=0;
+  for(const [,v] of invs){ if(!v.cause||v.cause===CAUSES[0]) continue; const c=causes[v.cause]=causes[v.cause]||{n:0,units:0}; c.n++; const u=Math.max(0,(Number(v.systemStock)||0)-(Number(v.qtyFound)||0)); c.units+=u; varTot+=u; }
+  const cl=Object.entries(causes).sort((a,b)=>b[1].n-a[1].n); const cmax=Math.max(1,...cl.map(c=>c[1].n));
+  let h=`<div class="grid2"><section class="panel"><h2>Why stock went missing</h2><p class="hint">From the investigations you have closed or classified${all?" across all stores":""}. Units = system stock minus quantity found.</p>
+   ${cl.length?`<div class="bars">${cl.map(([k,c])=>`<div class="bar"><span class="t">${esc(k)}</span><span class="track"><span class="fill" style="width:${c.n/cmax*100}%"></span></span><span class="n">${c.n}</span></div><div class="sub" style="margin:-4px 0 2px">${plural(c.units,"unit")} unaccounted</div>`).join("")}</div><p class="hint"><b>${plural(varTot,"unit")}</b> unaccounted in total.</p>`:'<p class="hint">No causes recorded yet. Open an item below and record what the history showed.</p>'}</section>
+   <section class="panel"><h2>The daily routine</h2><ol class="hint" style="margin:0;padding-left:18px">
+   <li>1pm check: items here have stock on E-Shop but an empty shelf.</li><li>Store refills what it finds and sends you the quantity found next day.</li><li>Open the item, enter the quantity found. Anything not found: check movements since last stock take and record the cause.</li><li>Close it once adjusted. Items that keep reappearing are flagged by “Times listed”.</li></ol></section></div>`;
+  h+=`<section class="panel"><div class="panel-head"><h2>Gaps with stock</h2><div class="toolbar"><select id="fSys" aria-label="Status"><option value="all">All</option><option value="open" ${ui.sysFilter==="open"?"selected":""}>Open</option><option value="closed" ${ui.sysFilter==="closed"?"selected":""}>Closed</option></select>${downloads?`<button class="btn sm" data-act="export-inv">Download .xlsx</button>`:""}</div></div>
+  <p class="hint">Latest “With Stock” list${all?" for each store":""}, plus open investigations for items that have since left the list.</p>
+  <div class="tbl-wrap"><table><thead><tr>${all?"<th>Store</th>":""}<th>Code</th><th>Item</th><th>Supplier</th><th class="num">System stock</th><th>On list</th><th class="num">Times listed</th><th>Found</th><th>Cause</th><th>Status</th><th></th></tr></thead><tbody>
+  ${list.map(o=>{const id=invId(o.store,o.code); const v=data.inv.get(id)||{}; const st=v.status||"Open";
+    const row=`<tr class="${editing===id?"editing":""}">${all?`<td class="storetag">${o.store}</td>`:""}<td class="code">${esc(o.code)}</td><td class="desc">${itemBtn(o)}${o.extra?`<div class="sub">Actual stock noted: ${esc(o.extra)}</div>`:""}</td><td>${esc(o.sup)}</td><td class="num">${o.stock??"–"}</td>
+     <td>${o.offList?'<span class="pill ok">Left the list</span>':`${ticket(o)}<div class="sub">since ${fmtDate(o.since)}</div>`}</td><td class="num">${o.times>=3?`<span class="pill crit">${o.times}</span>`:o.times||"–"}</td>
+     <td>${v.result&&v.result!=="Pending"?esc(v.result)+(v.qtyFound!==""&&v.qtyFound!=null?` (${esc(v.qtyFound)})`:""):'<span class="sub">Pending</span>'}</td><td>${v.cause&&v.cause!==CAUSES[0]?esc(v.cause):'<span class="sub">–</span>'}</td>
+     <td><span class="pill ${st==="Closed"?"ok":"warn"}">${st}</span></td><td><button class="btn sm" data-act="edit" data-id="${id}">${editing===id?"Close":"Investigate"}</button></td></tr>`;
+    return row+(editing===id?invForm(id,o,v,all):"");}).join("")||`<tr><td colspan="11" class="sub">No gaps with stock at the latest check.</td></tr>`}
+  </tbody></table></div></section>`;
+  return h;
+}
+function invForm(id,o,v,all){
+  const d=drafts[id]||(drafts[id]={result:v.result||"Pending",qtyFound:v.qtyFound??"",cause:v.cause||CAUSES[0],notes:v.notes||"",status:v.status||"Open"});
+  const sel=(f,opts)=>`<select id="inv_${f}" data-draft="${id}" data-field="${f}">${opts.map(x=>`<option ${x===d[f]?"selected":""}>${esc(x)}</option>`).join("")}</select>`;
+  return `<tr class="editing"><td colspan="${all?11:10}"><div class="inv-form">
+   <label>Result from store${sel("result",RESULTS)}</label>
+   <label>Quantity found<input id="inv_qtyFound" type="number" min="0" inputmode="numeric" data-draft="${id}" data-field="qtyFound" value="${esc(d.qtyFound)}"></label>
+   <label>Cause after checking history${sel("cause",CAUSES)}</label>
+   <label>Status${sel("status",["Open","Closed"])}</label>
+   <label class="wide">Notes (deliveries, waste, till sales, adjustment made)<textarea id="inv_notes" data-draft="${id}" data-field="notes">${esc(d.notes)}</textarea></label>
+   <div class="acts">${v.updatedAt?`<span class="sub" style="margin-right:auto">Last saved ${new Date(v.updatedAt).toLocaleString()}</span>`:""}<button class="btn" data-act="edit" data-id="${id}">Cancel</button><button class="btn primary" data-act="save-inv" data-id="${id}" data-store="${o.store}" data-code="${esc(o.code)}">Save</button></div>
+  </div></td></tr>`;
+}
+
+/* Suppliers */
+function supplierAgg(rows){
+  const m={};
+  for(const o of rows){const s=m[o.sup]=m[o.sup]||{sup:o.sup,items:0,disc:0,days:0,max:0,newC:0,stores:new Set(),codes:new Set(),long:0};
+    s.items++; if(o.disc)s.disc++; else{s.days+=o.days; if(o.days>=7)s.long++;} s.max=Math.max(s.max,o.disc?0:o.days); if(o.isNew)s.newC++; s.stores.add(o.store); s.codes.add(o.code);}
+  return Object.values(m).map(s=>({...s,avg:s.items-s.disc?s.days/(s.items-s.disc):0,uniq:s.codes.size})).sort((a,b)=>b.items-a.items);
+}
+function viewSuppliers(){
+  const S=selected(), all=ui.store==="all"; const rows=S.flatMap(s=>s.outRows); const ag=supplierAgg(rows);
+  const open=ui.openSup;
+  let h=`<section class="panel"><div class="panel-head"><h2>Supplier gaps at the latest check</h2>${downloads?`<button class="btn sm" data-act="export-out">Download .xlsx</button>`:""}</div>
+  <p class="hint">Gaps without stock grouped by supplier. Average and longest days count orderable items only. Click a supplier to see its items and log when you chased them and the delivery date they promised. A red flag means that date has passed and items are still out.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th class="num">Gaps</th>${all?'<th class="num">Unique items</th><th class="num">Stores</th>':""}<th class="num">Orderable</th><th class="num">Discontinued</th><th class="num">New today</th><th class="num">7+ days</th><th class="num">Avg days</th><th class="num">Longest</th><th>Follow-up</th></tr></thead><tbody>
+  ${ag.map(s=>{const r=`<tr class="click" data-sup="${esc(s.sup)}"><td><b>${esc(s.sup)}</b></td><td class="num">${s.items}</td>${all?`<td class="num">${s.uniq}</td><td class="num">${s.stores.size}</td>`:""}<td class="num">${s.items-s.disc}</td><td class="num">${s.disc}</td><td class="num">${s.newC}</td><td class="num">${s.long?`<span class="pill ${s.max>=14?"crit":"warn"}">${s.long}</span>`:0}</td><td class="num">${s.avg?s.avg.toFixed(1):"–"}</td><td class="num">${s.max||"–"}</td><td>${followCell(s)}</td></tr>`;
+    if(open!==s.sup) return r;
+    const its=sortRows(rows.filter(o=>o.sup===s.sup));
+    return r+`<tr><td colspan="${all?11:9}" style="background:var(--soft)">${supForm(s.sup)}<div class="tbl-wrap"><table><tbody>${its.map(o=>`<tr>${all?`<td class="storetag">${o.store}</td>`:""}<td class="code">${esc(o.code)}</td><td class="desc">${itemBtn(o)}</td><td>${o.disc?'<span class="pill">Discontinued</span>':agePill(o)}</td><td>${ticket(o)}</td></tr>`).join("")}</tbody></table></div></td></tr>`;}).join("")||`<tr><td colspan="10" class="sub">No gaps at the latest check.</td></tr>`}
+  </tbody></table></div></section>`;
+  if(!all){
+    const s=S[0]; if(s.checks.length>1){
+      const supSet=ag.slice(0,6).map(x=>x.sup);
+      h+=`<section class="panel"><h2>Top suppliers over recent checks</h2><p class="hint">Gaps without stock per check for the six suppliers with the most gaps today.</p><div class="tbl-wrap"><table><thead><tr><th>Supplier</th>${s.checks.slice(-10).map(c=>`<th class="num">${fmtDate(c.date)}</th>`).join("")}</tr></thead><tbody>
+      ${supSet.map(name=>`<tr><td>${esc(name)}</td>${s.checks.slice(-10).map(c=>`<td class="num">${(c.noStock||[]).filter(r=>(r[3]||"(no supplier)")===name).length}</td>`).join("")}</tr>`).join("")}</tbody></table></div></section>`;
+    }
+  }
+  return h;
+}
+
+function followCell(s){
+  const sn=data.sup.get(supId(s.sup)); const orderable=s.items-s.disc; const t=todayISO();
+  if(!sn) return s.long?'<span class="pill warn">Not chased</span>':'<span class="sub">–</span>';
+  let h=`<span class="sub">Chased ${fmtDate(sn.chasedOn)}</span>`;
+  if(sn.eta) h+= orderable&&sn.eta<t?` <span class="pill crit">ETA ${fmtDate(sn.eta)} passed</span>`:` <span class="pill">ETA ${fmtDate(sn.eta)}</span>`;
+  return h;
+}
+function supForm(name){
+  const id=supId(name), key="sup:"+id, v=data.sup.get(id)||{};
+  const d=drafts[key]||(drafts[key]={chasedOn:v.chasedOn||todayISO(),eta:v.eta||"",reply:v.reply||""});
+  return `<div class="sup-form"><label>Chased on<input type="date" id="sf_chased" data-draft="${key}" data-field="chasedOn" value="${esc(d.chasedOn)}"></label>
+   <label>Expected delivery<input type="date" id="sf_eta" data-draft="${key}" data-field="eta" value="${esc(d.eta)}"></label>
+   <label class="wide">Rep's reply<input type="text" id="sf_reply" data-draft="${key}" data-field="reply" value="${esc(d.reply)}" placeholder="e.g. out at the warehouse, container due next week"></label>
+   <div class="acts">${v.updatedAt?`<span class="sub" style="margin-right:auto">Saved ${new Date(v.updatedAt).toLocaleString()}</span>`:""}<button class="btn sm primary" data-act="save-sup" data-name="${esc(name)}">Save follow-up</button></div></div>`;
+}
+
+/* Across stores */
+function viewCross(){
+  const a=analyse(); const m={};
+  for(const s of Object.values(a)) for(const o of s.outRows){(m[o.code]=m[o.code]||{code:o.code,desc:o.desc,sup:o.sup,disc:o.disc,stores:[]}).stores.push({c:s.code,days:o.days,isNew:o.isNew});}
+  const multi=Object.values(m).filter(x=>x.stores.length>=2).sort((x,y)=>y.stores.length-x.stores.length||Math.max(...y.stores.map(s=>s.days))-Math.max(...x.stores.map(s=>s.days)));
+  const q=ui.q.trim().toLowerCase(); const shown=multi.filter(x=>!q||x.desc.toLowerCase().includes(q)||x.code.includes(q)||x.sup.toLowerCase().includes(q));
+  const withStores=Object.values(a).filter(s=>s.latest).length;
+  return `<section class="panel"><div class="panel-head"><h2>Same item out in two or more stores</h2><span class="count">${shown.length} items</span></div>
+  <p class="hint">Compares each store's latest check. An item missing in several stores at once points to the supplier or warehouse, not the store's ordering. Based on ${plural(withStores,"store")} with imported checks.</p>
+  <div class="toolbar"><input type="search" id="q" placeholder="Search item, code or supplier" value="${esc(ui.q)}" aria-label="Search"></div>
+  ${withStores<2?'<p class="hint">Import checks for at least two stores to compare them.</p>':`<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Item</th><th>Supplier</th><th class="num">Stores</th><th>Stores and days out</th></tr></thead><tbody>
+  ${shown.map(x=>`<tr><td class="code">${esc(x.code)}</td><td class="desc">${itemBtn(x)}${x.disc?' <span class="pill">Discontinued</span>':""}</td><td>${esc(x.sup)}</td><td class="num"><b>${x.stores.length}</b></td><td><div class="mini">${x.stores.map(s=>`<span class="ticket ${ageClass(s)}" title="${esc(storeLabel(s.c))}">${s.c}<small>${s.days}d</small></span>`).join("")}</div></td></tr>`).join("")||'<tr><td colspan="5" class="sub">No item is out in more than one store.</td></tr>'}</tbody></table></div>`}</section>${transfersHTML(a)}`;
+}
+
+function transfersHTML(a){
+  if(ui.store==="all") return `<section class="panel"><h2>Transfer ideas</h2><p class="hint">Pick a store at the top to see items it is out of that other stores do not have on their gap lists.</p></section>`;
+  const me=a[ui.store]; if(!me?.latest) return "";
+  const t=todayISO(); const others=Object.values(a).filter(s=>s.code!==ui.store&&STORE_NAME[s.code]&&s.latest&&dayDiff(s.latest.date,t)<=3);
+  const sets=others.map(s=>({c:s.code,listed:new Set([...(s.latest.noStock||[]),...(s.latest.withStock||[])].map(r=>r[0]))}));
+  const rows=me.outRows.filter(o=>!o.disc).map(o=>({o,avail:sets.filter(x=>!x.listed.has(o.code)).map(x=>x.c)})).filter(x=>x.avail.length).sort((x,y)=>y.o.days-x.o.days);
+  return `<section class="panel"><div class="panel-head"><h2>Transfer ideas for ${esc(storeLabel(ui.store))}</h2><span class="count">${rows.length} items</span></div>
+  <p class="hint">Orderable items out at this store that are not on the gap list of another store checked in the last 3 days. Those stores probably have it on the shelf, unless they do not range the line. Also useful for spotting ordering misses: if the supplier delivers to other stores, the gap here is an ordering problem.</p>
+  ${!sets.length?'<p class="hint">Needs a recent check from at least one other store.</p>':`<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Item</th><th>Supplier</th><th>Out here</th><th>Not a gap at</th></tr></thead><tbody>
+  ${rows.slice(0,150).map(({o,avail})=>`<tr><td class="code">${esc(o.code)}</td><td class="desc">${itemBtn(o)}</td><td>${esc(o.sup)}</td><td>${ticket(o)}</td><td><div class="mini">${avail.map(c=>`<span class="ticket" title="${esc(storeLabel(c))}">${c}</span>`).join("")}</div></td></tr>`).join("")||'<tr><td colspan="5" class="sub">Every gap here is also a gap at the other stores.</td></tr>'}</tbody></table></div>`}</section>`;
+}
+
+/* Uploads */
+function viewHistory(){
+  const all=ui.store==="all";
+  const cs=[...data.checks.entries()].map(([id,c])=>({id,...c})).filter(c=>all||c.store===ui.store).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:a.store.localeCompare(b.store));
+  return `<section class="panel"><div class="panel-head"><h2>Imported checks</h2><span class="count">${plural(cs.length,"check")} · last ${HISTORY_DAYS} days</span></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Store</th><th class="num">No stock</th><th class="num">Discontinued</th><th class="num">With stock</th><th>File</th><th>Imported</th><th></th></tr></thead><tbody>
+  ${cs.map(c=>`<tr><td>${fmtDateY(c.date)}</td><td>${esc(storeLabel(c.store))}</td><td class="num">${(c.noStock||[]).length}</td><td class="num">${(c.noStock||[]).filter(r=>r[6]==="YES").length}</td><td class="num">${(c.withStock||[]).length}</td><td class="sub">${esc(c.filename||"")}</td><td class="sub">${c.uploadedAt?new Date(c.uploadedAt).toLocaleString():""}</td>
+   <td>${confirmDel===c.id?`<span style="display:inline-flex;gap:6px"><button class="btn sm" data-act="del-no">Keep</button><button class="btn sm danger" data-act="del-yes" data-id="${c.id}">Delete</button></span>`:`<button class="btn sm" data-act="del" data-id="${c.id}">Delete</button>`}</td></tr>`).join("")||'<tr><td colspan="8" class="sub">No checks imported for this store.</td></tr>'}
+  </tbody></table></div></section>`;
+}
+
+/* Item history drawer */
+function drawerHTML(code){
+  const a=analyse(); let info=null; const rows=[];
+  for(const s of Object.values(a)){
+    if(!s.checks.length) continue;
+    let outT=0,withT=0;
+    const cells=s.checks.map(c=>{
+      const n=(c.noStock||[]).find(r=>r[0]===code), w=n?null:(c.withStock||[]).find(r=>r[0]===code);
+      if(n){outT++; if(!info) info=rowObj(n);} if(w){withT++; if(!info) info=rowObj(w);}
+      return {date:c.date,st:n?"out":w?"with":"ok"};
+    });
+    const cur=s.outRows.find(o=>o.code===code), curW=s.withRows.find(o=>o.code===code);
+    rows.push({store:s.code,cells:cells.slice(-28),outT,withT,cur,curW,n:s.checks.length});
+  }
+  if(!info) info={code,desc:"Item "+code,sup:"",dept:"",cat:"",disc:false};
+  const invs=[...data.inv.values()].filter(v=>v.code===code);
+  const sn=data.sup.get(supId(info.sup));
+  const label={out:"No stock",with:"Stock on system, shelf empty",ok:"Not on gap list"};
+  return `<div class="backdrop" data-act="close-item"></div><aside class="drawer" role="dialog" aria-label="Item history">
+   <div class="drawer-head"><div><div class="code sub">${esc(code)}</div><h2>${esc(info.desc)}</h2><div class="sub">${esc(info.sup)} · ${esc(info.dept)}${info.cat?" / "+esc(info.cat):""}${info.disc?' · <span class="pill">Discontinued</span>':""}</div></div><button class="btn sm" data-act="close-item">Close</button></div>
+   <section class="panel"><div class="panel-head"><h3>Gap history by store</h3><div class="legend"><span><i style="background:var(--crit)"></i>No stock</span><span><i style="background:var(--warn)"></i>Stock on system</span><span><i style="background:var(--ok-bg);border:1px solid var(--line)"></i>Not on gap list</span></div></div>
+   ${rows.map(r=>`<div class="strip-row"><div><b class="storetag">${r.store}</b> ${esc(STORE_NAME[r.store]||"")}<div class="sub">${r.cur?(r.cur.disc?"Out, discontinued":`Out ${plural(r.cur.days,"day")}`):r.curW?"Stock on system":"Not a gap now"}</div></div>
+     <div><div class="strip">${r.cells.map(c=>`<span class="${c.st}" title="${fmtDate(c.date)}: ${label[c.st]}"></span>`).join("")}</div>
+     <div class="strip-dates"><span>${fmtDate(r.cells[0].date)}</span><span>${plural(r.outT,"time")} no stock · ${plural(r.withT,"time")} on system</span><span>${fmtDate(r.cells[r.cells.length-1].date)}</span></div></div></div>`).join("")||'<p class="hint">No checks imported yet.</p>'}
+   <p class="hint">One square per imported check, latest on the right (last 28). “Not on gap list” means the shelf was not reported empty, or the store does not range this line.</p></section>
+   ${invs.length?`<section class="panel"><h3>Investigations</h3>${invs.map(v=>`<div><b class="storetag">${v.store}</b> ${esc(STORE_NAME[v.store]||"")} · <span class="pill ${v.status==="Closed"?"ok":"warn"}">${esc(v.status||"Open")}</span><div class="sub">System ${v.systemStock??"–"} · ${esc(v.result||"Pending")}${v.qtyFound!==""&&v.qtyFound!=null?` (${v.qtyFound} found)`:""} · ${esc(v.cause||"")}</div>${v.notes?`<div class="sub">${esc(v.notes)}</div>`:""}</div>`).join("")}</section>`:""}
+   ${sn?`<section class="panel"><h3>Supplier follow-up</h3><div class="sub">${esc(info.sup)}: chased ${fmtDate(sn.chasedOn)}${sn.eta?` · expected ${fmtDate(sn.eta)}`:""}</div>${sn.reply?`<div>${esc(sn.reply)}</div>`:""}</section>`:""}
+  </aside>`;
+}
+
+/* Daily brief */
+function briefStore(s,th){
+  const L=[]; const d=s.latest; if(!d) return `${storeLabel(s.code)}: no gap check imported yet.`;
+  const out=s.outRows, ord=out.filter(o=>!o.disc), disc=out.filter(o=>o.disc), longs=ord.filter(o=>o.days>=th).sort((a,b)=>b.days-a.days);
+  L.push(`SPAR ${storeLabel(s.code)} – gap check ${fmtDate(d.date)}`);
+  L.push(`Gaps with no stock: ${out.length} (${disc.length} discontinued). New since last check: ${out.filter(o=>o.isNew).length}. Back on shelf: ${s.back.length}.`);
+  if(s.withRows.length){L.push("");L.push(`Stock on system but shelf empty (${s.withRows.length}) – please refill and send me the quantity found:`);s.withRows.forEach(o=>L.push(`- ${o.code} ${o.desc} (system ${o.stock??"?"})`));}
+  const pend=s.back.filter(o=>o.nowWith); if(pend.length){L.push("");L.push(`Delivered but not on shelf yet (${pend.length}):`);pend.forEach(o=>L.push(`- ${o.code} ${o.desc}`));}
+  if(longs.length){L.push("");L.push(`Orderable items out ${th}+ days (${longs.length}) – check ordering:`);longs.slice(0,25).forEach(o=>L.push(`- ${o.code} ${o.desc} – ${o.days} days (${o.sup})`));if(longs.length>25)L.push(`…and ${longs.length-25} more`);}
+  if(disc.length){L.push("");L.push(`Discontinued gaps (${disc.length}) – remove or replace the facings.`);}
+  return L.join("\n");
+}
+function briefSuppliers(rows,th){
+  const m={}; for(const o of rows) if(!o.disc&&o.days>=th){(m[o.sup]=m[o.sup]||{}); const x=m[o.sup][o.code]=m[o.sup][o.code]||{o,stores:[]}; x.stores.push(`${o.store}:${o.days}d`);}
+  return Object.entries(m).map(([sup,items])=>({sup,n:Object.keys(items).length,text:[`${sup} – items out of stock ${th}+ days`,...Object.values(items).sort((a,b)=>b.stores.length-a.stores.length).map(x=>`- ${x.o.code} ${x.o.desc} – stores ${x.stores.join(", ")}`),"","Please confirm availability and expected delivery date."].join("\n")})).sort((a,b)=>b.n-a.n);
+}
+function briefBox(id,title,text,sub=""){
+  const lines=Math.min(18,text.split("\n").length+1);
+  return `<section class="panel"><div class="panel-head"><div><h3>${esc(title)}</h3>${sub?`<div class="sub">${sub}</div>`:""}</div><button class="btn sm" data-act="copy" data-target="${id}">Copy</button></div><textarea class="brief" id="${id}" rows="${lines}" readonly>${esc(text)}</textarea></section>`;
+}
+function viewBrief(){
+  const S=selected().filter(s=>STORE_NAME[s.code]); const th=ui.briefDays;
+  const sups=briefSuppliers(S.flatMap(s=>s.outRows),th);
+  let h=`<section class="panel"><div class="panel-head"><h2>Daily brief</h2><div class="toolbar"><label for="fBrief">Flag orderable gaps out</label><select id="fBrief">${[1,2,3,5,7,14].map(d=>`<option value="${d}" ${d===th?"selected":""}>${d}+ days</option>`).join("")}</select></div></div>
+  <p class="hint">Ready-to-send text built from the latest checks. Copy it into WhatsApp or email for the store managers and supplier reps. Edit the threshold to make the lists shorter or longer.</p></section>`;
+  h+=`<h2>For store managers</h2><div class="grid2">${S.filter(s=>s.latest).map(s=>briefBox("brief_"+s.code,storeLabel(s.code),briefStore(s,th))).join("")||'<p class="hint">No checks imported yet.</p>'}</div>`;
+  h+=`<h2>For suppliers</h2>${sups.length?`<div class="grid2">${sups.map((x,i)=>{const sn=data.sup.get(supId(x.sup));return briefBox("bsup_"+i,x.sup,x.text,`${plural(x.n,"item")}${sn?` · last chased ${fmtDate(sn.chasedOn)}`:""}`);}).join("")}</div>`:`<p class="hint">No orderable items out ${th}+ days.</p>`}`;
+  return h;
+}
+
+/* ---------- exports ---------- */
+async function saveXlsx(name,sheets){
+  if(!downloads) return;
+  const wb=XLSX.utils.book_new(); for(const [n,rows] of sheets){const ws=XLSX.utils.aoa_to_sheet(rows); ws["!cols"]=rows[0].map((_,i)=>({wch:Math.min(50,Math.max(8,...rows.slice(0,200).map(r=>String(r[i]??"").length)))})); XLSX.utils.book_append_sheet(wb,ws,n);}
+  const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
+  try{ await downloads.save({filename:name,data:new Uint8Array(buf)}); toast("Saved "+name); }
+  catch(e){ if(e?.code!=="declined") toast("Could not save the file ("+(e?.code||"error")+")."); }
+}
+function exportOut(){
+  const S=selected(); const rows=sortRows(filterOut(S.flatMap(s=>s.outRows)));
+  const t=todayISO(), tag=ui.store==="all"?"all-stores":`${ui.store}-${STORE_NAME[ui.store]}`;
+  const items=[["Store","Item Code","Item Description","Department","Category","Supplier","Discontinued","Out since","Days out","New today","Times listed"]].concat(rows.map(o=>[storeLabel(o.store),o.code,o.desc,o.dept,o.cat,o.sup,o.disc?"YES":"NO",o.since,o.days,o.isNew?"Yes":"",o.times]));
+  const sup=[["Supplier","Gaps","Orderable","Discontinued","Out 7+ days","Avg days (orderable)","Longest (days)","Stores"]].concat(supplierAgg(rows).map(s=>[s.sup,s.items,s.items-s.disc,s.disc,s.long,+s.avg.toFixed(1),s.max,[...s.stores].join(", ")]));
+  saveXlsx(`gaps-${tag}-${t}.xlsx`,[["Items",items],["Suppliers",sup]]);
+}
+function exportInv(){
+  const v=[...data.inv.values()].filter(x=>ui.store==="all"||x.store===ui.store);
+  const rows=[["Store","Item Code","Item Description","Supplier","System stock","Result","Qty found","Units unaccounted","Cause","Status","Notes","Updated"]].concat(v.map(x=>[storeLabel(x.store),x.code,x.desc,x.sup,x.systemStock,x.result,x.qtyFound,Math.max(0,(+x.systemStock||0)-(+x.qtyFound||0)),x.cause,x.status,x.notes,x.updatedAt?new Date(x.updatedAt).toLocaleString():""]));
+  saveXlsx(`investigations-${ui.store==="all"?"all-stores":ui.store}-${todayISO()}.xlsx`,[["Investigations",rows]]);
+}
+
+/* ---------- events ---------- */
+async function savePending(i){
+  const p=pending[i]; if(!p.store){toast("Pick the store for "+p.filename);return false;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(p.date)){toast("Pick the check date for "+p.filename);return false;}
+  const id=`s${p.store}_${p.date}`;
+  try{ await putCheck(id,{store:p.store,date:p.date,filename:p.filename,uploadedAt:new Date().toISOString(),withStock:p.withStock,noStock:p.noStock}); }
+  catch(e){ toast(e?.code==="quota_exceeded"?"Storage is full. Delete old checks on the Uploads tab.":"Could not save: "+(e?.message||e?.code||"error")); return false; }
+  pending[i]=null; return true;
+}
+document.addEventListener("click",async e=>{
+  const it=e.target.closest("[data-item]"); if(it){ui.item=it.dataset.item;render();return;}
+  const b=e.target.closest("[data-store],[data-tab],[data-act],[data-sort],[data-sup]"); if(!b) return;
+  if(b.dataset.act){
+    const act=b.dataset.act, i=+b.dataset.i;
+    if(act==="pick") $("#fileInput").click();
+    else if(act==="discard"){pending.splice(i,1);render();}
+    else if(act==="discard-all"){pending=[];render();}
+    else if(act==="save"){b.disabled=true; const p=pending[i]; if(await savePending(i)){pending=pending.filter(Boolean); toast(`Saved ${storeLabel(p.store)} for ${fmtDate(p.date)}`); if(ui.store!=="all"&&ui.store!==p.store) ui.store=p.store;} render();}
+    else if(act==="save-all"){b.disabled=true; let n=0; for(let k=0;k<pending.length;k++) if(await savePending(k)) n++; pending=pending.filter(Boolean); toast(`Saved ${plural(n,"check")}`); render();}
+    else if(act==="edit"){const id=b.dataset.id; editing=editing===id?null:id; if(!editing) delete drafts[id]; render();}
+    else if(act==="save-inv"){
+      const id=b.dataset.id, d=drafts[id]; const a=analyse(); const s=a[b.dataset.store];
+      const o=s?.withRows.find(x=>x.code===b.dataset.code); const prev=data.inv.get(id)||{};
+      const doc={store:b.dataset.store,code:b.dataset.code,desc:o?.desc??prev.desc??"",sup:o?.sup??prev.sup??"",systemStock:o?.stock??prev.systemStock??null,firstListed:prev.firstListed||o?.since||todayISO(),
+        result:d.result,qtyFound:d.qtyFound===""?"":Number(d.qtyFound),cause:d.cause,notes:d.notes,status:d.status,updatedAt:new Date().toISOString()};
+      b.disabled=true;
+      try{ await putInv(id,doc); editing=null; delete drafts[id]; toast("Investigation saved"); }catch(err){ toast("Could not save: "+(err?.message||err?.code||"error")); b.disabled=false; }
+      render();
+    }
+    else if(act==="del"){confirmDel=b.dataset.id;render();}
+    else if(act==="del-no"){confirmDel=null;render();}
+    else if(act==="del-yes"){try{await removeCheck(b.dataset.id);toast("Check deleted");}catch(err){toast("Could not delete: "+(err?.code||"error"));} confirmDel=null; render();}
+    else if(act==="close-item"){ui.item=null;render();}
+    else if(act==="copy"){const ta=document.getElementById(b.dataset.target); try{await navigator.clipboard.writeText(ta.value);toast("Copied");}catch{ta.focus();ta.select();toast("Text selected. Press Ctrl+C to copy.");}}
+    else if(act==="save-sup"){const name=b.dataset.name,id=supId(name),d=drafts["sup:"+id]; b.disabled=true;
+      try{await putSup(id,{name,chasedOn:d.chasedOn||todayISO(),eta:d.eta||"",reply:d.reply||"",updatedAt:new Date().toISOString()}); delete drafts["sup:"+id]; toast("Follow-up saved for "+name);}catch(err){toast("Could not save: "+(err?.message||err?.code||"error"));} render();}
+    else if(act==="export-out") exportOut();
+    else if(act==="export-inv") exportInv();
+    return;
+  }
+  if(b.dataset.sort){ui.sort=b.dataset.sort;render();return;}
+  if(b.dataset.sup!=null){ui.openSup=ui.openSup===b.dataset.sup?null:b.dataset.sup;render();return;}
+  if(b.dataset.store){ui.store=b.dataset.store;ui.supplier="";ui.dept="";editing=null;saveUI();render();return;}
+  if(b.dataset.tab){ui.tab=b.dataset.tab;editing=null;saveUI();render();window.scrollTo({top:0});}
+});
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="q"){ui.q=t.value;render();}
+  else if(t.dataset.draft){drafts[t.dataset.draft][t.dataset.field]=t.value;}
+  else if(t.dataset.pend!=null&&t.dataset.field==="date"){pending[+t.dataset.pend].date=t.value;}
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.id==="fSup"){ui.supplier=t.value;render();} else if(t.id==="fDept"){ui.dept=t.value;render();}
+  else if(t.id==="fDisc"){ui.disc=t.value;render();} else if(t.id==="fMin"){ui.minDays=+t.value;render();}
+  else if(t.id==="fSys"){ui.sysFilter=t.value;render();}
+  else if(t.id==="fBrief"){ui.briefDays=+t.value;render();}
+  else if(t.dataset.draft){drafts[t.dataset.draft][t.dataset.field]=t.value;}
+  else if(t.dataset.pend!=null){pending[+t.dataset.pend][t.dataset.field]=t.value;render();}
+});
+addEventListener("keydown",e=>{if(e.key==="Escape"&&ui.item){ui.item=null;render();}});
+$("#importBtn").addEventListener("click",()=>$("#fileInput").click());
+$("#fileInput").addEventListener("change",e=>{handleFiles([...e.target.files]);e.target.value="";});
+let dragN=0;
+addEventListener("dragenter",e=>{if([...(e.dataTransfer?.types||[])].includes("Files")){dragN++;document.body.classList.add("dragging");}});
+addEventListener("dragleave",()=>{if(--dragN<=0){dragN=0;document.body.classList.remove("dragging");}});
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",e=>{e.preventDefault();dragN=0;document.body.classList.remove("dragging");const f=[...(e.dataTransfer?.files||[])];if(f.length)handleFiles(f);});
+
+render();
+initStorage();
+</script>
+
+</body></html>

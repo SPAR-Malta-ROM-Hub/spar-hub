@@ -1,0 +1,1356 @@
+<!doctype html><html><head><meta charset=utf8><meta name="spar-tool" content="shop-tracker"><meta name="robots" content="noindex,nofollow"><script src="firebase-config.js"></script><script src="spar-runtime.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SPAR Malta Shop Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header with tabs; single column of cards that widens into a 2–3 column grid on laptop. */
+:root{
+  --bg:#F2F5F3; --panel:#FFFFFF; --panel-2:#F7F9F8; --fg:#13201A; --muted:#5A6B62; --line:#DCE4DF;
+  --accent:#0A7A42; --accent-ink:#FFFFFF; --brand-red:#D2232A;
+  --ok:#1E8A4C; --warn:#B86E00; --bad:#C62B31; --info:#3D6A9E;
+  --c-act:#0A7A42; --c-tgt:#6B7A72; --c-ly:#5B7BB0; --c-bar:#9CCBB0;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1411; --panel:#141E19; --panel-2:#19251F; --fg:#E4EDE8; --muted:#93A59B; --line:#26352D;
+  --accent:#3BC47D; --accent-ink:#06130C; --brand-red:#F0565C;
+  --ok:#47C784; --warn:#E5A53C; --bad:#F06469; --info:#86A9D9;
+  --c-act:#3BC47D; --c-tgt:#8A9A91; --c-ly:#8FAEE0; --c-bar:#2F5A43; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1411; --panel:#141E19; --panel-2:#19251F; --fg:#E4EDE8; --muted:#93A59B; --line:#26352D;
+  --accent:#3BC47D; --accent-ink:#06130C; --brand-red:#F0565C;
+  --ok:#47C784; --warn:#E5A53C; --bad:#F06469; --info:#86A9D9;
+  --c-act:#3BC47D; --c-tgt:#8A9A91; --c-ly:#8FAEE0; --c-bar:#2F5A43; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:10px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.01em;margin:0;line-height:1.1}
+.brand h1 .tag{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--brand-red);margin-right:8px;vertical-align:2px}
+.brand .sub{color:var(--muted);font-size:13px}
+.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync.live i{background:var(--ok)} .sync.err i{background:var(--bad)}
+.brand-side{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rep-msg{margin-top:16px;border-radius:8px;padding:10px 12px;font-size:14px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;border:1px solid var(--line);background:var(--panel)}
+.rep-msg.ok{background:color-mix(in srgb,var(--ok) 12%,var(--panel));border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.rep-msg.warn{background:color-mix(in srgb,var(--warn) 14%,var(--panel));border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.rep-msg.bad{background:color-mix(in srgb,var(--bad) 12%,var(--panel));border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.rep-msg button{flex:none}
+.cp-inputs{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px}
+.cp-pair{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cp-dates{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cp-summary{margin-top:14px;font-size:15px}
+.cp-notes{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:2px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{font:600 15px var(--f-body);background:none;border:0;color:var(--muted);padding:10px 14px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px}
+nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.badge{font:700 11px var(--f-body);background:var(--bad);color:#fff;border-radius:9px;padding:1px 6px;min-width:18px;text-align:center}
+.badge[data-zero="1"]{display:none}
+section.tab{display:flex;flex-direction:column;gap:16px;padding-top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:600;font-size:19px;letter-spacing:.01em;margin:0 0 4px;text-wrap:balance}
+.card .hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg{display:flex;flex-wrap:wrap;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg button{font:500 13px var(--f-body);border:0;background:none;color:var(--muted);padding:6px 10px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+.seg button:focus-visible,.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input,select,textarea{font:500 16px var(--f-body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+input[type=date]{padding:7px 8px}
+.btn{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:9px 14px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:none}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.sm{padding:6px 10px;font-size:13px}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* Entry */
+.daterow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.chip{display:flex;align-items:center;justify-content:space-between;gap:6px;font:600 15px var(--f-body);text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:10px 12px;cursor:pointer}
+.chip small{font-weight:500;font-size:12px;color:var(--muted)}
+.chip .st{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex:none;border:1.5px dashed var(--muted);color:var(--muted)}
+.chip.done .st{background:var(--ok);border:0;color:#fff}
+.chip.draft .st{border-color:var(--warn);color:var(--warn);border-style:solid}
+.chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.form-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.form-head h2{font-size:24px;margin:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:13px;color:var(--muted);font-weight:600}
+.field input{font-family:var(--f-display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;width:100%}
+.field.big input{font-size:28px}
+.field .ref{font-size:12px;color:var(--muted)}
+.group-title{margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.group-title::after{content:"";flex:1;height:1px;background:var(--line)}
+textarea{width:100%;min-height:60px;resize:vertical;font-size:15px}
+.preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:16px;background:var(--panel-2);border-radius:8px;padding:12px}
+.preview div{display:flex;flex-direction:column}
+.preview b{font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums}
+.preview span{font-size:12px;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center}
+.actions .spacer{flex:1}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}
+
+/* KPI tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .v{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .d{font-size:13px;color:var(--muted)}
+.up{color:var(--ok)} .down{color:var(--bad)} .flat{color:var(--muted)} .mid{color:var(--warn)}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;margin-inline:-4px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:right;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr.total td{font-weight:700;border-bottom:0;border-top:2px solid var(--line)}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--panel-2)}
+td.note{white-space:normal;text-align:left;color:var(--muted);font-size:13px;min-width:160px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.info{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.heat td{text-align:center;font-size:13px;padding:7px 8px;vertical-align:top;border-left:1px solid var(--panel)}
+.heat td b{display:block;font-size:15px;font-weight:700;margin-bottom:2px}
+.heat td small{display:block;font-size:12px;white-space:nowrap;line-height:1.35}
+.heat td small .hk{color:var(--muted)}
+.heat th:first-child,.heat td:first-child{position:sticky;left:0;z-index:1;background:var(--panel);vertical-align:middle}
+.heat tr.total td{border-top:2px solid var(--line)}
+.heat td.h-ok2{background:color-mix(in srgb,var(--ok) 42%,transparent)}
+.heat td.h-ok1{background:color-mix(in srgb,var(--ok) 18%,transparent)}
+.heat td.h-warn{background:color-mix(in srgb,var(--warn) 25%,transparent)}
+.heat td.h-bad{background:color-mix(in srgb,var(--bad) 30%,transparent)}
+
+/* Alerts */
+/* Departments */
+#up-card.drag{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.up-file{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.up-file .err{color:var(--bad)}
+td.chg{font-weight:600}
+tr.dept{cursor:pointer} tr.dept:hover td{background:var(--panel-2)}
+tr.dept td:first-child::before{content:"▸";display:inline-block;width:14px;color:var(--muted)}
+tr.dept.open td:first-child::before{content:"▾"}
+tr.cat td{font-size:13px;color:var(--muted);background:var(--panel-2)}
+tr.cat td:first-child{padding-left:30px}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:grid;grid-template-columns:minmax(0,150px) 1fr auto;gap:10px;align-items:center;font-size:14px}
+.bar-row .track{height:10px;background:var(--panel-2);border-radius:5px;overflow:hidden}
+.bar-row .fill{height:100%;background:var(--warn);border-radius:5px}
+.bar-row .fill.g{background:var(--ok)} .bar-row .fill.r{background:var(--bad)}
+.bar-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-row .val{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.eurd{font-weight:500;opacity:.85;white-space:nowrap}
+.movers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert{display:grid;grid-template-columns:4px 1fr;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px 10px 0;overflow:hidden}
+.alert .bar{border-radius:0 3px 3px 0}
+.alert.bad .bar{background:var(--bad)} .alert.warn .bar{background:var(--warn)} .alert.good .bar{background:var(--ok)} .alert.info .bar{background:var(--info)}
+.alert .t{font-weight:600}
+.alert .t small{font-weight:600;color:var(--muted);font-size:12px;letter-spacing:.05em;text-transform:uppercase;margin-right:6px}
+.alert .x{color:var(--muted);font-size:14px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Charts */
+.chart{position:relative;width:100%;min-height:200px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--muted);font:12px var(--f-body)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:4px;margin-right:6px}
+.legend i.dash{background:repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 7px)!important}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:13px;padding:7px 9px;border-radius:6px;line-height:1.35;max-width:240px;z-index:3;font-variant-numeric:tabular-nums}
+.tip b{font-weight:600}
+.empty{color:var(--muted);padding:24px 0;text-align:center;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:calc(100% - 32px)}
+.banner{background:color-mix(in srgb,var(--warn) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line));border-radius:8px;padding:10px 12px;font-size:14px}
+.muted{color:var(--muted)}
+.row-between{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+/* Targets */
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:16px}
+.tg-card h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
+.tg-card .tot{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.days7{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.days7 .field input{font-family:var(--f-display);font-size:19px;font-weight:600;padding:7px 8px;font-variant-numeric:tabular-nums;width:100%}
+.days7 .field label{font-size:12px}
+.days7 .field.waste label{color:var(--warn)}
+.tg-card.changed{border-color:var(--warn)}
+@media (max-width:520px){.tile .v{font-size:27px}.brand h1{font-size:21px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div>
+        <h1><span class="tag" aria-hidden="true"></span>SPAR Malta · My 6 Shops</h1>
+        <div class="sub">Paceville · Balluta · Valletta · Wembley · Voco · Steps</div>
+      </div>
+      <div class="brand-side">
+        <div class="sync" id="sync"><i></i><span>Connecting…</span></div>
+        <button class="btn primary sm" id="rep-btn" type="button" hidden>Generate weekly report</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="enter" aria-selected="true" id="t-enter">Enter figures</button>
+      <button role="tab" data-tab="overview" aria-selected="false" id="t-overview">Overview</button>
+      <button role="tab" data-tab="compare" aria-selected="false" id="t-compare">Compare</button>
+      <button role="tab" data-tab="trends" aria-selected="false" id="t-trends">Trends</button>
+      <button role="tab" data-tab="dept" aria-selected="false" id="t-dept">Departments</button>
+      <button role="tab" data-tab="alerts" aria-selected="false" id="t-alerts">Alerts <span class="badge" id="alert-badge" data-zero="1">0</span></button>
+      <button role="tab" data-tab="targets" aria-selected="false" id="t-targets">Targets</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="rep-msg" class="rep-msg" hidden role="status"><span id="rep-text"></span><button class="btn sm ghost" id="rep-close" type="button">Close</button></div>
+  <div id="nodb" class="banner" hidden style="margin-top:16px">Saving and loading figures isn't available in this view. Open the tracker from its link while signed in to Claude.</div>
+
+  <!-- ENTER -->
+  <section class="tab" id="tab-enter">
+    <div class="card">
+      <div class="row-between" style="margin-bottom:12px">
+        <div class="daterow">
+          <button class="btn sm" id="e-prev" aria-label="Previous day">‹</button>
+          <input type="date" id="e-date" aria-label="Trading day">
+          <button class="btn sm" id="e-next" aria-label="Next day">›</button>
+          <button class="btn sm ghost" id="e-yday">Yesterday</button>
+          <button class="btn sm" id="e-upload">Upload report</button>
+        </div>
+        <span class="muted" id="e-progress"></span>
+      </div>
+      <div class="chips" id="e-shops"></div>
+    </div>
+
+    <div class="card" id="e-form">
+      <div class="form-head">
+        <h2 id="e-title">—</h2>
+        <span class="muted" id="e-sub"></span>
+      </div>
+      <div class="fields">
+        <div class="field big"><label for="f-s">Sales (€)</label><input id="f-s" inputmode="decimal" autocomplete="off" placeholder="0.00"><span class="ref" id="r-s"></span></div>
+        <div class="field big"><label for="f-c">Customers</label><input id="f-c" inputmode="numeric" autocomplete="off" placeholder="0"><span class="ref" id="r-c"></span></div>
+        <div class="field big"><label for="f-w">Waste (€)</label><input id="f-w" inputmode="decimal" autocomplete="off" placeholder="0.00"><span class="ref" id="r-w"></span></div>
+      </div>
+      <div class="preview" id="e-preview"></div>
+
+      <div class="group-title label">Hours</div>
+      <div class="fields">
+        <div class="field"><label for="f-ph">Planned hours</label><input id="f-ph" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="f-ah">Actual worked hours</label><input id="f-ah" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="f-sick">Sick hours</label><input id="f-sick" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="f-lv">Leave hours</label><input id="f-lv" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="f-tr">Training hours</label><input id="f-tr" inputmode="decimal" autocomplete="off"></div>
+      </div>
+
+      <div class="group-title label">Targets for this day</div>
+      <div class="fields">
+        <div class="field"><label for="f-t">Sales target (€)</label><input id="f-t" inputmode="decimal" autocomplete="off"><span class="ref" id="r-t"></span></div>
+        <div class="field"><label for="f-wt">Waste target (€)</label><input id="f-wt" inputmode="decimal" autocomplete="off"></div>
+      </div>
+
+      <div class="group-title label">Comment</div>
+      <textarea id="f-note" placeholder="Anything that explains the day: weather, roadworks, event, stock issue…"></textarea>
+
+      <div class="actions">
+        <button class="btn primary" id="e-save">Save</button>
+        <span class="muted" id="e-state"></span>
+        <span class="spacer"></span>
+        <span id="e-clearwrap"><button class="btn danger sm" id="e-clear">Clear this day</button></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="g-title">Day at a glance</h2>
+      <p class="hint">All six shops for the day you're entering.</p>
+      <div class="tbl-wrap"><table id="g-table"></table></div>
+    </div>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section class="tab" id="tab-overview" hidden>
+    <div class="controls">
+      <input type="date" id="o-date" aria-label="Up to date">
+      <div class="seg" id="o-period"></div>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn sm" id="o-export" hidden>Export CSV</button>
+    </div>
+    <div class="muted" id="o-range" style="margin-top:-6px"></div>
+    <div class="tiles" id="o-tiles"></div>
+    <div class="card">
+      <div class="row-between"><h2>Things to watch</h2><button class="btn sm ghost" id="o-allalerts">See all alerts</button></div>
+      <div class="alerts" id="o-watch" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>Shop by shop</h2>
+      <p class="hint">Tap a shop to see its trends. "vs LY" compares only days where the shop also traded last year.</p>
+      <div class="tbl-wrap"><table id="o-table"></table></div>
+    </div>
+    <div class="card">
+      <h2 id="o-out-title">Month-end outlook</h2>
+      <p class="hint">Projected = sales so far this month + the remaining daily targets × each shop's achievement over the last 8 weeks. "Needed per day" is what each shop must average from tomorrow to hit the month target. Year to date is sales as % of target.</p>
+      <div class="tbl-wrap"><table id="o-outlook"></table></div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section class="tab" id="tab-compare" hidden>
+    <div class="card">
+      <h2>Compare two periods</h2>
+      <p class="hint">Choose what to compare and a date inside the period. The comparison period is the one just before it. Choose "Any dates" to set both periods yourself.</p>
+      <div class="controls">
+        <div class="seg" id="cp-mode"></div>
+      </div>
+      <div class="cp-inputs" id="cp-preset">
+        <div class="field"><label for="cp-end">Date in the period</label><input type="date" id="cp-end"></div>
+      </div>
+      <div class="cp-inputs" id="cp-custom" hidden>
+        <div class="cp-pair"><span class="label">Period</span><div class="cp-dates"><input type="date" id="cp-a1" aria-label="Period start"><span class="muted">to</span><input type="date" id="cp-a2" aria-label="Period end"></div></div>
+        <div class="cp-pair"><span class="label">Compared with</span><div class="cp-dates"><input type="date" id="cp-b1" aria-label="Comparison start"><span class="muted">to</span><input type="date" id="cp-b2" aria-label="Comparison end"></div></div>
+      </div>
+      <div class="cp-summary" id="cp-summary"></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn primary" id="cp-report" type="button" hidden>Get the full report for these dates</button>
+        <span class="muted" id="cp-report-hint"></span>
+      </div>
+    </div>
+    <div class="tiles" id="cp-tiles"></div>
+    <div class="card">
+      <h2>Shop by shop</h2>
+      <p class="hint" id="cp-table-hint"></p>
+      <div class="tbl-wrap"><table id="cp-table"></table></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Sales by shop</h2>
+        <div class="legend" id="cp-legend1"></div>
+        <div class="chart" id="cp-chart1"></div>
+      </div>
+      <div class="card">
+        <h2>Above or below target</h2>
+        <div class="legend" id="cp-legend2"></div>
+        <div class="chart" id="cp-chart2"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRENDS -->
+  <section class="tab" id="tab-trends" hidden>
+    <div class="controls">
+      <select id="tr-shop" aria-label="Shop"></select>
+      <div class="seg" id="tr-metric"></div>
+    </div>
+    <div class="card">
+      <h2 id="tr-w-title">Week by week</h2>
+      <p class="hint" id="tr-w-hint"></p>
+      <div class="legend" id="tr-w-legend"></div>
+      <div class="chart" id="tr-weekly"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Last 6 weeks, day by day</h2>
+        <p class="hint">Bars are each day; the line is the 7-day average, which smooths out weekday swings so the direction is easier to see.</p>
+        <div class="legend" id="tr-d-legend"></div>
+        <div class="chart" id="tr-daily"></div>
+      </div>
+      <div class="card">
+        <h2>Day-of-week pattern</h2>
+        <p class="hint">Average per weekday: last 8 full weeks against the 8 weeks before. Useful for rosters and ordering.</p>
+        <div class="legend" id="tr-dow-legend"></div>
+        <div class="chart" id="tr-dow"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row-between"><h2>Weekly heat map</h2><div class="seg" id="tr-heatmode"></div></div>
+      <p class="hint" id="tr-heat-hint"></p>
+      <div class="tbl-wrap"><table class="heat" id="tr-heat"></table></div>
+    </div>
+  </section>
+
+  <!-- DEPARTMENTS -->
+  <section class="tab" id="tab-dept" hidden>
+    <div class="card" id="up-card">
+      <div class="row-between">
+        <div style="min-width:0;flex:1">
+          <h2>Upload daily report</h2>
+          <p class="hint" style="margin:0">Pick the report file for one or more shops. Sales, customers and waste fill in for every day in the file, and the department figures below update. Uploading the same week again replaces it with the newer figures.</p>
+        </div>
+        <label class="btn primary" for="up-file" style="display:inline-block">Choose report files</label>
+        <input type="file" id="up-file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+      </div>
+      <div id="up-preview"></div>
+    </div>
+    <div id="rp-body"></div>
+  </section>
+
+  <!-- ALERTS -->
+  <section class="tab" id="tab-alerts" hidden>
+    <div class="card">
+      <h2>Alerts</h2>
+      <p class="hint" id="a-hint"></p>
+      <div class="filters" id="a-filter" style="margin-bottom:12px"></div>
+      <div class="alerts" id="a-list"></div>
+    </div>
+    <div class="card">
+      <h2>How alerts are worked out</h2>
+      <p class="hint" style="margin:0">Checked every time figures change: missing entries in the last 7 days · 3+ days in a row below target · week-to-date under 95% · waste over target or rising · basket spend falling vs the previous 8 weeks · fewer customers than last year · a day unusually high or low for its weekday · labour productivity dropping · month-end projection off target.</p>
+    </div>
+  </section>
+  <!-- TARGETS -->
+  <section class="tab" id="tab-targets" hidden>
+    <div class="card">
+      <div class="row-between">
+        <div class="daterow">
+          <button class="btn sm" id="tg-prev" aria-label="Previous month">‹</button>
+          <h2 id="tg-month" style="margin:0;min-width:150px;text-align:center">—</h2>
+          <button class="btn sm" id="tg-next" aria-label="Next month">›</button>
+        </div>
+        <div class="daterow">
+          <button class="btn sm" id="tg-copy">Copy last month</button>
+          <button class="btn primary" id="tg-save">Save targets</button>
+        </div>
+      </div>
+      <p class="hint" id="tg-status" style="margin:10px 0 0"></p>
+    </div>
+    <div class="tg-grid" id="tg-shops"></div>
+    <div class="card">
+      <h2>Month summary</h2>
+      <p class="hint">Month target = each weekday's target × how many of that weekday fall in the month. Compare against last month and against what the shop actually sold in the same month last year.</p>
+      <div class="tbl-wrap"><table id="tg-summary"></table></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const SHOPS=[{id:'PCV',name:'Paceville'},{id:'BAL',name:'Balluta'},{id:'VAL',name:'Valletta'},{id:'STJ',name:'Wembley'},{id:'VOC',name:'Voco'},{id:'STP',name:'Steps'}];
+const SHOP=Object.fromEntries(SHOPS.map(s=>[s.id,s]));
+const ALL=SHOPS.map(s=>s.id);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- dates ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const toD=s=>new Date(s+'T00:00:00Z');
+const ds=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=toD(s);d.setUTCDate(d.getUTCDate()+n);return ds(d)};
+const dow=s=>(toD(s).getUTCDay()+6)%7; // 0=Mon
+const monday=s=>addDays(s,-dow(s));
+const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtShortD=s=>{const d=toD(s);return d.getUTCDate()+' '+MON[d.getUTCMonth()]};
+const fmtLong=s=>{const d=toD(s);return DOW[dow(s)]+' '+d.getUTCDate()+' '+MON[d.getUTCMonth()]+' '+d.getUTCFullYear()};
+function isoWeek(s){const d=toD(s);d.setUTCDate(d.getUTCDate()-dow(s)+3);const y=d.getUTCFullYear();const j4=new Date(Date.UTC(y,0,4));const w=1+Math.round(((d-j4)/864e5-3+((j4.getUTCDay()+6)%7))/7);return{y,w}}
+const yearStart=y=>monday(y+'-01-04');
+const yearEnd=y=>addDays(yearStart(y+1),-1);
+function todayLocal(){const n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())}
+const yesterday=()=>addDays(todayLocal(),-1);
+const rangeCache=new Map();
+function range(a,b){const k=a+b;let r=rangeCache.get(k);if(r)return r;r=[];for(let d=a;d<=b;d=addDays(d,1))r.push(d);if(rangeCache.size>4000)rangeCache.clear();rangeCache.set(k,r);return r}
+
+/* ---------- format ---------- */
+const num=v=>(typeof v==='number'&&isFinite(v))?v:null;
+const eur=v=>v==null?'—':(v<0?'−':'')+'€'+Math.abs(Math.round(v)).toLocaleString('en-GB');
+const eur2=v=>v==null?'—':(v<0?'−':'')+'€'+Math.abs(v).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+const int=v=>v==null?'—':Math.round(v).toLocaleString('en-GB');
+const pctA=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const pctD=v=>v==null?'—':(v>=0?'+':'−')+Math.abs(v*100).toFixed(1)+'%';
+const cls=(v,good=true)=>v==null?'flat':(Math.abs(v)<0.005?'flat':((v>0)===good?'up':'down'));
+const axisEur=v=>Math.abs(v)>=1e6?'€'+(v/1e6).toFixed(1)+'m':Math.abs(v)>=1e3?'€'+(v/1e3).toFixed(Math.abs(v)>=1e4?0:1)+'k':'€'+Math.round(v);
+const axisInt=v=>Math.abs(v)>=1e3?(v/1e3).toFixed(Math.abs(v)>=1e4?0:1)+'k':String(Math.round(v));
+
+/* ---------- data ---------- */
+let D={}; ALL.forEach(id=>D[id]={});
+let monthDocs={}; let first={}; let latest=null; let loaded=false;
+const hasSales=r=>!!r&&num(r.s)!=null&&r.s>0;
+function rebuild(){
+  D={};ALL.forEach(id=>D[id]={});first={};latest=null;
+  for(const k in monthDocs){const m=monthDocs[k];if(!m||!D[m.shop]||!m.days)continue;for(const d in m.days){const r=m.days[d];if(r&&typeof r==='object')D[m.shop][d]=r}}
+  for(const id of ALL){const dates=Object.keys(D[id]).filter(d=>hasSales(D[id][d])).sort();if(dates.length){first[id]=dates[0];const l=dates[dates.length-1];if(!latest||l>latest)latest=l}}
+}
+function ly(id,d){const r=D[id][d];if(r&&num(r.s25)!=null&&r.s25>0)return{s:r.s25,c:num(r.c25)};const p=D[id][addDays(d,-364)];if(hasSales(p))return{s:p.s,c:num(p.c)};return null}
+/* Targets: a day's own override (tx/wtx) → the month's weekday targets → the target loaded with the day. */
+let monthTargets={};
+function mT(id,d){const m=monthTargets[d.slice(0,7)];return m&&m.shops&&m.shops[id]?m.shops[id]:null}
+function tgtBase(id,d){const m=mT(id,d);if(m&&Array.isArray(m.d)&&num(m.d[dow(d)])!=null)return m.d[dow(d)];const r=D[id][d];return r?num(r.t):null}
+function wtgtBase(id,d){const m=mT(id,d);if(m&&num(m.w)!=null)return m.w;const r=D[id][d];return r?num(r.wt):null}
+function tgt(id,d){const r=D[id][d];if(r&&num(r.tx)!=null)return r.tx;return tgtBase(id,d)}
+function wtgt(id,d){const r=D[id][d];if(r&&num(r.wtx)!=null)return r.wtx;return wtgtBase(id,d)}
+function agg(ids,from,to){return from>to?aggDays(ids,[]):aggDays(ids,range(from,to))}
+function aggDays(ids,days){
+  const a={s:0,t:0,c:0,w:0,wt:0,wtW:0,h:0,hs:0,lyS:0,lfS:0,lyC:0,lfC:0,days:0,wDays:0};
+  for(const id of ids){const rows=D[id];for(const d of days){const r=rows[d];if(!hasSales(r))continue;
+    a.days++;a.s+=r.s;a.t+=tgt(id,d)||0;a.c+=num(r.c)||0;
+    if(num(r.w)!=null){a.w+=r.w;a.wDays++;const wt=wtgt(id,d);if(wt){a.wt+=wt;a.wtW+=r.w}}
+    const h=num(r.ah)||num(r.ph);if(h){a.h+=h;a.hs+=r.s}
+    const L=ly(id,d);if(L){a.lyS+=L.s;a.lfS+=r.s;if(L.c&&num(r.c)){a.lyC+=L.c;a.lfC+=r.c}}
+  }}
+  return fin(a);
+}
+function fin(a){
+  a.ach=a.t?a.s/a.t:null;a.basket=a.c?a.s/a.c:null;a.wPct=a.s&&a.wDays?a.w/a.s:null;a.wVsT=a.wt?a.wtW/a.wt:null;
+  a.sph=a.h?a.hs/a.h:null;a.lyG=a.lyS?a.lfS/a.lyS-1:null;a.lyCG=a.lyC?a.lfC/a.lyC-1:null;
+  a.lyBasket=a.lyC?a.lyS/a.lyC:null;a.lyBG=(a.lyC&&a.lfC)?(a.lfS/a.lfC)/(a.lyS/a.lyC)-1:null;
+  a.lyW=a.lyS;return a;
+}
+function sumT(id,from,to){let t=0;for(const d of range(from,to)){const v=tgt(id,d);if(v)t+=v}return t}
+
+/* ---------- state ---------- */
+const S={tab:'enter',
+  e:{date:yesterday(),shop:null,dirty:false,drafts:{}},
+  o:{date:null,period:'wtd'},
+  tr:{shop:'ALL',metric:'sales',heat:'ach'},
+  a:{filter:'all'}};
+try{const t=localStorage.getItem('spar.tab');if(t)S.tab=t;const tr=JSON.parse(localStorage.getItem('spar.tr')||'null');if(tr)Object.assign(S.tr,tr)}catch(e){}
+let db=null, downloads=null, canWrite=true;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function setTab(t){S.tab=t;try{localStorage.setItem('spar.tab',t)}catch(e){}
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  TABS.forEach(x=>$('tab-'+x).hidden=x!==t);render();}
+const TABS=['enter','overview','compare','trends','dept','alerts','targets'];
+
+/* ---------- toast ---------- */
+let toastT;function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+
+/* ================= ENTER ================= */
+const F=['s','c','w','ph','ah','sick','lv','tr','t','wt'];
+const key=()=>S.e.shop+'|'+S.e.date;
+function entryRow(id,d){return D[id][d]||{}}
+function readForm(){const o={};for(const f of F){const v=$('f-'+f).value.trim().replace(/[€,\s]/g,'');o[f]=v===''?null:(isFinite(+v)?+v:NaN)}o.note=$('f-note').value.trim()||null;return o}
+function fillForm(){
+  const id=S.e.shop,d=S.e.date,r=entryRow(id,d),dr=S.e.drafts[key()];
+  const src=dr||r;
+  for(const f of F){const v=src[f];$('f-'+f).value=v==null||v===''?'':String(v)}
+  $('f-note').value=src.note||'';
+  if(!dr){const t=tgt(id,d),wt=wtgt(id,d);$('f-t').value=t==null?'':t;$('f-wt').value=wt==null?'':wt}
+  const tb=tgtBase(id,d),own=num(r.tx)!=null,mon=!!mT(id,d);
+  $('r-t').textContent=own?'Changed for this day only (month target '+eur(tb)+')':mon?'From the '+MON[+d.slice(5,7)-1]+' targets ('+DOW[dow(d)]+')':(tb!=null?'Loaded with the day':'No target set for '+MON[+d.slice(5,7)-1]+' yet. Add it on the Targets tab');
+  S.e.dirty=!!dr;
+  $('e-title').textContent=SHOP[id].name;
+  $('e-sub').textContent=fmtLong(d)+' · week '+isoWeek(d).w;
+  const L=ly(id,d);
+  $('r-s').textContent=L?'Last year same day: '+eur(L.s):'No last-year figure';
+  $('r-c').textContent=L&&L.c?'Last year: '+int(L.c):'';
+  updatePreview();clearConfirm(false);
+}
+function updatePreview(){
+  const o=readForm(),id=S.e.shop,d=S.e.date,L=ly(id,d);
+  const items=[];
+  const ach=o.s&&o.t?o.s/o.t:null;
+  items.push(['vs target',ach==null?'—':pctA(ach),ach==null?'flat':ach>=1?'up':ach>=.95?'mid':'down']);
+  const g=o.s&&L?o.s/L.s-1:null;items.push(['vs last year',pctD(g),cls(g)]);
+  const b=o.s&&o.c?o.s/o.c:null;const lb=L&&L.c?L.s/L.c:null;items.push(['Basket spend',b==null?'—':eur2(b),b&&lb?cls(b/lb-1):'flat']);
+  const wp=o.s&&o.w!=null?o.w/o.s:null;items.push(['Waste % of sales',wp==null?'—':(wp*100).toFixed(2)+'%',o.w!=null&&o.wt?(o.w<=o.wt?'up':'down'):'flat']);
+  const h=o.ah||o.ph;items.push(['Sales per hour',o.s&&h?eur(o.s/h):'—','flat']);
+  $('e-preview').innerHTML=items.map(([l,v,c])=>`<div><b class="${c}">${v}</b><span>${l}</span></div>`).join('');
+  $('r-w').textContent=o.wt!=null?'Target '+eur2(o.wt)+(o.w!=null?(o.w>o.wt?' · over by '+eur2(o.w-o.wt):' · under by '+eur2(o.wt-o.w)):''):'';
+  $('e-state').textContent=S.e.dirty?'Unsaved changes':(hasSales(entryRow(id,d))?'Saved':'Not entered yet');
+}
+function renderChips(){
+  const d=S.e.date;let done=0;
+  $('e-shops').innerHTML=SHOPS.map(s=>{const r=D[s.id][d];const ok=hasSales(r);if(ok)done++;const dr=S.e.drafts[s.id+'|'+d];
+    return `<button class="chip ${ok?'done':''} ${dr?'draft':''}" aria-pressed="${s.id===S.e.shop}" data-shop="${s.id}"><span>${s.name}<br><small>${ok?eur(r.s):dr?'Draft':'To enter'}</small></span><span class="st">${ok?'✓':''}</span></button>`}).join('');
+  $('e-progress').textContent=done+' of 6 shops entered';
+  $('e-shops').querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{stash();S.e.shop=c.dataset.shop;renderEnter(true)}));
+}
+function stash(){if(S.e.dirty)S.e.drafts[key()]=readForm()}
+function renderGlance(){
+  const d=S.e.date;$('g-title').textContent='Day at a glance · '+fmtLong(d);
+  let rows='',tot={s:0,t:0,c:0,w:0,wt:0};
+  for(const s of SHOPS){const r=D[s.id][d]||{};const ok=hasSales(r);const L=ly(s.id,d);const T=tgt(s.id,d),WT=wtgt(s.id,d);
+    if(ok){tot.s+=r.s;tot.t+=T||0;tot.c+=num(r.c)||0;tot.w+=num(r.w)||0;tot.wt+=WT||0}
+    const ach=ok&&T?r.s/T:null;
+    rows+=`<tr class="click" data-shop="${s.id}"><td>${s.name}</td><td>${ok?eur(r.s):'<span class="pill warn">Missing</span>'}</td><td>${eur(T)}</td><td class="${ach==null?'flat':ach>=1?'up':ach>=.95?'mid':'down'}">${pctA(ach)}</td><td class="${cls(ok&&L?r.s/L.s-1:null)}">${ok&&L?pctD(r.s/L.s-1):'—'}</td><td>${int(num(r.c))}</td><td>${ok&&r.c?eur2(r.s/r.c):'—'}</td><td class="${num(r.w)!=null&&WT?(r.w<=WT?'up':'down'):''}">${num(r.w)!=null?eur(r.w):'—'}</td><td class="note">${esc(r.note||'')}</td></tr>`}
+  $('g-table').innerHTML=`<thead><tr><th>Shop</th><th>Sales</th><th>Target</th><th>Achv</th><th>vs LY</th><th>Customers</th><th>Basket</th><th>Waste</th><th>Comment</th></tr></thead><tbody>${rows}<tr class="total"><td>Total</td><td>${eur(tot.s)}</td><td>${eur(tot.t)}</td><td>${pctA(tot.t?tot.s/tot.t:null)}</td><td></td><td>${int(tot.c)}</td><td>${tot.c?eur2(tot.s/tot.c):'—'}</td><td>${eur(tot.w)}</td><td></td></tr></tbody>`;
+  $('g-table').querySelectorAll('tr.click').forEach(tr=>tr.addEventListener('click',()=>{stash();S.e.shop=tr.dataset.shop;renderEnter(true);$('e-form').scrollIntoView({behavior:'smooth',block:'start'})}));
+}
+function pickDefaultShop(){const d=S.e.date;const m=SHOPS.find(s=>!hasSales(D[s.id][d]));return (m||SHOPS[0]).id}
+function renderEnter(refill){
+  $('e-date').value=S.e.date;
+  if(!S.e.shop)S.e.shop=pickDefaultShop();
+  renderChips();
+  if(refill||!S.e.dirty)fillForm();else updatePreview();
+  renderGlance();
+}
+function setEntryDate(d){if(!d)return;stash();S.e.date=d;S.e.shop=pickDefaultShop();renderEnter(true)}
+$('e-date').addEventListener('change',e=>setEntryDate(e.target.value));
+$('e-prev').addEventListener('click',()=>setEntryDate(addDays(S.e.date,-1)));
+$('e-next').addEventListener('click',()=>setEntryDate(addDays(S.e.date,1)));
+$('e-yday').addEventListener('click',()=>setEntryDate(yesterday()));
+[...F.map(f=>'f-'+f),'f-note'].forEach(id=>$(id).addEventListener('input',()=>{S.e.dirty=true;updatePreview();const c=$('e-shops').querySelector(`[data-shop="${S.e.shop}"]`);if(c&&!c.classList.contains('done'))c.classList.add('draft')}));
+document.querySelectorAll('#e-form input').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save()}}));
+$('e-save').addEventListener('click',save);
+
+async function writeDay(id,d,row){
+  const mid=id+'_'+d.slice(0,7);const ref=db.doc('months/'+mid);
+  if(monthDocs[mid]){await ref.update({days:{[d]:row}})}
+  else{const snap=await ref.get();if(snap.exists)await ref.update({days:{[d]:row}});else await ref.set({shop:id,month:d.slice(0,7),days:{[d]:row}})}
+}
+async function save(){
+  if(!db){toast('Saving isn\'t available in this view');return}
+  const o=readForm();
+  const bad=F.filter(f=>Number.isNaN(o[f]));
+  if(bad.length){toast('Check the number in '+bad.map(f=>$('f-'+f).previousElementSibling.textContent).join(', '));return}
+  if(o.s==null){toast('Enter the sales figure first');$('f-s').focus();return}
+  const id=S.e.shop,d=S.e.date,prev=entryRow(id,d);
+  const row={...prev};for(const f of F)if(f!=='t'&&f!=='wt')row[f]=o[f];row.note=o.note;row.at=new Date().toISOString();
+  // a target typed here that differs from the month's target is kept for this day only
+  const tb=tgtBase(id,d),wb=wtgtBase(id,d);
+  row.tx=o.t!=null&&o.t!==tb?o.t:null;row.wtx=o.wt!=null&&o.wt!==wb?o.wt:null;
+  $('e-save').disabled=true;$('e-state').textContent='Saving…';
+  try{await writeDay(id,d,row);
+    D[id][d]=row;delete S.e.drafts[key()];S.e.dirty=false;
+    toast('Saved '+SHOP[id].name+' · '+fmtShortD(d));
+    const next=SHOPS.find(s=>s.id!==id&&!hasSales(D[s.id][d])&&!S.e.drafts[s.id+'|'+d]);
+    if(next){S.e.shop=next.id}
+    renderEnter(true);
+    if(next)$('f-s').focus({preventScroll:true});
+  }catch(e){
+    $('e-state').textContent='';
+    if(e&&e.code==='invalid_argument'){canWrite=false;toast('You can view this tracker but not change it')}
+    else if(e&&e.code==='quota_exceeded')toast('Storage is full. Ask Claude to archive old months.');
+    else toast('Couldn\'t save. Check your connection and press Save again.');
+  }finally{$('e-save').disabled=false}
+}
+function clearConfirm(show){
+  const w=$('e-clearwrap');
+  if(!show){w.innerHTML='<button class="btn danger sm" id="e-clear">Clear this day</button>';$('e-clear').addEventListener('click',()=>clearConfirm(true));return}
+  w.innerHTML='<span class="confirm">Remove sales, waste and hours for this day? <button class="btn danger sm" id="e-clear-yes">Remove</button><button class="btn sm" id="e-clear-no">Keep</button></span>';
+  $('e-clear-no').addEventListener('click',()=>clearConfirm(false));
+  $('e-clear-yes').addEventListener('click',async()=>{
+    const id=S.e.shop,d=S.e.date,prev=entryRow(id,d);const row={...prev};['s','c','w','ah','sick','lv','tr','note'].forEach(f=>row[f]=null);row.at=new Date().toISOString();
+    try{await writeDay(id,d,row);D[id][d]=row;delete S.e.drafts[key()];S.e.dirty=false;toast('Cleared '+SHOP[id].name+' · '+fmtShortD(d));renderEnter(true)}catch(e){toast('Couldn\'t clear. Try again.')}
+  });
+}
+
+/* ================= OVERVIEW ================= */
+const PERIODS=[['day','Day'],['wtd','Week to date'],['lw','Last week'],['mtd','Month to date'],['l28','Last 28 days'],['ytd','Year to date']];
+function periodRange(p,R){
+  switch(p){
+    case 'day':return{from:R,to:R,prev:[addDays(R,-7),addDays(R,-7)],label:fmtLong(R),prevLabel:'same day last week'};
+    case 'wtd':{const m=monday(R);return{from:m,to:R,prev:[addDays(m,-7),addDays(R,-7)],label:'Week '+isoWeek(R).w+' · '+fmtShortD(m)+' – '+fmtShortD(R),prevLabel:'same days last week'}}
+    case 'lw':{const m=addDays(monday(R),-7);return{from:m,to:addDays(m,6),prev:[addDays(m,-7),addDays(m,-1)],label:'Week '+isoWeek(m).w+' · '+fmtShortD(m)+' – '+fmtShortD(addDays(m,6)),prevLabel:'the week before'}}
+    case 'mtd':{const f=R.slice(0,8)+'01';const n=range(f,R).length;const pf=addDays(f,-1).slice(0,8)+'01';return{from:f,to:R,prev:[pf,addDays(pf,n-1)],label:MON[+R.slice(5,7)-1]+' 1 – '+fmtShortD(R),prevLabel:'same days last month'}}
+    case 'l28':return{from:addDays(R,-27),to:R,prev:[addDays(R,-55),addDays(R,-28)],label:fmtShortD(addDays(R,-27))+' – '+fmtShortD(R),prevLabel:'the 28 days before'};
+    default:{const y=isoWeek(R).y;const f=yearStart(y);return{from:f,to:R,prev:null,label:'Year '+y+' · '+fmtShortD(f)+' – '+fmtShortD(R),prevLabel:''}}
+  }
+}
+$('o-period').innerHTML=PERIODS.map(([k,l])=>`<button data-p="${k}" aria-pressed="false">${l}</button>`).join('');
+$('o-period').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S.o.period=b.dataset.p;renderOverview()}));
+$('o-date').addEventListener('change',e=>{if(e.target.value){S.o.date=e.target.value;render()}});
+$('o-allalerts').addEventListener('click',()=>setTab('alerts'));
+function refDate(){return S.o.date||latest||yesterday()}
+function tile(label,v,d){return `<div class="tile"><span class="label">${label}</span><span class="v">${v}</span><span class="d">${d}</span></div>`}
+function achCls(a){return a==null?'flat':a>=1?'up':a>=.95?'mid':'down'}
+function renderOverview(){
+  const R=refDate();$('o-date').value=R;
+  $('o-period').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p===S.o.period)));
+  const P=periodRange(S.o.period,R);const a=agg(ALL,P.from,P.to);const pv=P.prev?agg(ALL,P.prev[0],P.prev[1]):null;
+  $('o-range').textContent=P.label+(a.days?'':' · no figures yet');
+  const vsPrev=(x,y)=>pv&&y?`<span class="${cls(x/y-1)}">${pctD(x/y-1)}</span> vs ${P.prevLabel}`:'';
+  $('o-tiles').innerHTML=[
+    tile('Sales',eur(a.s),`Target ${eur(a.t)} · <span class="${achCls(a.ach)}">${pctA(a.ach)}</span>`),
+    tile('vs last year',`<span class="${cls(a.lyG)}">${pctD(a.lyG)}</span>`,a.lyS?`${eur(a.lfS)} vs ${eur(a.lyS)} (shops open last year)`:'No last-year figures'),
+    tile('Customers',int(a.c),a.lyCG!=null?`<span class="${cls(a.lyCG)}">${pctD(a.lyCG)}</span> vs last year`:vsPrev(a.c,pv&&pv.c)),
+    tile('Avg basket',a.basket?eur2(a.basket):'—',a.lyBG!=null?`<span class="${cls(a.lyBG)}">${pctD(a.lyBG)}</span> vs last year`:''),
+    tile('Waste',eur(a.w),`${a.wPct!=null?(a.wPct*100).toFixed(2)+'% of sales':''}${a.wVsT!=null?` · <span class="${a.wVsT<=1?'up':'down'}">${pctA(a.wVsT)} of target</span>`:''}`),
+    tile('Sales per hour',a.sph?eur(a.sph):'—',pv&&pv.sph&&a.sph?vsPrev(a.sph,pv.sph):'Sales ÷ labour hours'),
+  ].join('');
+  // watch list
+  const al=getAlerts().filter(x=>x.sev!=='info');
+  $('o-watch').innerHTML=al.length?al.slice(0,5).map(alertHTML).join(''):'<div class="empty">Nothing needs attention right now.</div>';
+  // shop table
+  let rows='';
+  for(const s of SHOPS){const x=agg([s.id],P.from,P.to);const p=P.prev?agg([s.id],P.prev[0],P.prev[1]):null;
+    const st=x.ach==null?'':x.ach>=1?'<span class="pill ok">On target</span>':x.ach>=.95?'<span class="pill warn">Close</span>':'<span class="pill bad">Behind</span>';
+    rows+=`<tr class="click" data-shop="${s.id}"><td><b>${s.name}</b></td><td>${eur(x.s)}</td><td>${eur(x.t)}</td><td class="${achCls(x.ach)}">${pctA(x.ach)}</td><td>${st}</td><td class="${cls(x.lyG)}">${pctD(x.lyG)}</td><td class="${p&&p.s?cls(x.s/p.s-1):'flat'}">${p&&p.s?pctD(x.s/p.s-1):'—'}</td><td>${int(x.c)}</td><td>${x.basket?eur2(x.basket):'—'}</td><td>${eur(x.w)}</td><td class="${x.wVsT==null?'':x.wVsT<=1?'up':'down'}">${pctA(x.wVsT)}</td><td>${x.wPct!=null?(x.wPct*100).toFixed(2)+'%':'—'}</td><td>${x.sph?eur(x.sph):'—'}</td></tr>`}
+  rows+=`<tr class="total"><td>All shops</td><td>${eur(a.s)}</td><td>${eur(a.t)}</td><td class="${achCls(a.ach)}">${pctA(a.ach)}</td><td></td><td class="${cls(a.lyG)}">${pctD(a.lyG)}</td><td class="${pv&&pv.s?cls(a.s/pv.s-1):'flat'}">${pv&&pv.s?pctD(a.s/pv.s-1):'—'}</td><td>${int(a.c)}</td><td>${a.basket?eur2(a.basket):'—'}</td><td>${eur(a.w)}</td><td class="${a.wVsT==null?'':a.wVsT<=1?'up':'down'}">${pctA(a.wVsT)}</td><td>${a.wPct!=null?(a.wPct*100).toFixed(2)+'%':'—'}</td><td>${a.sph?eur(a.sph):'—'}</td></tr>`;
+  $('o-table').innerHTML=`<thead><tr><th>Shop</th><th>Sales</th><th>Target</th><th>Achv</th><th></th><th>vs LY</th><th title="${esc(P.prevLabel)}">vs prev</th><th>Customers</th><th>Basket</th><th>Waste</th><th>Waste vs tgt</th><th>Waste %</th><th>Sales/hr</th></tr></thead><tbody>${rows}</tbody>`;
+  $('o-table').querySelectorAll('tr.click').forEach(tr=>tr.addEventListener('click',()=>{S.tr.shop=tr.dataset.shop;saveTr();setTab('trends')}));
+  // outlook
+  let orow='',T={ytd:0,fy:0,proj:0,need:0,doing:0,yS:0,yT:0};
+  for(const s of SHOPS){const o=outlook(s.id,R);if(!o)continue;for(const k in T)T[k]+=o[k];orow+=outRow(s.name,o)}
+  if(T.fy){T.gap=T.proj/T.fy-1;orow+=outRow('All shops',T,true)}
+  $('o-out-title').textContent='Month-end outlook · '+MON[+R.slice(5,7)-1]+' '+R.slice(0,4);
+  $('o-outlook').innerHTML=orow?`<thead><tr><th>Shop</th><th>Month so far</th><th>Month target</th><th>Projected</th><th>vs target</th><th>Needed per day</th><th>Doing per day (14d)</th><th>Year to date</th></tr></thead><tbody>${orow}</tbody>`:'<tbody><tr><td class="muted">No targets loaded for this month yet.</td></tr></tbody>';
+  $('o-export').hidden=!downloads;
+}
+function outRow(name,o,tot){return `<tr class="${tot?'total':''}"><td>${tot?name:'<b>'+name+'</b>'}</td><td>${eur(o.ytd)}</td><td>${eur(o.fy)}</td><td>${eur(o.proj)}</td><td class="${cls(o.gap)}">${pctD(o.gap)}</td><td>${eur(o.need)}</td><td class="${o.doing>=o.need?'up':'down'}">${eur(o.doing)}</td><td class="${cls(o.yS&&o.yT?o.yS/o.yT-1:null)}">${o.yT?pctA(o.yS/o.yT):'—'}</td></tr>`}
+function monthEnd(R){const d=toD(R.slice(0,8)+'01');d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);return ds(d)}
+function outlook(id,R){
+  const ms=R.slice(0,8)+'01',me=monthEnd(R);
+  const mtd=agg([id],ms,R);if(!mtd.days)return null;
+  const mt=sumT(id,ms,me);if(!mt)return null;
+  const rem=R<me?range(addDays(R,1),me):[];const remT=rem.length?sumT(id,rem[0],me):0;
+  const tr=agg([id],addDays(R,-55),R).ach||1;
+  const proj=mtd.s+remT*tr;
+  const avgD=n=>{const a=agg([id],addDays(R,-n+1),R);const dd=new Set();range(addDays(R,-n+1),R).forEach(d=>{if(hasSales(D[id][d]))dd.add(d)});return dd.size?a.s/dd.size:0};
+  const yt=agg([id],yearStart(isoWeek(R).y),R);
+  return{ytd:mtd.s,fy:mt,proj,gap:proj/mt-1,need:rem.length?Math.max(0,(mt-mtd.s)/rem.length):0,doing:avgD(14),yS:yt.s,yT:yt.t};
+}
+$('o-export').addEventListener('click',async()=>{
+  if(!downloads)return;
+  const R=refDate(),P=periodRange(S.o.period,R);
+  const head=['Date','Week','Shop','Sales target','Sales','Customers','Basket spend','Last year sales','Waste target','Waste','Planned hours','Actual hours','Sick hours','Leave hours','Training hours','Comment'];
+  const q=v=>v==null?'':(/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v));
+  const lines=[head.join(',')];
+  for(const d of range(P.from,P.to))for(const s of SHOPS){const r=D[s.id][d]||{};if(!hasSales(r)&&!tgt(s.id,d))continue;const L=ly(s.id,d);
+    lines.push([d,isoWeek(d).w,s.name,tgt(s.id,d),num(r.s),num(r.c),hasSales(r)&&r.c?(r.s/r.c).toFixed(2):'',L?L.s:'',wtgt(s.id,d),num(r.w),num(r.ph),num(r.ah),num(r.sick),num(r.lv),num(r.tr),r.note||''].map(q).join(','))}
+  try{await downloads.save({filename:'spar-shops-'+P.from+'-to-'+P.to+'.csv',data:lines.join('\n')})}catch(e){if(e&&e.code!=='declined')toast('Export isn\'t available here')}
+});
+
+/* ================= ALERTS ================= */
+const SEV={bad:0,warn:1,good:2,info:3};
+let alertCache=null,alertKey='';
+function getAlerts(){const k=refDate()+'|'+yesterday()+'|'+dataVersion;if(k===alertKey&&alertCache)return alertCache;alertKey=k;alertCache=computeAlerts(refDate());return alertCache}
+let dataVersion=0;
+function computeAlerts(R){
+  const out=[];const push=(sev,shop,title,detail)=>out.push({sev,shop,title,detail});
+  const Y=yesterday();
+  { // targets for the coming month
+    const td=todayLocal(),nm=addMonths(td.slice(0,7),1),cm=td.slice(0,7),ALLS={id:'ALL',name:'All shops'};
+    const has=m=>monthTargets[m]||SHOPS.some(s=>monthDays(m).some(d=>D[s.id][d]&&num(D[s.id][d].t)));
+    if(!has(cm))push('bad',ALLS,'No targets set for '+monthName(cm),'Add them on the Targets tab so achievement can be worked out.');
+    if(+td.slice(8)>=20&&!has(nm))push('warn',ALLS,'Targets for '+monthName(nm)+' not set yet','Add them on the Targets tab before the 1st.');
+  }
+  for(const s of SHOPS){const id=s.id,rows=D[id];if(!first[id])continue;
+    // missing entries (last 7 days to yesterday)
+    const miss=range(addDays(Y,-6),Y).filter(d=>d>=first[id]&&!hasSales(rows[d]));
+    if(miss.length)push(miss.includes(Y)&&miss.length===1?'warn':'bad',s,miss.length===1?'Missing figures for '+fmtLong(miss[0]):miss.length+' days missing in the last week',miss.length>1?'Missing: '+miss.map(fmtShortD).join(', ')+'.':'Enter them on the Enter figures tab so the totals are complete.');
+    const r=rows[R];
+    // streaks
+    let below=0,d=R;while(hasSales(rows[d])&&tgt(id,d)&&rows[d].s<tgt(id,d)){below++;d=addDays(d,-1)}
+    let above=0;d=R;while(hasSales(rows[d])&&tgt(id,d)&&rows[d].s>=tgt(id,d)){above++;d=addDays(d,-1)}
+    if(below>=3){const x=agg([id],addDays(R,-below+1),R);push(below>=5?'bad':'warn',s,below+' days in a row below target',`Short by ${eur(x.t-x.s)} over those days (${pctA(x.ach)} of target).`)}
+    if(above>=5)push('good',s,above+' days in a row on or above target','Keep doing whatever is working.');
+    // week to date
+    const m=monday(R);const wk=agg([id],m,R);
+    if(wk.days>=3&&wk.ach!=null){if(wk.ach<.95)push('warn',s,`Week ${isoWeek(R).w} at ${pctA(wk.ach)} of target so far`,`${eur(wk.t-wk.s)} behind with ${7-wk.days} day${7-wk.days===1?'':'s'} left this week.`);
+      else if(wk.ach>=1.08)push('good',s,`Week ${isoWeek(R).w} running at ${pctA(wk.ach)} of target`,`${eur(wk.s-wk.t)} ahead so far this week.`)}
+    // waste
+    const w7=agg([id],addDays(R,-6),R),w56=agg([id],addDays(R,-62),addDays(R,-7));
+    if(w7.wVsT!=null&&w7.wVsT>1.1)push(w7.wVsT>1.5?'bad':'warn',s,`Waste ${pctA(w7.wVsT)} of target over the last 7 days`,`${eur(w7.wtW-w7.wt)} over target. Check ordering and markdowns.`);
+    if(w7.wPct!=null&&w56.wPct&&w7.wPct>w56.wPct*1.25&&w7.w>50)push('warn',s,'Waste is rising',`${(w7.wPct*100).toFixed(2)}% of sales this week vs ${(w56.wPct*100).toFixed(2)}% over the previous 8 weeks.`);
+    // basket
+    const b14=agg([id],addDays(R,-13),R),b56=agg([id],addDays(R,-69),addDays(R,-14));
+    if(b14.basket&&b56.basket&&b14.days>=7){const g=b14.basket/b56.basket-1;
+      if(g<=-.03)push('warn',s,'Basket spend is falling',`${eur2(b14.basket)} in the last 2 weeks vs ${eur2(b56.basket)} before (${pctD(g)}). Look at promotions and upselling at the till.`);
+      else if(g>=.04)push('good',s,'Basket spend is growing',`${eur2(b14.basket)} in the last 2 weeks vs ${eur2(b56.basket)} before (${pctD(g)}).`)}
+    // customers vs LY
+    if(b14.lyCG!=null&&b14.lyCG<=-.05)push('warn',s,'Fewer customers than last year',`${pctD(b14.lyCG)} customers over the last 2 weeks${b14.lyG!=null?', sales '+pctD(b14.lyG):''}.`);
+    // unusual day
+    if(hasSales(r)){const same=[1,2,3,4,5,6].map(k=>rows[addDays(R,-7*k)]).filter(hasSales).map(x=>x.s);
+      if(same.length>=4){const avg=same.reduce((p,c)=>p+c,0)/same.length;const dv=r.s/avg-1;
+        if(Math.abs(dv)>=.2)push(dv>0?'info':'warn',s,`${DOW[dow(R)]} ${fmtShortD(R)} was ${pctD(dv)} vs a normal ${DOW[dow(R)]}`,`${eur(r.s)} against an average of ${eur(avg)} over the last ${same.length} ${DOW[dow(R)]}s.${r.note?' Comment: “'+r.note+'”':' Add a comment to explain it.'}`)}}
+    // record day
+    if(hasSales(r)){const ys=yearStart(isoWeek(R).y);let mx=0;for(const dd of range(ys,addDays(R,-1))){const x=rows[dd];if(hasSales(x)&&x.s>mx)mx=x.s}if(mx&&r.s>mx)push('good',s,'Best day of the year',`${eur(r.s)} on ${fmtLong(R)}. Previous best ${eur(mx)}.`)}
+    // labour
+    if(w7.sph&&w56.sph&&w7.sph<w56.sph*.9)push('warn',s,'Sales per labour hour dropping',`${eur(w7.sph)} per hour over the last 7 days vs ${eur(w56.sph)} before. Check the roster against trade.`);
+    // outlook
+    const o=outlook(id,R);const mn=MON[+R.slice(5,7)-1];if(o&&o.fy){if(o.gap<-.02)push('warn',s,`On course to finish ${mn} ${pctD(o.gap)} vs target`,`Projected ${eur(o.proj)} vs ${eur(o.fy)}. Needs ${eur(o.need)} a day from here; averaging ${eur(o.doing)} over the last 2 weeks.`);
+      else if(o.gap>.03)push('good',s,`On course to beat the ${mn} target by ${pctD(o.gap)}`,`Projected ${eur(o.proj)} vs ${eur(o.fy)}.`)}
+  }
+  return out.sort((a,b)=>SEV[a.sev]-SEV[b.sev]);
+}
+function alertHTML(x){const tag={bad:'Act now',warn:'Watch',good:'Good news',info:'Note'}[x.sev];
+  return `<div class="alert ${x.sev}"><span class="bar"></span><div><div class="t"><small>${esc(x.shop.name)}</small>${esc(x.title)}</div><div class="x">${esc(x.detail)}</div></div></div>`}
+function renderAlerts(){
+  const al=getAlerts();const f=S.a.filter;
+  $('a-hint').textContent='Based on figures up to '+fmtLong(refDate())+'. Change the date on the Overview tab to look back.';
+  const opts=[['all','All'],['bad','Act now'],['warn','Watch'],['good','Good news'],...SHOPS.map(s=>[s.id,s.name])];
+  $('a-filter').innerHTML='<div class="seg">'+opts.map(([k,l])=>`<button data-f="${k}" aria-pressed="${k===f}">${l}</button>`).join('')+'</div>';
+  $('a-filter').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S.a.filter=b.dataset.f;renderAlerts()}));
+  const list=al.filter(x=>f==='all'||x.sev===f||x.shop.id===f);
+  $('a-list').innerHTML=list.length?list.map(alertHTML).join(''):'<div class="empty">No alerts in this view.</div>';
+}
+function updateBadge(){const n=getAlerts().filter(x=>x.sev==='bad'||x.sev==='warn').length;const b=$('alert-badge');b.textContent=n;b.dataset.zero=n?'0':'1'}
+
+/* ================= TRENDS ================= */
+const METRICS={
+  sales:{label:'Sales',fmt:eur,axis:axisEur,v:a=>a.days?a.s:null,t:a=>a.t||null,ly:a=>a.lyS||null,zero:true},
+  ach:{label:'Achievement',fmt:pctA,axis:v=>Math.round(v*100)+'%',v:a=>a.ach,ref:1,zero:false},
+  cust:{label:'Customers',fmt:int,axis:axisInt,v:a=>a.days?a.c:null,ly:a=>a.lyC||null,zero:true},
+  basket:{label:'Basket spend',fmt:eur2,axis:v=>'€'+v.toFixed(2),v:a=>a.basket,ly:a=>a.lyBasket,zero:false},
+  waste:{label:'Waste €',fmt:eur,axis:axisEur,v:a=>a.wDays?a.w:null,t:a=>a.wt||null,zero:true},
+  wpct:{label:'Waste %',fmt:v=>v==null?'—':(v*100).toFixed(2)+'%',axis:v=>(v*100).toFixed(1)+'%',v:a=>a.wPct,zero:true},
+  sph:{label:'Sales/hour',fmt:eur,axis:v=>'€'+Math.round(v),v:a=>a.sph,zero:false},
+};
+$('tr-metric').innerHTML=Object.entries(METRICS).map(([k,m])=>`<button data-m="${k}" aria-pressed="false">${m.label}</button>`).join('');
+$('tr-metric').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S.tr.metric=b.dataset.m;saveTr();renderTrends()}));
+$('tr-shop').innerHTML='<option value="ALL">All 6 shops</option>'+SHOPS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+$('tr-shop').addEventListener('change',e=>{S.tr.shop=e.target.value;saveTr();renderTrends()});
+const HEAT=[['ach','vs target'],['ly','vs last year'],['waste','Waste vs target'],['basket','Basket spend']];
+$('tr-heatmode').innerHTML=HEAT.map(([k,l])=>`<button data-h="${k}" aria-pressed="false">${l}</button>`).join('');
+$('tr-heatmode').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S.tr.heat=b.dataset.h;saveTr();renderHeat()}));
+function saveTr(){try{localStorage.setItem('spar.tr',JSON.stringify(S.tr))}catch(e){}}
+const ids=()=>S.tr.shop==='ALL'?ALL:[S.tr.shop];
+
+function renderTrends(){
+  if(!METRICS[S.tr.metric])S.tr.metric='sales';
+  $('tr-shop').value=S.tr.shop;
+  $('tr-metric').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===S.tr.metric)));
+  const M=METRICS[S.tr.metric],R=refDate(),I=ids();
+  // weekly
+  const y=isoWeek(R).y;let wkStart=yearStart(y);const lastMon=monday(R);const complete=dow(R)===6;
+  const weeks=[];for(let m=wkStart;m<=lastMon;m=addDays(m,7)){if(m===lastMon&&!complete&&!['ach','basket','wpct','sph'].includes(S.tr.metric))break;weeks.push(m)}
+  const labels=[],act=[],tgt=[],lyv=[],notes=[];
+  for(const m of weeks){const a=agg(I,m,addDays(m,6));labels.push('Wk '+isoWeek(m).w);act.push(M.v(a));tgt.push(M.t?M.t(a):null);lyv.push(M.ly?M.ly(a):null);notes.push(fmtShortD(m)+' – '+fmtShortD(addDays(m,6))+(a.days<7*I.length&&a.days?' · partial':''))}
+  const series=[{name:'This year',values:act,color:'var(--c-act)',width:2.5,dot:true}];
+  if(M.t&&tgt.some(v=>v))series.push({name:'Target',values:tgt,color:'var(--c-tgt)',dash:true,width:1.5});
+  if(M.ly&&lyv.some(v=>v))series.push({name:'Last year',values:lyv,color:'var(--c-ly)',width:1.5});
+  $('tr-w-title').textContent=M.label+' week by week · '+(S.tr.shop==='ALL'?'all 6 shops':SHOP[S.tr.shop].name);
+  const lyOnly=I.filter(id=>!agg([id],addDays(R,-90),R).lyS).map(id=>SHOP[id].name);
+  $('tr-w-hint').textContent=(M.ly&&lyOnly.length&&lyOnly.length<I.length?'Last year line covers only shops that traded last year ('+lyOnly.join(', ')+' opened in 2026). ':'')+'Hover or tap a point for the figures.';
+  legend('tr-w-legend',series.concat(M.ref?[{name:'100% target',color:'var(--c-tgt)',dash:true}]:[]));
+  chart($('tr-weekly'),{labels,series,fmt:M.fmt,axis:M.axis,zero:M.zero,ref:M.ref,sub:notes,height:260});
+  // daily 42
+  const days=range(addDays(R,-41),R);const dl=[],dv=[],d7=[],dt=[],dn=[];
+  const isSum=['sales','cust','waste'].includes(S.tr.metric);
+  for(const d of days){const a=agg(I,d,d);dl.push(DOW[dow(d)].slice(0,2)+' '+fmtShortD(d));dv.push(M.v(a));dt.push(M.t?M.t(a):null);
+    if(isSum){const vs=range(addDays(d,-6),d).map(x=>M.v(agg(I,x,x))).filter(v=>v!=null);d7.push(vs.length?vs.reduce((p,c)=>p+c,0)/vs.length:null)}
+    else{const w=agg(I,addDays(d,-6),d);d7.push(w.days?M.v(w):null)}
+    dn.push(I.map(id=>D[id][d]&&D[id][d].note?(I.length>1?SHOP[id].name+': ':'')+D[id][d].note:'').filter(Boolean).join(' · '))}
+  const ds2=[{name:'Each day',values:dv,color:'var(--c-bar)',type:'bar'},{name:'7-day average',values:d7,color:'var(--c-act)',width:2.5,dot:true}];
+  if(M.t&&dt.some(v=>v))ds2.push({name:'Target',values:dt,color:'var(--c-tgt)',dash:true,width:1.5});
+  legend('tr-d-legend',ds2.concat(M.ref?[{name:'100% target',color:'var(--c-tgt)',dash:true}]:[]));
+  chart($('tr-daily'),{labels:dl,series:ds2,fmt:M.fmt,axis:M.axis,zero:M.zero,ref:M.ref,notes:dn,height:240});
+  // day of week
+  const end=addDays(lastMon,-1),mid=addDays(end,-55),st=addDays(end,-111);
+  const dowv=(from,to)=>DOW.map((_,i)=>{const vals=[];for(let m=monday(from);m<=to;m=addDays(m,7)){const d=addDays(m,i);if(d<from||d>to)continue;const a=agg(I,d,d);const v=M.v(a);if(v!=null&&a.days)vals.push(v)}return vals.length?vals.reduce((p,c)=>p+c,0)/vals.length:null});
+  const cur=dowv(addDays(mid,1),end),prv=dowv(st,mid);
+  const dser=[{name:'Last 8 weeks',values:cur,color:'var(--c-act)',type:'bar'},{name:'8 weeks before',values:prv,color:'var(--c-ly)',type:'bar'}];
+  legend('tr-dow-legend',dser);
+  chart($('tr-dow'),{labels:DOW,series:dser,fmt:M.fmt,axis:M.axis,zero:M.zero,height:220,allLabels:true});
+  renderHeat();
+}
+function renderHeat(){
+  $('tr-heatmode').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.h===S.tr.heat)));
+  const R=refDate(),lastMon=monday(R);const weeks=[];for(let i=11;i>=0;i--)weeks.push(addDays(lastMon,-7*i));
+  const mode=S.tr.heat;
+  $('tr-heat-hint').textContent={ach:'Each week: % of target, actual sales and the sales target. Green ≥ 100%, amber 95–100%, red below 95%.',ly:'Each week: growth vs the same week last year, this year\'s sales and last year\'s. Only shops that traded last year.',waste:'Each week: waste as % of waste target, actual waste and the waste target. Green is under target; red is more than 10% over.',basket:'Each week: average basket spend and the change vs the shop\'s own 12-week average.'}[mode]+' * = week not finished yet (sales so far against the target for the days entered).';
+  const cell=(a,base)=>{if(!a||!a.days)return `<td>—</td>`;
+    const L=(k,v)=>`<small><span class="hk">${k}</span> ${v}</small>`;
+    if(mode==='ach'){const v=a.ach;if(v==null)return `<td>${L('Sales',eur(a.s))}</td>`;return `<td class="${v>=1.05?'h-ok2':v>=1?'h-ok1':v>=.95?'h-warn':'h-bad'}"><b>${pctA(v)}</b>${L('Sales',eur(a.s))}${L('Target',eur(a.t))}</td>`}
+    if(mode==='ly'){const v=a.lyG;if(v==null)return `<td>—</td>`;return `<td class="${v>=.05?'h-ok2':v>=0?'h-ok1':v>=-.05?'h-warn':'h-bad'}"><b>${pctD(v)}</b>${L('This yr',eur(a.lfS))}${L('Last yr',eur(a.lyS))}</td>`}
+    if(mode==='waste'){const v=a.wVsT;if(v==null)return `<td>${a.wDays?L('Waste',eur(a.w)):'—'}</td>`;return `<td class="${v<=.85?'h-ok2':v<=1?'h-ok1':v<=1.1?'h-warn':'h-bad'}"><b>${pctA(v)}</b>${L('Waste',eur(a.wtW))}${L('Target',eur(a.wt))}</td>`}
+    const v=a.basket;if(v==null)return `<td>—</td>`;const g=base?v/base-1:0;return `<td class="${g>=.03?'h-ok2':g>=0?'h-ok1':g>=-.03?'h-warn':'h-bad'}"><b>${eur2(v)}</b>${L('vs avg',pctD(g))}</td>`};
+  const line=(name,ids,tot)=>{const ag=weeks.map(m=>agg(ids,m,addDays(m,6)));const bs=ag.map(a=>a.basket).filter(v=>v!=null);const base=bs.length?bs.reduce((p,c)=>p+c,0)/bs.length:null;
+    return `<tr class="${tot?'total':''}"><td>${tot?name:'<b>'+name+'</b>'}</td>${ag.map(a=>cell(a,base)).join('')}</tr>`};
+  let h='<thead><tr><th>Shop</th>'+weeks.map((m,i)=>`<th style="text-align:center">Wk ${isoWeek(m).w}${i===11&&dow(R)!==6?'*':''}<br><span style="font-weight:500;text-transform:none;letter-spacing:0">${fmtShortD(m)}</span></th>`).join('')+'</tr></thead><tbody>';
+  for(const s of SHOPS)h+=line(s.name,[s.id]);
+  h+=line('All shops',ALL,true);
+  $('tr-heat').innerHTML=h+'</tbody>';
+}
+function legend(id,series){$(id).innerHTML=series.map(s=>`<span><i class="${s.dash?'dash':''}" style="background:${s.color};color:${s.color}${s.type==='bar'?';height:10px;width:10px;vertical-align:0':''}"></i>${esc(s.name)}</span>`).join('')}
+
+/* ---------- SVG chart ---------- */
+function niceTicks(mn,mx,n){if(mn===mx){mx=mn+(Math.abs(mn)||1)}const span=mx-mn,s0=span/n,mag=Math.pow(10,Math.floor(Math.log10(s0))),e=s0/mag;const step=(e>=7.5?10:e>=3.5?5:e>=1.5?2:1)*mag;const lo=Math.floor(mn/step)*step,hi=Math.ceil(mx/step)*step;const t=[];for(let v=lo;v<=hi+step/2;v+=step)t.push(+v.toFixed(10));return t}
+function chart(el,cfg){
+  const W=Math.max(260,Math.floor(el.clientWidth||600)),H=cfg.height||240,m={l:54,r:12,t:10,b:28};
+  const vals=[];cfg.series.forEach(s=>s.values.forEach(v=>{if(v!=null&&isFinite(v))vals.push(v)}));if(cfg.ref!=null)vals.push(cfg.ref);
+  if(!cfg.series[0].values.some(v=>v!=null)){el.innerHTML='<div class="empty">No figures for this selection yet.</div>';return}
+  let mn=Math.min(...vals),mx=Math.max(...vals);
+  if(cfg.zero!==false)mn=Math.min(0,mn);else{const p=(mx-mn)*.12||Math.abs(mx)*.05||1;mn-=p;mx+=p}
+  const ticks=niceTicks(mn,mx,4),y0=ticks[0],y1=ticks[ticks.length-1];
+  const n=cfg.labels.length,band=(W-m.l-m.r)/n,X=i=>m.l+band*(i+.5),Y=v=>m.t+(H-m.t-m.b)*(1-(v-y0)/(y1-y0));
+  let g='';
+  ticks.forEach(t=>{g+=`<line class="grid" x1="${m.l}" x2="${W-m.r}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${m.l-8}" y="${Y(t)+4}" text-anchor="end">${esc(cfg.axis(t))}</text>`});
+  const every=cfg.allLabels?1:Math.max(1,Math.ceil(n/Math.max(2,Math.floor((W-m.l)/64))));
+  for(let i=0;i<n;i++){if((n-1-i)%every===0)g+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${esc(cfg.labels[i])}</text>`}
+  const bars=cfg.series.filter(s=>s.type==='bar');const bw=Math.max(2,band*.72/Math.max(1,bars.length));
+  bars.forEach((s,k)=>s.values.forEach((v,i)=>{if(v==null)return;const x=X(i)-band*.36+k*bw;const yv=Y(Math.max(v,y0)),yb=Y(Math.max(y0,Math.min(0,y1)));g+=`<rect x="${x.toFixed(1)}" y="${Math.min(yv,yb).toFixed(1)}" width="${(bw-1).toFixed(1)}" height="${Math.abs(yb-yv).toFixed(1)}" rx="2" fill="${s.color}"/>`}));
+  if(cfg.ref!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(cfg.ref)}" y2="${Y(cfg.ref)}" stroke="var(--c-tgt)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+  cfg.series.filter(s=>s.type!=='bar').forEach(s=>{let d='',pen=false;s.values.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});
+    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width||2}" ${s.dash?'stroke-dasharray="6 4"':''} stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(s.dot){let li=-1;s.values.forEach((v,i)=>{if(v!=null)li=i});if(li>=0)g+=`<circle cx="${X(li)}" cy="${Y(s.values[li])}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2"/>`}
+    if(s.values.filter(v=>v!=null).length===1){s.values.forEach((v,i)=>{if(v!=null)g+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3" fill="${s.color}"/>`})}
+  });
+  g+=`<line class="hov" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" stroke-width="1" opacity="0"/>`;
+  g+=`<rect class="hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(cfg.series.map(s=>s.name).join(', '))}">${g}</svg><div class="tip" hidden></div>`;
+  const svg=el.querySelector('svg'),tip=el.querySelector('.tip'),hov=el.querySelector('.hov');
+  const move=e=>{const r=svg.getBoundingClientRect();const sx=(e.clientX-r.left)*(W/r.width);let i=Math.floor((sx-m.l)/band);if(i<0||i>=n){hide();return}
+    hov.setAttribute('x1',X(i));hov.setAttribute('x2',X(i));hov.setAttribute('opacity','.5');
+    let h=`<b>${esc(cfg.labels[i])}</b>${cfg.sub&&cfg.sub[i]?'<br><span style="opacity:.75">'+esc(cfg.sub[i])+'</span>':''}`;
+    cfg.series.forEach(s=>{h+=`<br>${esc(s.name)}: <b>${s.values[i]==null?'—':esc(cfg.fmt(s.values[i]))}</b>`});
+    if(cfg.notes&&cfg.notes[i])h+=`<br><span style="opacity:.85">💬 ${esc(cfg.notes[i])}</span>`;
+    tip.innerHTML=h;tip.hidden=false;const tw=tip.offsetWidth,px=X(i)*(r.width/W);let left=px+12;if(left+tw>r.width)left=px-tw-12;if(left<0)left=0;tip.style.left=left+'px';tip.style.top='4px'};
+  const hide=()=>{tip.hidden=true;hov.setAttribute('opacity','0')};
+  svg.addEventListener('pointermove',move);svg.addEventListener('pointerdown',move);svg.addEventListener('pointerleave',hide);
+}
+
+/* ================= REPORTS (daily department report upload) ================= */
+const DOWFULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const SHOP_CODES={'61':'PCV','63':'BAL','65':'VAL','68':'STP','71':'STJ','73':'VOC'};
+const ALIASES={PCV:['paceville'],BAL:['balluta'],VAL:['valletta'],STP:['steps'],STJ:['wembley','st julian','st. julian','stjulian','st julians'],VOC:['voco']};
+// The file number is the surest guide (report-71 = Wembley). Titles like "SPAR Express Paceville Wembley" name Paceville too, so Paceville is checked last.
+function detectShop(title,fname){const m=String(fname||'').match(/(?:^|\D)(6[1358]|7[13])(?:\D|$)/);if(m)return SHOP_CODES[m[1]];const t=(title||'').toLowerCase();for(const id of ['STJ','STP','VOC','BAL','VAL','PCV'])if(ALIASES[id].some(a=>t.includes(a)))return id;return null}
+function loadXLSX(){if(window.XLSX)return Promise.resolve(window.XLSX);return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>window.XLSX?res(window.XLSX):rej(new Error('load'));s.onerror=()=>rej(new Error('load'));document.head.appendChild(s)})}
+const keyOf=l=>String(l).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+const nv=v=>{if(v==null||v==='')return 0;const n=typeof v==='number'?v:parseFloat(String(v).replace(/[,€\s]/g,''));return isFinite(n)?Math.round(n*100)/100:0};
+function toISO(v,X){if(v==null||v==='')return null;if(typeof v==='number'&&X){const p=X.SSF.parse_date_code(v);return p?p.y+'-'+pad(p.m)+'-'+pad(p.d):null}if(v instanceof Date)return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);if(m)return m[3]+'-'+pad(+m[2])+'-'+pad(+m[1]);return null}
+function parseReport(rows,X,fname){
+  const h=rows[0]||[];const cols=[],dates=[];
+  for(let c=0;c<h.length;c++){const v=h[c];if(typeof v==='string'&&DOWFULL.includes(v.trim())){cols.push(c);dates.push(toISO(h[c+1],X))}}
+  if(cols.length!==7||dates.some(d=>!d))throw new Error('This doesn\'t look like the daily department report: the Monday to Sunday columns weren\'t found.');
+  if(dow(dates[0])!==0)throw new Error('The first day in this report isn\'t a Monday.');
+  const lyCol=h.findIndex(v=>typeof v==='string'&&/totals\s*ly/i.test(v));
+  const out={title:String(h[0]||'').trim(),days:dates,depts:[],cats:[],waste:{},m:{}};
+  let sec='sales',cur=null;
+  for(let i=2;i<rows.length;i++){const r=rows[i]||[];const code=r[0]==null?'':String(r[0]).trim(),label=r[1]==null?'':String(r[1]).trim();if(!label)continue;
+    const d=cols.map(c=>nv(r[c]));
+    if(label==='Waste'){sec='waste';continue}
+    if(sec==='sales'){
+      const ly=lyCol>=0?nv(r[lyCol]):0;
+      if(/^D\d+$/.test(code)){cur=code;if(d.some(x=>x)||ly)out.depts.push({c:code,n:label,d,ly});continue}
+      if(/^C\d+$/.test(code)){if(d.some(x=>x)||ly)out.cats.push({c:code,n:label,p:cur,d,ly});continue}
+      sec='misc';
+    }
+    if(sec==='waste'&&/^D\d+$/.test(code)){if(d.some(x=>x))out.waste[code]=d;continue}
+    if(label.startsWith('%'))continue;
+    let k=keyOf(label);if(/^\d+$/.test(code))k='pay_'+k;
+    if(k&&!out.m[k])out.m[k]=d;
+  }
+  const tot=out.m.total_inc_vat_inc_d030||out.m.total_inc_vat;
+  if(!tot)throw new Error('The sales totals weren\'t found in this file.');
+  out.has=tot.map(v=>v>0);
+  out.shop=detectShop(out.title,fname);
+  out.week=dates[0];
+  return out;
+}
+function coreDay(p,i){const o={};const s=(p.m.total_inc_vat_inc_d030||p.m.total_inc_vat)[i];if(s>0)o.s=s;
+  const c=p.m.customer_no_current_wk&&p.m.customer_no_current_wk[i];if(c>0)o.c=c;
+  if(p.m.total_waste)o.w=p.m.total_waste[i];return o}
+
+let pending=[];
+$('up-file').addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';handleFiles(f)});
+$('e-upload').addEventListener('click',()=>{setTab('dept');$('up-file').click()});
+const upCard=$('up-card');
+['dragenter','dragover'].forEach(t=>upCard.addEventListener(t,e=>{e.preventDefault();upCard.classList.add('drag')}));
+['dragleave','drop'].forEach(t=>upCard.addEventListener(t,e=>{e.preventDefault();upCard.classList.remove('drag')}));
+upCard.addEventListener('drop',e=>{const f=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(f.length)handleFiles(f)});
+async function handleFiles(files){
+  if(!files.length)return;
+  $('up-preview').innerHTML='<div class="up-file muted">Reading '+files.length+' file'+(files.length>1?'s':'')+'…</div>';
+  let X;try{X=await loadXLSX()}catch(e){$('up-preview').innerHTML='<div class="up-file err">Couldn\'t load the file reader. Check your connection and try again.</div>';return}
+  pending=[];
+  for(const f of files){try{const buf=await f.arrayBuffer();const wb=X.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=X.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});pending.push({name:f.name,p:parseReport(rows,X,f.name)})}
+    catch(e){pending.push({name:f.name,err:e&&e.message&&!/^load$/.test(e.message)?e.message:'Couldn\'t read this file.'})}}
+  renderPending();
+}
+function renderPending(){
+  if(!pending.length){$('up-preview').innerHTML='';return}
+  const ok=pending.filter(x=>x.p);
+  let h='';
+  pending.forEach((x,ix)=>{
+    if(x.err){h+=`<div class="up-file"><b>${esc(x.name)}</b><span class="err">${esc(x.err)}</span></div>`;return}
+    const p=x.p,sh=p.shop;
+    let rows='';p.days.forEach((d,i)=>{if(!p.has[i])return;const o=coreDay(p,i);const r=sh?D[sh][d]:null;const prev=r&&hasSales(r)?r.s:null;
+      const diff=prev!=null&&Math.abs(prev-(o.s||0))>0.5;
+      rows+=`<tr><td>${DOW[i]} ${fmtShortD(d)}</td><td>${eur2(o.s)}</td><td>${int(o.c)}</td><td>${o.w!=null?eur2(o.w):'—'}</td><td class="${diff?'mid':'muted'}">${prev==null?'New':diff?'Replaces '+eur2(prev):'Same'}</td></tr>`});
+    const nd=p.has.filter(Boolean).length;
+    if(x.done){h+=`<div class="up-file"><div><b>${esc(p.title||x.name)}</b> <span class="up">· imported</span></div></div>`;return}
+    h+=`<div class="up-file"><div class="row-between"><div><b>${esc(p.title||x.name)}</b> <span class="muted">· week ${isoWeek(p.week).w} · ${fmtShortD(p.days[0])} – ${fmtShortD(p.days[6])} · ${nd} day${nd===1?'':'s'}</span></div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:14px">Shop <select data-ix="${ix}" class="up-shop">${sh?'':'<option value="">Choose…</option>'}${SHOPS.map(s=>`<option value="${s.id}"${s.id===sh?' selected':''}>${s.name}</option>`).join('')}</select></label></div>
+      ${x.fail?`<span class="err">Not imported: ${esc(x.fail)}</span>`:''}
+      ${nd?`<div class="tbl-wrap"><table><thead><tr><th>Day</th><th>Sales</th><th>Customers</th><th>Waste</th><th>In tracker</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<span class="muted">No trading days in this file yet.</span>'}</div>`});
+  h+=`<div class="up-file"><div class="actions" style="margin:0">${ok.filter(x=>!x.done).length?`<button class="btn primary" id="up-go">Import ${ok.filter(x=>!x.done).length} report${ok.filter(x=>!x.done).length>1?'s':''}</button>`:''}<button class="btn" id="up-cancel">Cancel</button><span class="muted" id="up-msg"></span></div></div>`;
+  $('up-preview').innerHTML=h;
+  $('up-preview').querySelectorAll('.up-shop').forEach(s=>s.addEventListener('change',()=>{pending[+s.dataset.ix].p.shop=s.value||null;renderPending()}));
+  $('up-cancel').addEventListener('click',()=>{pending=[];renderPending()});
+  if($('up-go'))$('up-go').addEventListener('click',importPending);
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// One store call with patient retries: the store can ask a page to slow down (resource_exhausted) or be briefly unavailable.
+async function dbCall(fn,what){let wait=800;for(let a=0;;a++){try{return await fn()}catch(e){const c=e&&e.code;
+  if((c==='resource_exhausted'||c==='unavailable')&&a<5){await sleep(wait+Math.random()*400);wait*=2;continue}
+  const err=new Error(what);err.code=c||'error';err.detail=(e&&e.message)||String(e);throw err}}}
+const cleanKey=k=>{k=String(k).toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/_+/g,'_').replace(/^_+|_+$/g,'').slice(0,80);return /^[a-z]/.test(k)?k:'k_'+k};
+const cleanArr=a=>Array.isArray(a)?a.map(v=>typeof v==='number'&&isFinite(v)?v:0):[];
+function reportBody(x,at){const p=x.p,m={},waste={};
+  for(const k in p.m){const ck=cleanKey(k);if(ck&&!(ck in m))m[ck]=cleanArr(p.m[k])}
+  for(const k in p.waste)waste[cleanKey(k)]=cleanArr(p.waste[k]);
+  const txt=v=>String(v==null?'':v).slice(0,120);
+  return{shop:p.shop,week:p.week,days:p.days.slice(0,7),has:p.has.map(Boolean),
+    depts:p.depts.map(d=>({c:txt(d.c),n:txt(d.n),d:cleanArr(d.d),ly:typeof d.ly==='number'&&isFinite(d.ly)?d.ly:0})),
+    cats:p.cats.map(d=>({c:txt(d.c),n:txt(d.n),p:txt(d.p),d:cleanArr(d.d),ly:typeof d.ly==='number'&&isFinite(d.ly)?d.ly:0})),
+    waste,m,file:txt(x.name),title:txt(p.title),at}}
+const ERRTXT={invalid_argument:'the tracker refused the data',quota_exceeded:'storage is full',resource_exhausted:'too many saves at once',unavailable:'connection problem',revoked:'access was removed',not_granted:'saving isn\'t allowed in this view'};
+async function importPending(){
+  if(!db){toast('Saving isn\'t available in this view');return}
+  const ok=pending.filter(x=>x.p&&!x.done);
+  if(ok.some(x=>!x.p.shop)){toast('Choose the shop for each report first');return}
+  const shops=pending.filter(x=>x.p).map(x=>x.p.shop+'_'+x.p.week);if(new Set(shops).size!==shops.length){toast('Two files are for the same shop and week. Remove one.');return}
+  $('up-go').disabled=true;
+  const at=new Date().toISOString();let nDays=0,nOk=0;const results=[];
+  for(const x of ok){const p=x.p,shop=p.shop,id=shop+'_'+p.week;$('up-msg').textContent='Importing '+SHOP[shop].name+'…';
+    try{
+      const body=reportBody(x,at);
+      await dbCall(()=>db.doc('reports/'+id).set(body),'saving the department figures');
+      repDocs[id]=body;
+      const byM={};p.days.forEach((d,i)=>{if(!p.has[i])return;const o=coreDay(p,i);o.rep=at;(byM[d.slice(0,7)]=byM[d.slice(0,7)]||{})[d]=o});
+      for(const [mo,days] of Object.entries(byM)){const mid=shop+'_'+mo,ref=db.doc('months/'+mid);
+        let exists=!!monthDocs[mid];if(!exists){const sn=await dbCall(()=>ref.get(),'checking the month');exists=sn.exists}
+        await sleep(150);
+        if(exists)await dbCall(()=>ref.update({days}),'filling in the days');else await dbCall(()=>ref.set({shop,month:mo,days}),'filling in the days');
+        for(const d in days){D[shop][d]=Object.assign({},D[shop][d]||{},days[d]);nDays++}}
+      const entry={[id]:{shop,week:p.week,n:p.has.filter(Boolean).length,at}};const iref=db.doc('reportIndex/all');
+      let ie=repIndexExists;if(!ie){const sn=await dbCall(()=>iref.get(),'checking the report list');ie=sn.exists}
+      await sleep(150);
+      if(ie)await dbCall(()=>iref.update({entries:entry}),'updating the report list');else{await dbCall(()=>iref.set({entries:entry}),'updating the report list');repIndexExists=true}
+      repIndex=Object.assign({},repIndex,{[id]:entry[id]});S.rp.week=p.week;x.done=true;nOk++;results.push({ok:true,name:SHOP[shop].name});
+    }catch(e){x.fail=(ERRTXT[e.code]||'unexpected error')+' while '+(e.message||'saving')+(e.detail?' ('+e.code+': '+e.detail+')':'');results.push({ok:false,name:SHOP[shop].name,why:x.fail})}
+    await sleep(250);
+  }
+  const failed=results.filter(r=>!r.ok);
+  if(!failed.length){pending=[];renderPending();toast('Imported '+nOk+' report'+(nOk>1?'s':'')+' · '+nDays+' days updated')}
+  else{renderPending();$('up-msg').innerHTML=(nOk?'<span class="up">Imported '+esc(results.filter(r=>r.ok).map(r=>r.name).join(', '))+'.</span> ':'')+'<span class="down">Not imported: '+esc(failed.map(r=>r.name+' ('+r.why+')').join('; '))+'</span>. Press Import to try the rest again.'}
+  dataVersion++;if(S.tab!=='dept')render();else renderDept();updateBadge();
+}
+
+/* ---- department views ---- */
+let repIndex={},repIndexExists=false,repDocs={},repSub=null;
+S.rp={week:null,shop:'ALL',open:{}};
+function subWeek(w){if(!db||(repSub&&repSub.w===w))return;if(repSub)repSub.u();
+  const u=db.collection('reports').where('week','in',[w,addDays(w,-7)]).limit(50).onSnapshot(sn=>{sn.docs.forEach(d=>{if(d.exists)repDocs[d.id]=d.data()});if(S.tab==='dept')renderDept()},()=>{});repSub={w,u}}
+const eD=(a,b)=>b?` <span class="eurd">(${a-b>=0?'+':'−'}€${Math.abs(Math.round(a-b)).toLocaleString('en-GB')})</span>`:'';
+const pE=(a,b)=>b?pctD(a/b-1)+eD(a,b):'—';
+const idxOf=doc=>doc.has.map((v,i)=>v?i:-1).filter(i=>i>=0);
+const sIdx=(arr,idx)=>arr?idx.reduce((p,i)=>p+(arr[i]||0),0):0;
+function renderDept(){
+  const body=$('rp-body');
+  if(!db){body.innerHTML='';return}
+  const weeks=[...new Set(Object.values(repIndex).map(e=>e.week))].sort().reverse();
+  if(!weeks.length){body.innerHTML='<div class="card"><div class="empty">No reports uploaded yet. Choose a report file above to see sales by department, waste by department, night trade and payment mix.</div></div>';return}
+  if(!S.rp.week||!weeks.includes(S.rp.week))S.rp.week=weeks[0];
+  const W=S.rp.week;subWeek(W);
+  const avail=SHOPS.filter(s=>repIndex[s.id+'_'+W]);
+  if(S.rp.shop!=='ALL'&&!avail.some(s=>s.id===S.rp.shop))S.rp.shop='ALL';
+  const docs=(S.rp.shop==='ALL'?avail:avail.filter(s=>s.id===S.rp.shop)).map(s=>repDocs[s.id+'_'+W]).filter(Boolean);
+  const ctl=`<div class="controls"><select id="rp-week" aria-label="Week">${weeks.map(w=>`<option value="${w}"${w===W?' selected':''}>Week ${isoWeek(w).w} · ${fmtShortD(w)} – ${fmtShortD(addDays(w,6))}</option>`).join('')}</select>
+    <select id="rp-shop" aria-label="Shop"><option value="ALL">All shops with a report (${avail.length})</option>${avail.map(s=>`<option value="${s.id}"${s.id===S.rp.shop?' selected':''}>${s.name}</option>`).join('')}</select></div>`;
+  if(!docs.length){body.innerHTML=ctl+'<div class="card"><div class="empty">Loading the report…</div></div>';wireRp();return}
+  const missing=SHOPS.filter(s=>!repIndex[s.id+'_'+W]).map(s=>s.name);
+  const nDays=Math.max(...docs.map(d=>idxOf(d).length));const complete=docs.every(d=>idxOf(d).length===7);
+  const M=k=>docs.reduce((p,d)=>p+sIdx(d.m[k],idxOf(d)),0);
+  const has=k=>docs.some(d=>d.m[k]);
+  const prevs=docs.map(d=>repDocs[d.shop+'_'+addDays(d.week,-7)]);const havePrev=prevs.every(Boolean);
+  const ch=(a,b)=>a&&b?a/b-1:null;
+  const totInc=M('total_inc_vat_inc_d030')||M('total_inc_vat'),totEx=M('total_inc_vat');
+  // Last week / last year in the report exclude tobacco, so add tobacco's own last week / last year back in.
+  const tob=M('tobacco_related_products_incl_vat'),tobPW=M('tobacco_related_products_prev_week_incl_vat'),tobPY=M('tobacco_related_products_prev_year_incl_vat');
+  const pw=M('total_prev_week_inc_vat')+tobPW,py=M('total_prev_year_inc_vat')+tobPY;
+  const cust=M('customer_no_current_wk'),custPW=M('customer_no_previous_wk'),waste=M('total_waste'),tgtS=M('target_sales');
+  const n1=M('sales_between_00_00_06_00_inc_vat'),n2=M('sales_between_22_00_23_59_inc_vat');
+  const scope=(S.rp.shop==='ALL'?docs.length+' shop'+(docs.length>1?'s':''):SHOP[S.rp.shop].name)+' · '+(complete?'full week':nDays+' day'+(nDays>1?'s':'')+' so far');
+  let h=ctl;
+  h+=`<p class="hint" style="margin:-4px 0 0">${weeks.length===1?'Only weeks with an uploaded report appear in the week menu. Upload more weeks to compare them. ':''}${esc(scope)}. Comparisons with last week and last year use the same days only.${missing.length&&S.rp.shop==='ALL'?' No report yet for '+esc(missing.join(', '))+'.':''}</p>`;
+  h+='<div class="tiles">'+[
+    tile('Sales inc tobacco',eur(totInc),tgtS?`Target ${eur(tgtS)} · <span class="${achCls(totInc/tgtS)}">${pctA(totInc/tgtS)}</span>`:''),
+    tile('vs last week',`<span class="${cls(ch(totInc,pw))}">${pctD(ch(totInc,pw))}</span>`,`${eur(totInc)} vs ${eur(pw)} (incl. tobacco)`),
+    tile('vs last year',`<span class="${cls(ch(totInc,py))}">${pctD(ch(totInc,py))}</span>`,py?`${eur(totInc)} vs ${eur(py)} (incl. tobacco)`:'No last-year sales in the report'),
+    tile('Customers',int(cust),custPW?`<span class="${cls(ch(cust,custPW))}">${pctD(ch(cust,custPW))}</span> vs last week`:''),
+    tile('Avg basket',cust?eur2(totInc/cust):'—',custPW&&pw?`Last week ${eur2(pw/custPW)}`:''),
+    tile('Waste',eur(waste),totInc?(waste/totInc*100).toFixed(2)+'% of sales':''),
+  ].join('')+'</div>';
+
+  // departments
+  const dmap={};const add=(c,n,f)=>{dmap[c]=dmap[c]||{c,n,cy:0,ly:0,pw:0,w:0,cats:{}};f(dmap[c])};
+  docs.forEach((d,k)=>{const idx=idxOf(d),pv=prevs[k];const pvD=pv?Object.fromEntries(pv.depts.map(x=>[x.c,x])):{},pvC=pv?Object.fromEntries(pv.cats.map(x=>[x.c,x])):{};
+    d.depts.forEach(x=>add(x.c,x.n,o=>{o.cy+=sIdx(x.d,idx);o.ly+=x.ly||0;o.pw+=pvD[x.c]?sIdx(pvD[x.c].d,idx):0;o.w+=sIdx(d.waste[x.c]||d.waste[String(x.c).toLowerCase()],idx)}));
+    d.cats.forEach(x=>{const o=dmap[x.p];if(!o)return;const cc=o.cats[x.c]=o.cats[x.c]||{c:x.c,n:x.n,cy:0,ly:0,pw:0};cc.cy+=sIdx(x.d,idx);cc.ly+=x.ly||0;cc.pw+=pvC[x.c]?sIdx(pvC[x.c].d,idx):0});
+  });
+  const dl=Object.values(dmap).filter(o=>o.cy||o.ly).sort((a,b)=>b.cy-a.cy);
+  const tCY=dl.reduce((p,o)=>p+o.cy,0),tLY=dl.reduce((p,o)=>p+o.ly,0);
+  const dRow=(o,cat,parent)=>{const sh=tCY?o.cy/tCY:null,shL=tLY?o.ly/tLY:null;const vpw=havePrev&&o.pw?o.cy/o.pw-1:null;const vly=complete&&o.ly?o.cy/o.ly-1:null;
+    const wp=o.w&&o.cy?o.w/o.cy:null;
+    return `<tr class="${cat?'cat':'dept'+(S.rp.open[o.c]?' open':'')}"${cat?` data-p="${parent}"`:` data-c="${o.c}"`}${cat&&!S.rp.open[parent]?' hidden':''}><td>${esc(o.n.trim())}</td><td>${eur(o.cy)}</td><td>${sh==null?'—':(sh*100).toFixed(1)+'%'}</td><td>${shL==null?'—':(shL*100).toFixed(1)+'%'}</td><td class="chg ${cls(sh!=null&&shL!=null?sh-shL:null)}">${sh!=null&&shL!=null?((sh-shL>=0?'+':'−')+Math.abs((sh-shL)*100).toFixed(1)+' pts'):'—'}</td><td class="chg ${cls(vpw)}">${vpw==null?'—':pE(o.cy,o.pw)}</td><td class="chg ${cls(vly)}">${complete?(vly==null?'—':pE(o.cy,o.ly)):'<span class="muted">after Sun</span>'}</td><td>${cat?'':(o.w?eur(o.w):'—')}</td><td class="${wp!=null&&wp>.02?'down':''}">${cat||wp==null?'':(wp*100).toFixed(1)+'%'}</td></tr>`};
+  let drows='';for(const o of dl){drows+=dRow(o);Object.values(o.cats).filter(c=>c.cy||c.ly).sort((a,b)=>b.cy-a.cy).forEach(c=>drows+=dRow(c,true,o.c))}
+  // tobacco (reported separately, with daily last week / last year)
+  if(has('tobacco_related_products_incl_vat'))drows+=`<tr><td style="padding-left:22px">Tobacco &amp; Related</td><td>${eur(tob)}</td><td colspan="3" class="muted">Reported separately</td><td class="chg ${cls(ch(tob,tobPW))}">${pE(tob,tobPW)}</td><td class="chg ${cls(ch(tob,tobPY))}">${pE(tob,tobPY)}</td><td></td><td></td></tr>`;
+  drows+=`<tr class="total"><td>Total excl. tobacco</td><td>${eur(tCY)}</td><td>100%</td><td>100%</td><td></td><td class="chg ${cls(ch(totEx,M('total_prev_week_inc_vat')))}">${pE(totEx,M('total_prev_week_inc_vat'))}</td><td class="chg ${cls(ch(totEx,M('total_prev_year_inc_vat')))}">${pE(totEx,M('total_prev_year_inc_vat'))}</td><td>${eur(dl.reduce((p,o)=>p+o.w,0))}</td><td></td></tr>`;
+  if(has('tobacco_related_products_incl_vat')){const pwAll=dl.reduce((p,o)=>p+o.pw,0)+tobPW,inc=tCY+tob;
+    drows+=`<tr class="total"><td>Total incl. tobacco</td><td>${eur(inc)}</td><td></td><td></td><td></td><td class="chg ${cls(ch(totInc,pw))}">${pE(totInc,pw)}</td><td class="chg ${cls(ch(totInc,py))}">${pE(totInc,py)}</td><td></td><td></td></tr>`}
+  h+=`<div class="card"><h2>Departments</h2><p class="hint">Tap a department to see its categories. <b>Share</b> is the department's part of total sales; comparing it with last year's share shows what customers are buying more or less of, and works even mid-week. ${havePrev?'"vs last wk" uses the same days of the previous week\'s report.':'"vs last wk" appears once the previous week\'s report has been uploaded.'} "vs LY" needs the full week, because the report gives last year as a weekly total.</p>
+    <div class="tbl-wrap"><table id="rp-dept"><thead><tr><th>Department</th><th>Sales</th><th>Share</th><th>Share LY</th><th>Share change</th><th>vs last wk</th><th>vs LY</th><th>Waste</th><th>Waste %</th></tr></thead><tbody>${drows}</tbody></table></div></div>`;
+
+  // movers
+  const catsAll=dl.flatMap(o=>Object.values(o.cats).map(c=>Object.assign({dept:o.n},c)));
+  let mv,mvTitle,mvHint;
+  if(havePrev){mv=catsAll.map(c=>({n:c.n,dept:c.dept,v:c.cy-c.pw,p:c.pw?c.cy/c.pw-1:null}));mvTitle='Biggest movers vs last week';mvHint='Change in € against the same days last week.'}
+  else{mv=catsAll.map(c=>({n:c.n,dept:c.dept,v:tLY?(c.cy/tCY-c.ly/tLY)*tCY:0,p:null}));mvTitle='Biggest changes in mix vs last year';mvHint='How many € more or less each category took this week than if it had kept last year\'s share of sales.'}
+  const up=mv.filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,6),dn=mv.filter(x=>x.v<0).sort((a,b)=>a.v-b.v).slice(0,6);
+  const mx=Math.max(1,...up.map(x=>x.v),...dn.map(x=>-x.v));
+  const bars=(list,g)=>list.length?list.map(x=>`<div class="bar-row"><span class="nm" title="${esc(x.dept.trim())} · ${esc(x.n.trim())}">${esc(x.n.trim())}<br><small class="muted">${esc(x.dept.trim())}</small></span><span class="track"><span class="fill ${g?'g':'r'}" style="width:${Math.max(3,Math.abs(x.v)/mx*100).toFixed(1)}%;display:block"></span></span><span class="val ${g?'up':'down'}">${g?'+':'−'}${eur(Math.abs(x.v))}${x.p!=null?' · '+pctD(x.p):''}</span></div>`).join(''):'<div class="muted">None</div>';
+  h+=`<div class="card"><h2>${mvTitle}</h2><p class="hint">${mvHint}</p><div class="movers"><div><div class="label" style="margin-bottom:8px">Up</div><div class="bars">${bars(up,true)}</div></div><div><div class="label" style="margin-bottom:8px">Down</div><div class="bars">${bars(dn,false)}</div></div></div></div>`;
+
+  // waste by department
+  const wl=dl.filter(o=>o.w).sort((a,b)=>b.w-a.w);const wmx=Math.max(1,...wl.map(o=>Math.abs(o.w)));
+  const night=(lbl,k,kc)=>{const cy=M(k),lw=M(k.replace(/_inc_vat$/,'_last_week_inc_vat')),ly=M(k.replace(/_inc_vat$/,'_last_year_inc_vat'));const c=M(kc),clw=M(kc+'_last_week'),cly=M(kc+'_last_year');
+    return `<tr><td><b>${lbl}</b></td><td>${eur(cy)}</td><td class="chg ${cls(ch(cy,lw))}">${pctD(ch(cy,lw))}</td><td class="chg ${cls(ch(cy,ly))}">${pctD(ch(cy,ly))}</td><td>${int(c)}</td><td class="chg ${cls(ch(c,clw))}">${pctD(ch(c,clw))}</td><td>${c?eur2(cy/c):'—'}</td><td>${totInc?(cy/totInc*100).toFixed(1)+'%':'—'}</td></tr>`};
+  const cash=M('pay_cash'),card=M('pay_bov'),cred=M('pay_credit_sales'),pay=cash+card+cred;
+  h+=`<div class="grid2"><div class="card"><h2>Waste by department</h2><p class="hint">Waste € and as % of that department's sales.</p><div class="bars">${wl.length?wl.map(o=>`<div class="bar-row"><span class="nm">${esc(o.n.trim())}</span><span class="track"><span class="fill" style="width:${Math.max(3,Math.abs(o.w)/wmx*100).toFixed(1)}%;display:block"></span></span><span class="val">${eur2(o.w)} · ${o.cy?(o.w/o.cy*100).toFixed(1)+'%':'—'}</span></div>`).join(''):'<div class="muted">No waste recorded.</div>'}</div></div>
+    <div class="card"><h2>Payments</h2><p class="hint">How customers paid, same days as above.</p>${pay?`<div class="bars">${[['Card',card],['Cash',cash],['Credit',cred]].map(([n,v])=>`<div class="bar-row"><span class="nm">${n}</span><span class="track"><span class="fill g" style="width:${Math.max(2,v/pay*100).toFixed(1)}%;display:block"></span></span><span class="val">${eur(v)} · ${(v/pay*100).toFixed(1)}%</span></div>`).join('')}</div>`:'<div class="muted">No payment split in this report.</div>'}</div></div>`;
+  if(has('sales_between_00_00_06_00_inc_vat')||has('sales_between_22_00_23_59_inc_vat'))
+    h+=`<div class="card"><h2>Night trade</h2><p class="hint">Sales and receipts (chits) late at night, against the same days last week and last year. Useful for night staffing.</p><div class="tbl-wrap"><table><thead><tr><th>Time</th><th>Sales</th><th>vs last wk</th><th>vs LY</th><th>Chits</th><th>Chits vs last wk</th><th>Avg chit</th><th>Share of sales</th></tr></thead><tbody>${night('22:00 – 23:59','sales_between_22_00_23_59_inc_vat','nr_of_chits_between_22_00_23_59')}${night('00:00 – 06:00','sales_between_00_00_06_00_inc_vat','nr_of_chits_between_00_00_06_00')}</tbody></table></div></div>`;
+
+  // day by day
+  let dd='';for(let i=0;i<7;i++){const ds_=docs.filter(d=>d.has[i]);const date=addDays(W,i);
+    if(!ds_.length){dd+=`<tr><td><b>${DOW[i]}</b> <span class="muted">${fmtShortD(date)}</span></td><td colspan="8" class="muted" style="text-align:left">Not in the report yet</td></tr>`;continue}
+    const g=k=>ds_.reduce((p,d)=>p+((d.m[k]||[])[i]||0),0);
+    const inc=g('total_inc_vat_inc_d030')||g('total_inc_vat'),ex=inc,t=g('target_sales'),lw=g('total_prev_week_inc_vat')+g('tobacco_related_products_prev_week_incl_vat'),lyv=g('total_prev_year_inc_vat')+g('tobacco_related_products_prev_year_incl_vat'),cu=g('customer_no_current_wk'),wv=g('total_waste');
+    dd+=`<tr><td><b>${DOW[i]}</b> <span class="muted">${fmtShortD(date)}</span></td><td>${eur(inc)}</td><td>${t?eur(t):'—'}</td><td class="${t?achCls(inc/t):''}">${t?pctA(inc/t):'—'}</td><td class="chg ${cls(ch(ex,lw))}">${pctD(ch(ex,lw))}</td><td class="chg ${cls(ch(ex,lyv))}">${pctD(ch(ex,lyv))}</td><td>${int(cu)}</td><td>${cu?eur2(ex/cu):'—'}</td><td>${eur2(wv)}</td></tr>`}
+  h+=`<div class="card"><h2>Day by day</h2><p class="hint">All figures include tobacco: the report's last week and last year totals exclude it, so tobacco's own last week and last year are added back.</p><div class="tbl-wrap"><table><thead><tr><th>Day</th><th>Sales</th><th>Target</th><th>Achv</th><th>vs last wk</th><th>vs LY</th><th>Customers</th><th>Basket</th><th>Waste</th></tr></thead><tbody>${dd}</tbody></table></div></div>`;
+  body.innerHTML=h;wireRp();
+}
+function wireRp(){
+  const w=$('rp-week'),s=$('rp-shop');
+  if(w)w.addEventListener('change',e=>{S.rp.week=e.target.value;renderDept()});
+  if(s)s.addEventListener('change',e=>{S.rp.shop=e.target.value;renderDept()});
+  const t=$('rp-dept');if(t)t.querySelectorAll('tr.dept').forEach(tr=>tr.addEventListener('click',()=>{const c=tr.dataset.c;S.rp.open[c]=!S.rp.open[c];tr.classList.toggle('open',S.rp.open[c]);t.querySelectorAll(`tr.cat[data-p="${c}"]`).forEach(r=>r.hidden=!S.rp.open[c])}));
+}
+
+/* ================= TARGETS ================= */
+const ym=s=>s.slice(0,7);
+const addMonths=(m,n)=>{const d=new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7)-1+n,1));return ds(d).slice(0,7)};
+const monthDays=m=>{const f=m+'-01';const l=ds(new Date(Date.UTC(+m.slice(0,4),+m.slice(5,7),0)));return range(f,l)};
+const monthName=m=>['January','February','March','April','May','June','July','August','September','October','November','December'][+m.slice(5,7)-1]+' '+m.slice(0,4);
+S.tg={month:ym(todayLocal()),drafts:{}};
+function mode(arr){const c=new Map();let best=null,bn=0;for(const v of arr){const n=(c.get(v)||0)+1;c.set(v,n);if(n>bn){bn=n;best=v}}return best}
+// What the grid shows for a month: the saved targets, else a suggestion from the daily targets already loaded.
+function targetsFor(m){
+  if(monthTargets[m]&&monthTargets[m].shops)return{src:'saved',shops:JSON.parse(JSON.stringify(monthTargets[m].shops))};
+  const days=monthDays(m);const shops={};let any=false;
+  for(const s of SHOPS){const d=DOW.map((_,i)=>{const v=days.filter(x=>dow(x)===i).map(x=>D[s.id][x]&&num(D[s.id][x].t)).filter(v=>v!=null);return v.length?mode(v):null});
+    const w=mode(days.map(x=>D[s.id][x]&&num(D[s.id][x].wt)).filter(v=>v!=null));
+    if(d.some(v=>v!=null)||w!=null)any=true;shops[s.id]={d,w:w??null}}
+  return{src:any?'suggested':'empty',shops};
+}
+function curTargets(){const m=S.tg.month;return S.tg.drafts[m]||targetsFor(m)}
+function dowCounts(m){const c=[0,0,0,0,0,0,0];monthDays(m).forEach(d=>c[dow(d)]++);return c}
+function monthTotal(sh,m){if(!sh)return 0;const c=dowCounts(m);let t=0;for(let i=0;i<7;i++)t+=(num(sh.d&&sh.d[i])||0)*c[i];return t}
+function renderTargets(){
+  const m=S.tg.month,T=curTargets(),c=dowCounts(m),dirty=!!S.tg.drafts[m];
+  $('tg-month').textContent=monthName(m);
+  const saved=monthTargets[m];
+  $('tg-status').innerHTML=dirty?'<span class="mid">Unsaved changes.</span> Press <b>Save targets</b> to apply them to every day of '+esc(monthName(m))+'.':
+    T.src==='saved'?'<span class="up">Saved.</span> Every day in '+esc(monthName(m))+' uses these targets'+(saved&&saved.at?' (last saved '+new Date(saved.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+')':'')+'. A target you change on a single day in Enter figures stays as it is.':
+    T.src==='suggested'?'<span class="mid">Not saved yet.</span> These are filled in from the daily targets already in the tracker. Check them and press <b>Save targets</b>.':
+    'No targets for '+esc(monthName(m))+' yet. Type each shop\'s target for each weekday, or press <b>Copy last month</b> and adjust.';
+  $('tg-shops').innerHTML=SHOPS.map(s=>{const sh=T.shops[s.id]||{d:[],w:null};
+    return `<div class="card tg-card${dirty?' changed':''}" data-shop="${s.id}"><div class="row-between"><h3>${s.name}</h3><span class="tot" id="tg-tot-${s.id}"></span></div>
+      <div class="days7">${DOW.map((n,i)=>`<div class="field"><label for="tg-${s.id}-${i}">${n} <span class="muted">×${c[i]}</span></label><input id="tg-${s.id}-${i}" data-k="${i}" inputmode="decimal" autocomplete="off" value="${sh.d&&sh.d[i]!=null?sh.d[i]:''}" placeholder="€"></div>`).join('')}
+      <div class="field waste"><label for="tg-${s.id}-w">Waste / day</label><input id="tg-${s.id}-w" data-k="w" inputmode="decimal" autocomplete="off" value="${sh.w!=null?sh.w:''}" placeholder="€"></div></div></div>`}).join('');
+  $('tg-shops').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',onTgInput));
+  updateTgTotals();
+}
+function readTg(){const shops={};let bad=false;
+  for(const s of SHOPS){const get=k=>{const v=$('tg-'+s.id+'-'+k).value.trim().replace(/[€,\s]/g,'');if(v==='')return null;const n=+v;if(!isFinite(n)||n<0){bad=true;return null}return n};
+    shops[s.id]={d:DOW.map((_,i)=>get(i)),w:get('w')}}
+  return{shops,bad}}
+function onTgInput(){const m=S.tg.month;const r=readTg();const was=!!S.tg.drafts[m];S.tg.drafts[m]={src:'draft',shops:r.shops};
+  if(!was){$('tg-status').innerHTML='<span class="mid">Unsaved changes.</span> Press <b>Save targets</b> to apply them to every day of '+esc(monthName(m))+'.';document.querySelectorAll('.tg-card').forEach(c=>c.classList.add('changed'))}
+  updateTgTotals()}
+function updateTgTotals(){
+  const m=S.tg.month,T=curTargets(),pm=addMonths(m,-1),days=monthDays(m),pdays=monthDays(pm);
+  let rows='',tot={cur:0,prev:0,ly:0,w:0};
+  for(const s of SHOPS){const sh=T.shops[s.id];const cur=monthTotal(sh,m);const wk=sh&&sh.d?sh.d.reduce((p,v)=>p+(num(v)||0),0):0;
+    const el=$('tg-tot-'+s.id);if(el)el.textContent=cur?'Month '+eur(cur)+' · week '+eur(wk):'';
+    const prev=sumT(s.id,pdays[0],pdays[pdays.length-1]);
+    let lyS=0,lyN=0;for(const d of days){const L=ly(s.id,d);if(L){lyS+=L.s;lyN++}}
+    const lyFull=lyN>=days.length-2?lyS:0;
+    const w=sh&&num(sh.w)!=null?sh.w*days.length:0;
+    tot.cur+=cur;tot.prev+=prev;tot.ly+=lyFull;tot.w+=w;
+    rows+=`<tr><td><b>${s.name}</b></td><td>${cur?eur(cur):'—'}</td><td>${prev?eur(prev):'—'}</td><td class="${cur&&prev?cls(cur/prev-1):'flat'}">${cur&&prev?pctD(cur/prev-1):'—'}</td><td>${lyFull?eur(lyFull):'—'}</td><td class="${cur&&lyFull?cls(cur/lyFull-1):'flat'}">${cur&&lyFull?pctD(cur/lyFull-1):'—'}</td><td>${w?eur(w):'—'}</td></tr>`}
+  rows+=`<tr class="total"><td>All shops</td><td>${eur(tot.cur)}</td><td>${eur(tot.prev)}</td><td class="${tot.cur&&tot.prev?cls(tot.cur/tot.prev-1):'flat'}">${tot.cur&&tot.prev?pctD(tot.cur/tot.prev-1):'—'}</td><td>${tot.ly?eur(tot.ly):'—'}</td><td></td><td>${eur(tot.w)}</td></tr>`;
+  $('tg-summary').innerHTML=`<thead><tr><th>Shop</th><th>${MON[+m.slice(5,7)-1]} target</th><th>${MON[+pm.slice(5,7)-1]} target</th><th>Change</th><th>Sold ${MON[+m.slice(5,7)-1]} last year</th><th>Target vs last year</th><th>Waste allowance</th></tr></thead><tbody>${rows}</tbody>`;
+}
+function tgMove(n){S.tg.month=addMonths(S.tg.month,n);renderTargets()}
+$('tg-prev').addEventListener('click',()=>tgMove(-1));
+$('tg-next').addEventListener('click',()=>tgMove(1));
+$('tg-copy').addEventListener('click',()=>{const m=S.tg.month,src=targetsFor(addMonths(m,-1));
+  if(src.src==='empty'){toast('No targets found for '+monthName(addMonths(m,-1)));return}
+  S.tg.drafts[m]={src:'draft',shops:JSON.parse(JSON.stringify(src.shops))};renderTargets();toast('Copied from '+monthName(addMonths(m,-1))+'. Adjust and save.')});
+$('tg-save').addEventListener('click',async()=>{
+  if(!db){toast('Saving isn\'t available in this view');return}
+  const m=S.tg.month,r=readTg();
+  if(r.bad){toast('One of the targets isn\'t a valid number');return}
+  $('tg-save').disabled=true;
+  try{const body={month:m,shops:r.shops,at:new Date().toISOString()};await db.doc('targets/'+m).set(body);
+    monthTargets[m]=body;delete S.tg.drafts[m];dataVersion++;toast('Targets saved for '+monthName(m));renderTargets();updateBadge();
+  }catch(e){toast(e&&e.code==='invalid_argument'?'You can view this tracker but not change targets':'Couldn\'t save. Check your connection and try again.')}
+  finally{$('tg-save').disabled=false}
+});
+
+/* ================= COMPARE ================= */
+const CPMODES=[['day','Day vs day'],['week','Week vs week'],['2w','2 weeks vs 2 weeks'],['month','Month vs month'],['custom','Any dates']];
+S.cp={mode:'2w',end:null,a1:null,a2:null,b1:null,b2:null};
+$('cp-mode').innerHTML=CPMODES.map(([k,l])=>`<button data-m="${k}" aria-pressed="false">${l}</button>`).join('');
+$('cp-mode').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.m==='custom'&&S.cp.mode!=='custom'){const r=cpRanges();S.cp.a1=r.a[0];S.cp.a2=r.a[1];S.cp.b1=r.b[0];S.cp.b2=r.b[1]}
+  S.cp.mode=b.dataset.m;renderCompare()}));
+$('cp-end').addEventListener('change',e=>{if(e.target.value){S.cp.end=e.target.value;renderCompare()}});
+['a1','a2','b1','b2'].forEach(k=>$('cp-'+k).addEventListener('change',e=>{S.cp[k]=e.target.value||null;renderCompare()}));
+function cpEnd(){return S.cp.end||latest||yesterday()}
+function cpRanges(){
+  const m=S.cp.mode,E=cpEnd();
+  if(m==='day')return{a:[E,E],b:[addDays(E,-7),addDays(E,-7)],bWord:'the same day last week'};
+  if(m==='week'){const s=monday(E);return{a:[s,addDays(s,6)],b:[addDays(s,-7),addDays(s,-1)],bWord:'the week before'}}
+  if(m==='2w'){const e=addDays(monday(E),6),s=addDays(e,-13);return{a:[s,e],b:[addDays(s,-14),addDays(s,-1)],bWord:'the 2 weeks before'}}
+  if(m==='month'){const f=E.slice(0,8)+'01',pf=addMonths(E.slice(0,7),-1)+'-01';return{a:[f,monthEnd(f)],b:[pf,monthEnd(pf)],bWord:'the month before'}}
+  return{a:[S.cp.a1,S.cp.a2],b:[S.cp.b1,S.cp.b2],bWord:'the comparison period'};
+}
+const rangeLabel=r=>r[0]===r[1]?fmtLong(r[0]):fmtShortD(r[0])+' – '+fmtShortD(r[1])+' '+r[1].slice(0,4);
+const rangeShort=r=>r[0]===r[1]?DOW[dow(r[0])]+' '+fmtShortD(r[0]):fmtShortD(r[0])+' – '+fmtShortD(r[1]);
+/* Target for comparing: the tracker's own target; if a day has none (its month's targets aren't saved),
+   the same weekday's target from the most recent earlier month that has targets. */
+function lastTargetsBefore(d){const ms=Object.keys(monthTargets).filter(m=>m<d.slice(0,7)).sort();return ms.length?monthTargets[ms[ms.length-1]]:null}
+function cpTgt(id,d){const v=tgt(id,d);if(v!=null)return{v,sub:false};const m=lastTargetsBefore(d),sh=m&&m.shops&&m.shops[id];
+  if(sh&&Array.isArray(sh.d)&&num(sh.d[dow(d)])!=null)return{v:sh.d[dow(d)],sub:true,from:m.month};return{v:null,sub:false}}
+function cpWtgt(id,d){const v=wtgt(id,d);if(v!=null)return v;const m=lastTargetsBefore(d),sh=m&&m.shops&&m.shops[id];return sh&&num(sh.w)!=null?sh.w:null}
+function cpAgg(ids,r){
+  const a={s:0,t:0,c:0,w:0,wt:0,wtW:0,days:0,expect:0,subs:new Set(),subFrom:new Set(),noT:0};
+  const lastD=latest||yesterday();
+  for(const id of ids)for(const d of range(r[0],r[1])){
+    if(d<=lastD&&(!first[id]||d>=first[id]))a.expect++;
+    const row=D[id][d];if(!hasSales(row))continue;
+    a.days++;a.s+=row.s;a.c+=num(row.c)||0;
+    const T=cpTgt(id,d);if(T.v!=null){a.t+=T.v;if(T.sub){a.subs.add(d);a.subFrom.add(T.from)}}else a.noT++;
+    if(num(row.w)!=null){a.w+=row.w;const wt=cpWtgt(id,d);if(wt){a.wt+=wt;a.wtW+=row.w}}
+  }
+  a.ach=a.t?a.s/a.t:null;a.basket=a.c?a.s/a.c:null;a.wPct=a.s?a.w/a.s:null;a.wVsT=a.wt?a.wtW/a.wt:null;return a;
+}
+const chg=(x,y)=>x!=null&&y?x/y-1:null;
+const vsT=a=>a.ach==null?null:a.ach-1;
+function renderCompare(){
+  $('cp-mode').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===S.cp.mode)));
+  const custom=S.cp.mode==='custom';$('cp-preset').hidden=custom;$('cp-custom').hidden=!custom;
+  $('cp-end').value=cpEnd();['a1','a2','b1','b2'].forEach(k=>$('cp-'+k).value=S.cp[k]||'');
+  const R=cpRanges();
+  const bad=!R.a[0]||!R.a[1]||!R.b[0]||!R.b[1]?'Fill in all four dates.':(R.a[0]>R.a[1]||R.b[0]>R.b[1])?'Each period\'s start date must be on or before its end date.':'';
+  const clear=()=>{$('cp-tiles').innerHTML='';$('cp-table').innerHTML='';$('cp-table-hint').textContent='';['cp-chart1','cp-chart2','cp-legend1','cp-legend2'].forEach(id=>$(id).innerHTML='');$('cp-report').hidden=true;$('cp-report-hint').textContent=''};
+  if(bad){$('cp-summary').innerHTML=`<span class="down">${esc(bad)}</span>`;clear();return}
+  const A=cpAgg(ALL,R.a),B=cpAgg(ALL,R.b);
+  const nA=range(R.a[0],R.a[1]).length,nB=range(R.b[0],R.b[1]).length;
+  const notes=[];
+  if(nA!==nB)notes.push(`The periods have different lengths (${nA} and ${nB} days), so totals aren't like for like. Compare the % vs target and basket instead.`);
+  [[A,'This period'],[B,'The comparison period']].forEach(([x,l])=>{if(x.days<x.expect)notes.push(`${l} is missing figures for ${x.expect-x.days} shop-day${x.expect-x.days===1?'':'s'}.`)});
+  if(R.a[1]>(latest||yesterday()))notes.push('This period isn\'t finished yet: figures run up to '+fmtLong(latest||yesterday())+'.');
+  const subs=[...new Set([...A.subs,...B.subs])].sort(),from=[...new Set([...A.subFrom,...B.subFrom])];
+  if(subs.length)notes.push(`No targets saved for ${subs.map(fmtShortD).join(', ')}, so the ${from.map(monthName).join(' / ')} targets for the same weekday are used.`);
+  if(A.noT||B.noT)notes.push('Some days have no target at all, so % vs target leaves them out.');
+  $('cp-summary').innerHTML=`<b>${esc(rangeLabel(R.a))}</b> <span class="muted">compared with</span> <b>${esc(rangeLabel(R.b))}</b>`+(notes.length?`<ul class="cp-notes">${notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:'');
+  const tA=vsT(A),tB=vsT(B);
+  $('cp-tiles').innerHTML=[
+    tile('Sales',eur(A.s),`<span class="${cls(chg(A.s,B.s))}">${pctD(chg(A.s,B.s))}</span> vs ${eur(B.s)}`),
+    tile('vs target',`<span class="${tA==null?'flat':tA>=0?'up':tA>=-.05?'mid':'down'}">${pctD(tA)}</span>`,A.t?`${eur(Math.abs(A.s-A.t))} ${A.s>=A.t?'ahead':'behind'} · before: ${pctD(tB)}`:'No target'),
+    tile('Customers',int(A.c),`<span class="${cls(chg(A.c,B.c))}">${pctD(chg(A.c,B.c))}</span> · ${A.c>=B.c?'+':'−'}${int(Math.abs(A.c-B.c))}`),
+    tile('Avg basket',A.basket?eur2(A.basket):'—',B.basket?`<span class="${cls(chg(A.basket,B.basket))}">${pctD(chg(A.basket,B.basket))}</span> vs ${eur2(B.basket)}`:''),
+    tile('Waste',eur(A.w),`<span class="${cls(chg(A.w,B.w),false)}">${pctD(chg(A.w,B.w))}</span> vs ${eur(B.w)}${A.wPct!=null?' · '+(A.wPct*100).toFixed(2)+'% of sales':''}`),
+  ].join('');
+  const per=SHOPS.map(s=>({s,a:cpAgg([s.id],R.a),b:cpAgg([s.id],R.b)}));
+  const tcls=v=>v==null?'flat':v>=0?'up':v>=-.05?'mid':'down';
+  const row=(name,a,b,tot)=>{const g=chg(a.s,b.s),ta=vsT(a),tb=vsT(b);
+    return `<tr class="${tot?'total':''}"><td>${tot?name:'<b>'+esc(name)+'</b>'}</td><td>${eur(a.s)}</td><td>${eur(b.s)}</td><td class="${cls(g)}">${pctD(g)}</td><td class="${tcls(ta)}">${pctD(ta)}</td><td class="${tcls(tb)}">${pctD(tb)}</td><td class="${a.t?(a.s>=a.t?'up':'down'):'flat'}">${a.t?(a.s>=a.t?'+':'−')+'€'+Math.abs(Math.round(a.s-a.t)).toLocaleString('en-GB'):'—'}</td><td class="${cls(chg(a.c,b.c))}">${pctD(chg(a.c,b.c))}</td><td>${a.basket?eur2(a.basket):'—'}</td><td>${b.basket?eur2(b.basket):'—'}</td><td>${eur(a.w)}</td><td>${eur(b.w)}</td><td class="${a.wVsT==null?'':a.wVsT<=1?'up':'down'}">${pctA(a.wVsT)}</td></tr>`};
+  const sa=rangeShort(R.a),sb=rangeShort(R.b);
+  $('cp-table').innerHTML=`<thead><tr><th>Shop</th><th>Sales<br>${esc(sa)}</th><th>Sales<br>${esc(sb)}</th><th>Change</th><th>vs target<br>${esc(sa)}</th><th>vs target<br>${esc(sb)}</th><th>€ vs target<br>${esc(sa)}</th><th>Customers<br>change</th><th>Basket<br>${esc(sa)}</th><th>Basket<br>${esc(sb)}</th><th>Waste<br>${esc(sa)}</th><th>Waste<br>${esc(sb)}</th><th>Waste<br>vs target</th></tr></thead><tbody>${per.map(x=>row(x.s.name,x.a,x.b)).join('')}${row('All shops',A,B,true)}</tbody>`;
+  $('cp-table-hint').textContent='Sorted as in the rest of the tracker. Green is ahead of target or up; amber is up to 5% behind target; red is further behind or down.';
+  const names=SHOPS.map(s=>s.name);
+  const s1=[{name:sb,values:per.map(x=>x.b.days?x.b.s:null),color:'var(--c-ly)',type:'bar'},{name:sa,values:per.map(x=>x.a.days?x.a.s:null),color:'var(--c-act)',type:'bar'}];
+  legend('cp-legend1',s1);chart($('cp-chart1'),{labels:names,series:s1,fmt:eur,axis:axisEur,zero:true,height:240,allLabels:true});
+  const s2=[{name:sb,values:per.map(x=>vsT(x.b)),color:'var(--c-ly)',type:'bar'},{name:sa,values:per.map(x=>vsT(x.a)),color:'var(--c-act)',type:'bar'}];
+  legend('cp-legend2',s2);chart($('cp-chart2'),{labels:names,series:s2,fmt:pctD,axis:v=>Math.round(v*100)+'%',zero:true,height:240,allLabels:true});
+  $('cp-report').hidden=!mcp;
+  $('cp-report-hint').textContent=mcp?'Adds the reasons from the gap checks and departments. Arrives as a notification.':'';
+}
+$('cp-report').addEventListener('click',()=>{const R=cpRanges();
+  startReport($('cp-report'),'Get the full report for these dates',
+    'Run requested from the Compare tab in the Shop Tracker at '+new Date().toISOString()+'. For this run only, ignore the default weekly period in the task instructions. Main period: '+R.a[0]+' to '+R.a[1]+'. Comparison period: '+R.b[0]+' to '+R.b[1]+'. Compare the main period against the comparison period, per shop and in total, with the same analysis, target rule and report layout. If the periods differ in length, say so and lean on % vs target, basket and per-day averages. For gap checks, use the checks dated within each period, and say where a period has too few checks to compare. For category movers, use the weekly department reports whose weeks fall inside each period.');
+});
+
+/* ---------- render ---------- */
+function render(){
+  if(S.tab==='enter')renderEnter(false);
+  else if(S.tab==='overview')renderOverview();
+  else if(S.tab==='compare')renderCompare();
+  else if(S.tab==='trends')renderTrends();
+  else if(S.tab==='targets')renderTargets();
+  else if(S.tab==='dept')renderDept();
+  else renderAlerts();
+  if(loaded)updateBadge();
+}
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(S.tab==='trends')renderTrends()},200)});
+
+function setSync(state,text){const s=$('sync');s.className='sync '+state;s.querySelector('span').textContent=text}
+
+/* ---------- weekly report button ----------
+   Starts Keith's "Weekly sales & availability report" scheduled task, which reads this tracker
+   and the Gap Check Tracker and sends the report as a notification. */
+const REPORT_TASK='trig_01WoBY42fGsQCc5mv4i6M9gR',REPORT_SERVER='Claude Code Remote';
+let mcp=null,repBusy=false;
+function repShow(kind,text){$('rep-text').textContent=text;$('rep-msg').className='rep-msg '+kind;$('rep-msg').hidden=false}
+$('rep-close').addEventListener('click',()=>{$('rep-msg').hidden=true});
+function repResetBtn(b,label){b.disabled=false;b.textContent=label;repBusy=false}
+async function startReport(b,label,note){
+  if(!mcp||repBusy)return;repBusy=true;b.disabled=true;b.textContent='Starting…';
+  try{
+    await mcp.callTool(REPORT_SERVER,'fire_trigger',{trigger_id:REPORT_TASK,text:note},{cache:false});
+    repShow('ok','Report started. It reads these sales figures and the gap checks, and you\'ll get a notification when it\'s ready, usually within 10 minutes.');
+    b.textContent='Report started';setTimeout(()=>repResetBtn(b,label),60000);
+  }catch(e){const c=e&&e.code;
+    if(c==='approval_required'){repShow('warn','Starting the report needs your approval. Press the button again and choose Allow.');repResetBtn(b,label)}
+    else if(c==='not_in_manifest'){repShow('warn','This page isn\'t allowed to start the report. Turn on Claude Code Remote in this page\'s Permissions menu, then try again.');repResetBtn(b,label)}
+    else if(c==='server_not_connected'||c==='selection_required'||c==='server_not_found'){repShow('bad','Claude Code Remote isn\'t connected for your account. Add it in claude.ai Settings → Connectors, then try again.');repResetBtn(b,label)}
+    else if(c==='needs_reauth'){repShow('bad','Claude Code Remote needs reconnecting. Reconnect it in claude.ai Settings → Connectors, then try again.');repResetBtn(b,label)}
+    else if(c==='blocked_by_policy'){repShow('bad','Your organisation\'s settings don\'t allow this page to start the report.');repResetBtn(b,label)}
+    else if(c==='tool_error'){repShow('bad','The report couldn\'t be started. Check that "Weekly sales & availability report" is still in your scheduled tasks, or ask Claude to run it.');repResetBtn(b,label)}
+    else if(c==='not_granted'||c==='capability_disabled'||c==='capability_removed'){mcp=null;$('rep-btn').hidden=true;$('cp-report').hidden=true;repShow('warn','Starting the report isn\'t available in this view. Open the tracker in claude.ai.');repBusy=false}
+    else{repShow('warn','It isn\'t clear whether the report started. Wait about 10 minutes for the notification before pressing the button again.');b.textContent='Waiting…';setTimeout(()=>repResetBtn(b,label),60000)}
+  }
+}
+$('rep-btn').addEventListener('click',()=>startReport($('rep-btn'),'Generate weekly report','Run requested from the "Generate weekly report" button in the Shop Tracker at '+new Date().toISOString()+'. Report on the most recent Monday to Sunday week whose Sunday figures have been entered (if today is Sunday and today\'s figures are in, that means the week ending today), compared with the week before it.'));
+
+/* ---------- boot ---------- */
+setTab(TABS.includes(S.tab)?S.tab:'enter');
+(async()=>{
+  const c=window.claude;if(!c||!c.use){$('nodb').hidden=false;setSync('err','Offline');return}
+  c.use('downloads').then(d=>{downloads=d;if(S.tab==='overview')$('o-export').hidden=!d}).catch(()=>{});
+  c.use('mcp').then(m=>{mcp=m;$('rep-btn').hidden=!m;if(S.tab==='compare')renderCompare()}).catch(()=>{});
+  db=await c.use('db');
+  if(!db){$('nodb').hidden=false;setSync('err','Not connected');return}
+  setSync('','Loading figures…');
+  db.collection('months').limit(1000).onSnapshot(snap=>{
+    monthDocs={};snap.docs.forEach(d=>{if(d.exists)monthDocs[d.id]=d.data()});
+    rebuild();dataVersion++;loaded=true;
+    setSync('live','Live · up to '+(latest?fmtShortD(latest):'—'));
+    if(S.tab==='enter'){renderEnter(!S.e.dirty)}else render();updateBadge();
+  },err=>{setSync('err','Connection lost. Reload the page');});
+  db.doc('reportIndex/all').onSnapshot(sn=>{repIndex=sn.exists?Object.assign({},sn.data().entries||{}):{};repIndexExists=sn.exists;if(S.tab==='dept')renderDept()},()=>{});
+  db.collection('targets').limit(500).onSnapshot(snap=>{
+    monthTargets={};snap.docs.forEach(d=>{if(d.exists)monthTargets[d.id]=d.data()});
+    dataVersion++;
+    if(S.tab==='enter'){renderEnter(!S.e.dirty)}else render();if(loaded)updateBadge();
+  },()=>{});
+})();
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="spar-page" content="admin">
+<title>Manage access · SPAR Malta Hub</title>
+<script>try{var t=localStorage.getItem("sparHubTheme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+header{padding-block:24px 18px;border-bottom:1px solid var(--line);margin-bottom:22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-weight:700;font-size:28px;margin:0}
+h2{font-weight:600;font-size:22px;margin:0 0 4px}
+.lede{color:var(--muted);font-size:14px;margin:0 0 16px}
+section{margin-bottom:22px}
+.addform{display:grid;grid-template-columns:1.4fr 1.2fr .8fr auto;gap:10px;align-items:end}
+.addform .field{margin:0}
+@media (max-width:720px){.addform{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:700;padding:8px 8px;border-bottom:1px solid var(--line)}
+td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td select{min-height:38px;padding:6px 8px;width:auto}
+td .btn{min-height:36px;padding:6px 12px;font-size:13.5px}
+.email{color:var(--muted);font-size:13.5px;word-break:break-all}
+.you{font-size:12px;font-weight:700;color:var(--accent);margin-left:6px}
+.tablewrap{overflow-x:auto}
+@media (max-width:560px){
+  thead{display:none}
+  tr{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  td{border:0;padding:0}
+  td.r-name{grid-column:1/-1}
+}
+textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--fg);background:var(--panel-2);
+  border:1px solid var(--line);border-radius:8px;padding:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.roles{font-size:13.5px;color:var(--muted);margin:14px 0 0;line-height:1.6}
+.roles b{color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true">SP<span class="dot"></span></div>
+      <h1>Manage access</h1>
+    </div>
+    <a class="btn btn-ghost" href="./">← Back to hub</a>
+  </header>
+
+  <div id="notAdmin" class="panel" hidden>
+    <h2>Admins only</h2>
+    <p class="lede">Only hub admins can manage who has access.</p>
+  </div>
+
+  <div id="adminUi" hidden>
+    <section class="panel">
+      <h2>Add a person</h2>
+      <p class="lede">They'll get an email with a link to choose their own password. Access starts straight away.</p>
+      <div id="addMsg" role="status" aria-live="polite"></div>
+      <form class="addform" id="addForm" novalidate>
+        <div class="field"><label for="nEmail">Email</label><input id="nEmail" type="email" inputmode="email" autocomplete="off" required></div>
+        <div class="field"><label for="nName">Name</label><input id="nName" type="text" autocomplete="off" placeholder="e.g. Maria Borg"></div>
+        <div class="field"><label for="nRole">Access</label>
+          <select id="nRole"><option value="edit">Can edit</option><option value="view">View only</option><option value="admin">Admin</option></select></div>
+        <button class="btn btn-primary" id="addBtn" type="submit">Add</button>
+      </form>
+      <p class="roles"><b>View only</b> — sees everything, changes nothing. <b>Can edit</b> — uses the tools fully (imports, ticks, notes). <b>Admin</b> — can edit, plus manages this page.</p>
+    </section>
+
+    <section class="panel">
+      <h2>People with access</h2>
+      <p class="lede">Removing someone cuts them off immediately, even if they're signed in.</p>
+      <div id="listMsg" role="status" aria-live="polite"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Person</th><th>Access</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Import saved data</h2>
+      <p class="lede">For moving the data that's saved in the claude.ai versions of the tools. Paste the export file's contents (or choose the file) and press Import. Existing records with the same name are overwritten.</p>
+      <div id="impMsg" role="status" aria-live="polite"></div>
+      <textarea id="impText" spellcheck="false" placeholder='{"tool":"cash-analyser","docs":{"reports/2026-w44":{...}},"storage":{"key":"value"}}'></textarea>
+      <div class="row">
+        <input type="file" id="impFile" accept=".json,application/json" style="width:auto;max-width:100%;min-height:0;padding:6px">
+        <button class="btn btn-primary" id="impBtn" type="button">Import</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script type="module">
+  const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
+  const $ = (id) => document.getElementById(id);
+  const say = (where, text, kind = "ok") => {
+    $(where).innerHTML = "";
+    if (!text) return;
+    const p = document.createElement("p"); p.className = "msg " + kind; p.textContent = text; $(where).appendChild(p);
+  };
+  const ROLES = { admin: "Admin", edit: "Can edit", view: "View only" };
+  const TOOLS = ["shop-tracker", "gap-check", "weekly-checklist", "staff-unders", "cash-analyser"];
+
+  const me = await SPAR.ready;
+  if (me.role !== "admin") { $("notAdmin").hidden = false; throw new Error("not admin"); }
+  $("adminUi").hidden = false;
+
+  const c = await SPAR.firebase();           // { app, auth, db, fs, authMod }
+  const { fs, db, auth, authMod } = c;
+  const { initializeApp, getApps } = await import(FB + "firebase-app.js");
+
+  // ── People list ──
+  fs.onSnapshot(fs.collection(db, "members"), (qs) => {
+    const tb = $("rows"); tb.innerHTML = "";
+    const list = qs.docs.map((d) => ({ email: d.id, ...d.data() }))
+      .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="3" class="muted">No one yet.</td></tr>'; return; }
+    for (const m of list) {
+      const tr = document.createElement("tr");
+      const tdN = document.createElement("td"); tdN.className = "r-name";
+      const nm = document.createElement("div"); nm.textContent = m.name || m.email;
+      if (m.email === me.email) { const y = document.createElement("span"); y.className = "you"; y.textContent = "YOU"; nm.appendChild(y); }
+      const em = document.createElement("div"); em.className = "email"; em.textContent = m.email;
+      tdN.append(nm, em);
+
+      const tdR = document.createElement("td");
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", "Access for " + m.email);
+      for (const [v, l] of Object.entries(ROLES)) { const o = new Option(l, v, false, m.role === v); sel.add(o); }
+      sel.onchange = async () => {
+        try { await fs.updateDoc(fs.doc(db, "members", m.email), { role: sel.value, updatedAt: Date.now() }); say("listMsg", `${m.name || m.email} is now “${ROLES[sel.value]}”.`); }
+        catch (e) { say("listMsg", "Couldn't change access: " + (e.code || e.message), "err"); sel.value = m.role; }
+      };
+      tdR.appendChild(sel);
+
+      const tdA = document.createElement("td"); tdA.style.textAlign = "right";
+      const actions = document.createElement("div"); actions.className = "row"; actions.style.cssText = "margin:0;justify-content:flex-end";
+      const resend = document.createElement("button"); resend.className = "btn btn-ghost"; resend.type = "button"; resend.textContent = "Send password link";
+      resend.onclick = async () => {
+        try { await authMod.sendPasswordResetEmail(auth, m.email); say("listMsg", "Password link sent to " + m.email + "."); }
+        catch (e) { say("listMsg", "Couldn't send: " + (e.code || e.message), "err"); }
+      };
+      actions.appendChild(resend);
+      if (m.email !== me.email) {
+        const del = document.createElement("button"); del.className = "btn btn-danger"; del.type = "button"; del.textContent = "Remove";
+        del.onclick = async () => {
+          if (!confirm(`Remove ${m.name || m.email}'s access to the hub?`)) return;
+          try { await fs.deleteDoc(fs.doc(db, "members", m.email)); say("listMsg", (m.name || m.email) + " no longer has access."); }
+          catch (e) { say("listMsg", "Couldn't remove: " + (e.code || e.message), "err"); }
+        };
+        actions.appendChild(del);
+      }
+      tdA.appendChild(actions);
+      tr.append(tdN, tdR, tdA);
+      tb.appendChild(tr);
+    }
+  }, (e) => say("listMsg", "Couldn't load the list: " + (e.code || e.message), "err"));
+
+  // ── Add a person ──
+  function randomPassword() {
+    const a = new Uint8Array(24); crypto.getRandomValues(a);
+    return btoa(String.fromCharCode(...a)) + "aA1!";
+  }
+  $("addForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const email = $("nEmail").value.trim().toLowerCase();
+    const name = $("nName").value.trim();
+    const role = $("nRole").value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("addMsg", "Enter a valid email address.", "err"); return; }
+    $("addBtn").disabled = true;
+    try {
+      await fs.setDoc(fs.doc(db, "members", email), { name, role, addedBy: me.email, addedAt: Date.now() });
+      // Create their login with a throwaway password, using a separate
+      // connection so you stay signed in as yourself.
+      const inviteApp = getApps().find((a) => a.name === "invite") || initializeApp(window.SPAR_FIREBASE_CONFIG, "invite");
+      const inviteAuth = authMod.getAuth(inviteApp);
+      let existed = false;
+      try {
+        await authMod.createUserWithEmailAndPassword(inviteAuth, email, randomPassword());
+        await authMod.signOut(inviteAuth);
+      } catch (e) {
+        if (e.code === "auth/email-already-in-use") existed = true; else throw e;
+      }
+      await authMod.sendPasswordResetEmail(auth, email);
+      say("addMsg", existed
+        ? `${name || email} added. They already had a login, so they can sign in now — a password link was sent too in case they need it.`
+        : `${name || email} added. They've been emailed a link to choose their password, then they sign in at this site's address.`);
+      $("addForm").reset();
+    } catch (e) {
+      say("addMsg", "Couldn't add: " + (e.code || e.message), "err");
+    }
+    $("addBtn").disabled = false;
+  });
+
+  // ── Import ──
+  $("impFile").onchange = async () => { const f = $("impFile").files[0]; if (f) $("impText").value = await f.text(); };
+
+  function toFsPath(tool, path) {
+    const s = path.replace(/^\/+|\/+$/g, "").split("/");
+    if (s.some((x) => !x)) throw new Error("Bad path: " + path);
+    if (s.length % 2) throw new Error("Not a document path (odd number of parts): " + path);
+    if (s[0] === "data" && s[1] === "users") throw new Error("Private per-person data can't be imported for someone else: " + path);
+    return ["apps", tool, ...s];
+  }
+  $("impBtn").onclick = async () => {
+    let payload;
+    try { payload = JSON.parse($("impText").value); } catch (e) { say("impMsg", "That isn't valid JSON.", "err"); return; }
+    const packs = Array.isArray(payload) ? payload : [payload];
+    $("impBtn").disabled = true;
+    let n = 0;
+    try {
+      for (const p of packs) {
+        if (!TOOLS.includes(p.tool)) throw new Error(`Unknown tool "${p.tool}". Use one of: ${TOOLS.join(", ")}`);
+        const writes = [];
+        for (const [path, body] of Object.entries(p.docs || {}))
+          writes.push([fs.doc(db, ...toFsPath(p.tool, path)), body]);
+        for (const [key, value] of Object.entries(p.storage || {}))
+          writes.push([fs.doc(db, "apps", p.tool, "_kv", encodeURIComponent(key).replace(/\./g, "%2E")),
+            { key, value: typeof value === "string" ? value : JSON.stringify(value), updatedAt: Date.now() }]);
+        for (let i = 0; i < writes.length; i += 400) {
+          const b = fs.writeBatch(db);
+          for (const [ref, body] of writes.slice(i, i + 400)) b.set(ref, body);
+          await b.commit();
+        }
+        n += writes.length;
+      }
+      say("impMsg", `Imported ${n} record${n === 1 ? "" : "s"}.`);
+    } catch (e) {
+      say("impMsg", "Import stopped: " + (e.code || e.message), "err");
+    }
+    $("impBtn").disabled = false;
+  };
+</script>
+</body>
+</html>
