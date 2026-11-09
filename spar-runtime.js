@@ -79,14 +79,22 @@
         fs.getDoc(fs.doc(db, "members", email)).then(function (snap) {
           if (!snap.exists()) throw { code: "permission-denied" };
           var member = snap.data();
-          ctx = { app: app, auth: auth, db: db, fs: fs, authMod: authMod, user: user, member: member };
-          // Keep a small public profile so tools can show names for ids.
-          var prof = { name: member.name || user.displayName || email, email: email, role: member.role || "view" };
-          fs.setDoc(fs.doc(db, "profiles", user.uid), prof, { merge: true }).catch(function () {});
-          readyResolve(ctx);
-          unlock();
-          if (PAGE === "tool") addPill();
-          document.dispatchEvent(new CustomEvent("spar:ready", { detail: publicCtx() }));
+          return fs.getDocs(fs.collection(db, "stores")).catch(function () { return { docs: [] }; }).then(function (qs) {
+            var all = qs.docs.map(function (d) { var x = d.data(); x.code = d.id; return x; })
+              .sort(function (a, b) { return String(a.name || a.code).localeCompare(String(b.name || b.code)); });
+            var seesAll = SEES_ALL.indexOf(member.role) >= 0;
+            var mine = Array.isArray(member.stores) ? member.stores : [];
+            var visible = all.filter(function (st) { return st.active !== false && (seesAll || mine.indexOf(st.code) >= 0); });
+            ctx = { app: app, auth: auth, db: db, fs: fs, authMod: authMod, user: user, member: member,
+              stores: visible, allStores: all, seesAll: seesAll };
+            // Keep a small public profile so modules can show names for ids.
+            var prof = { name: member.name || user.displayName || email, email: email, role: member.role || "" };
+            fs.setDoc(fs.doc(db, "profiles", user.uid), prof, { merge: true }).catch(function () {});
+            readyResolve(ctx);
+            unlock();
+            if (PAGE === "tool") addPill();
+            document.dispatchEvent(new CustomEvent("spar:ready", { detail: publicCtx() }));
+          });
         }).catch(function (err) {
           if (err && err.code === "permission-denied") {
             showNotice("No access yet",
@@ -106,13 +114,37 @@
     });
   }
 
+  var SEES_ALL = ["admin", "hq", "support"];
+  var ROLE_LABELS = { admin: "Admin", hq: "Head Office", support: "Support", rom: "ROM", sm: "Store Manager" };
+  var STORE_KEY = "sparStore";
+
   function publicCtx() {
     if (!ctx) return null;
+    var role = ctx.member.role || "";
+    var stores = ctx.stores.slice();
+    function current() {
+      var saved = null;
+      try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
+      var hit = stores.filter(function (s) { return s.code === saved; })[0];
+      return hit || stores[0] || null;
+    }
     return {
       uid: ctx.user.uid,
       email: (ctx.user.email || "").toLowerCase(),
       name: ctx.member.name || ctx.user.email,
-      role: ctx.member.role || "view",
+      role: role,
+      roleLabel: ROLE_LABELS[role] || role,
+      isAdmin: role === "admin",
+      isHQ: role === "admin" || role === "hq",
+      seesAll: ctx.seesAll,
+      stores: stores,                 // stores this person may see (active only)
+      allStores: ctx.allStores.slice(),
+      store: function () { return current(); },
+      setStore: function (code) { try { localStorage.setItem(STORE_KEY, code); } catch (e) {} },
+      storeName: function (code) {
+        var hit = ctx.allStores.filter(function (s) { return s.code === code; })[0];
+        return hit ? hit.name : code;
+      },
       signOut: function () { return ctx.authMod.signOut(ctx.auth).then(goLogin); }
     };
   }
@@ -418,7 +450,7 @@
     return { id: id, name: name, avatarUrl: avatarFor(name, color), color: color,
       email: (data && data.email) || null, isMe: id === myId, guest: false };
   }
-  function role() { return (ctx && ctx.member && ctx.member.role) || "view"; }
+  function role() { return (ctx && ctx.member && ctx.member.role) || "sm"; }
 
   var userNs = Object.freeze({
     isOwner: function () { return ready.then(function () { return role() === "admin"; }, function () { return false; }); },
@@ -426,7 +458,7 @@
     can: function (name) {
       return ready.then(function () {
         var r = role();
-        if (name === "data.write") return r === "admin" || r === "edit";
+        if (name === "data.write") return ["admin", "hq", "support", "rom"].indexOf(r) >= 0;
         if (name === "files.write" || name === "assets.write") return r === "admin";
         return false;
       }, function () { return null; });

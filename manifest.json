@@ -1,0 +1,14 @@
+{
+  "name": "SPAR Malta Hub",
+  "short_name": "SPAR Hub",
+  "description": "SPAR Malta store operations modules",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F4F4",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

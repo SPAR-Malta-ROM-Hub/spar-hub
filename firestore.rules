@@ -1,13 +1,16 @@
 rules_version = '2';
 
-// SPAR Malta Hub — database rules.
+// SPAR Malta Hub — database rules (version 2: store-based access).
 // Paste this whole file into Firebase console → Firestore Database → Rules → Publish.
 //
 // Who gets in is decided by the "members" collection: one document per
-// person, named by their email (lower case), with a "role" of:
-//   admin — everything, plus manage who has access
-//   edit  — read and change data in all tools
-//   view  — read only
+// person, named by their email (lower case), with:
+//   role   — admin   : everything, plus manage people and stores
+//            hq      : Head Office — sees all stores, posts DAPs, sets module settings
+//            support : support teams — sees and works in all stores
+//            rom     : Regional Operations Manager — their own stores
+//            sm      : Store Manager — their own store
+//   stores — list of store codes (for rom and sm), e.g. ["MXK","SLM"]
 // Anyone not listed gets nothing, even with a valid login.
 
 service cloud.firestore {
@@ -25,40 +28,75 @@ service cloud.firestore {
     function isMember() {
       return signedIn() && exists(memberDoc());
     }
-    function myRole() {
-      return get(memberDoc()).data.role;
+    function me() {
+      return get(memberDoc()).data;
     }
-    function canWrite() {
-      return isMember() && myRole() in ['admin', 'edit'];
+    function role() {
+      return me().role;
     }
     function isAdmin() {
-      return isMember() && myRole() == 'admin';
+      return isMember() && role() == 'admin';
+    }
+    function isHQ() {
+      return isMember() && role() in ['admin', 'hq'];
+    }
+    function seesAll() {
+      return role() in ['admin', 'hq', 'support'];
+    }
+    function hasStore(code) {
+      return isMember() && (seesAll() || (me().stores is list && code in me().stores));
     }
 
-    // Access list. Members may read their own entry (to log in);
-    // only admins see or change the full list.
+    // ── People ──
     match /members/{email} {
       allow get: if signedIn() && (email == myEmail() || isAdmin());
       allow list: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.role in ['admin', 'edit', 'view']
+        && request.resource.data.role in ['admin', 'hq', 'support', 'rom', 'sm']
         && email == email.lower();
       allow delete: if isAdmin() && email != myEmail();   // can't lock yourself out
     }
 
-    // Display names, so tools can show who did what.
+    // Display names, so modules can show who did what.
     match /profiles/{uid} {
       allow read: if isMember();
       allow write: if isMember() && request.auth.uid == uid;
     }
 
-    // Shared tool data (checklist ticks, unders, cash reports, …).
-    match /apps/{tool}/{rest=**} {
+    // ── Store list (from the Store Mapping) ──
+    match /stores/{code} {
       allow read: if isMember();
-      allow write: if canWrite();
+      allow write: if isAdmin();
     }
 
-    // Each person's private tool data — nobody else can read it.
+    // ── Modules ──
+    // Store data: each store's records, seen only by people with that store.
+    match /modules/{module}/stores/{code}/{rest=**} {
+      allow read: if hasStore(code);
+      allow write: if module != 'dap' && hasStore(code);
+    }
+    // Module settings (checklist templates, product lists…): everyone reads, Head Office edits.
+    match /modules/{module}/config/{rest=**} {
+      allow read: if isMember();
+      allow write: if isHQ();
+    }
+
+    // DAP: Head Office posts; stores can only tick off and add a note.
+    match /modules/dap/stores/{code}/posts/{id} {
+      allow read: if hasStore(code);
+      allow create, delete: if isHQ();
+      allow update: if isHQ() || (hasStore(code)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['done', 'note', 'status', 'ackBy', 'ackName', 'ackAt', 'seenAt']));
+    }
+
+    // ── Earlier tools moved from claude.ai (Keith's Shop Tracker, Gap Check) ──
+    match /apps/{tool}/{rest=**} {
+      allow read: if isMember() && role() != 'sm';
+      allow write: if isMember() && role() in ['admin', 'hq', 'support', 'rom'];
+    }
+
+    // Each person's private settings — nobody else can read them.
     match /private/{uid}/{rest=**} {
       allow read, write: if isMember() && request.auth.uid == uid;
     }

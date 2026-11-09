@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="dap">
+<title>DAP · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.post{border:1px solid var(--line);border-left:6px solid var(--brand);border-radius:14px;background:#fff;padding:16px 18px;margin-bottom:12px}
+.post.done{border-left-color:var(--gd);opacity:.92}
+.post.urgent{border-left-color:#8B0A10;background:#FFFBFB}
+.post-head{display:flex;gap:8px 12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.post-head h3{font-size:17px;margin:0}
+.post-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+.post-body{white-space:pre-wrap;margin:10px 0 0;line-height:1.5}
+.items{list-style:none;padding:0;margin:12px 0 0}
+.items li{border-top:1px solid var(--line)}
+.items label{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;cursor:pointer;font-size:14.5px;line-height:1.4}
+.items input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--gd)}
+.items .ticked{color:var(--muted);text-decoration:line-through}
+.post-foot{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
+.post-foot textarea{flex:1 1 260px;min-height:44px}
+.donebox{margin-top:10px;font-size:13px;color:var(--gd);font-weight:700}
+.audience{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px}
+.audience label{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px}
+.storeboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--soft)}
+.storeboxes label{display:flex;gap:7px;align-items:center;font-size:13px}
+.romrow{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:6px}
+.romrow b{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.sentrow{cursor:pointer}
+.bar{height:8px;border-radius:99px;background:#E9EBEA;overflow:hidden;min-width:90px}
+.bar>i{display:block;height:100%;background:var(--gd)}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}
+.section-title h2{font-size:18px;margin:0}
+</style>
+</head>
+<body>
+<header class="top" data-title="DAP" data-store="1"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs" hidden>
+    <button class="tab active" data-tab="store" type="button">Store view</button>
+    <button class="tab" data-tab="post" type="button">Post a DAP</button>
+    <button class="tab" data-tab="sent" type="button">Sent &amp; progress</button>
+  </div>
+
+  <!-- ── STORE VIEW ── -->
+  <section data-pane="store">
+    <div class="kpis">
+      <div class="card kpi"><label>To do</label><strong id="kOpen">–</strong></div>
+      <div class="card kpi"><label>Overdue</label><strong id="kOver">–</strong></div>
+      <div class="card kpi"><label>Done this week</label><strong class="good" id="kDone">–</strong></div>
+      <div class="card kpi"><label>Store</label><strong id="kStore" style="font-size:19px">–</strong></div>
+    </div>
+    <div class="section-title"><h2>To do</h2></div>
+    <div id="openList"><p class="empty">Loading…</p></div>
+    <div class="section-title"><h2>Done</h2><span class="note">Last 30</span></div>
+    <div id="doneList"></div>
+  </section>
+
+  <!-- ── POST (Head Office) ── -->
+  <section data-pane="post" hidden>
+    <div class="card panel">
+      <h2>Post a DAP</h2>
+      <div id="fMsg" role="status" aria-live="polite"></div>
+      <form id="fForm" novalidate>
+        <label class="f"><span>Title</span><input class="in" id="fTitle" maxlength="120" placeholder="e.g. Christmas display ready by Friday" required></label>
+        <div class="grid2">
+          <label class="f"><span>Date</span><input class="in" id="fDate" type="date" required></label>
+          <label class="f"><span>Complete by <small class="note">(optional)</small></span><input class="in" id="fDue" type="date"></label>
+        </div>
+        <label class="f"><span>Priority</span>
+          <select class="in" id="fPriority" style="max-width:240px"><option value="normal">Normal</option><option value="urgent">Urgent</option></select></label>
+        <label class="f"><span>Message</span><textarea class="in" id="fMessage" placeholder="What stores need to know"></textarea></label>
+        <label class="f"><span>Action points <small class="note">— one per line; stores tick each one off</small></span>
+          <textarea class="in" id="fItems" placeholder="Build the Christmas gondola end&#10;Check all shelf-edge labels in aisle 3&#10;Send a photo to your ROM"></textarea></label>
+        <div class="f">
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Send to</span>
+          <div class="audience">
+            <label><input type="radio" name="aud" value="all" checked> All active stores (<span id="allCount">0</span>)</label>
+            <label><input type="radio" name="aud" value="pick"> Choose stores</label>
+          </div>
+          <div class="storeboxes" id="fStores" hidden></div>
+        </div>
+        <button class="btn" id="fPost" type="submit">Post DAP</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ── SENT (Head Office) ── -->
+  <section data-pane="sent" hidden>
+    <div class="card panel">
+      <h2>Sent DAPs</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Date</th><th>Title</th><th>Priority</th><th>Stores</th><th>From</th></tr></thead>
+          <tbody id="sentRows"><tr><td colspan="5" class="note">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card panel" id="detail" hidden>
+      <div class="row" style="justify-content:space-between">
+        <h2 id="dTitle" style="margin:0"></h2>
+        <div class="row">
+          <button class="btn secondary small" id="dRefresh" type="button">Refresh</button>
+          <button class="btn danger small" id="dDelete" type="button">Delete DAP</button>
+        </div>
+      </div>
+      <p class="note" id="dMeta"></p>
+      <div class="kpis" style="margin:10px 0 14px">
+        <div class="card kpi"><label>Stores</label><strong id="dStores">–</strong></div>
+        <div class="card kpi"><label>Completed</label><strong class="good" id="dDone">–</strong></div>
+        <div class="card kpi"><label>Outstanding</label><strong class="bad" id="dOpen">–</strong></div>
+        <div class="card kpi"><label>Not opened yet</label><strong id="dUnseen">–</strong></div>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Store</th><th>ROM</th><th>Status</th><th>Ticked</th><th>Completed by</th><th>Note</th></tr></thead>
+          <tbody id="dRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+  const me = await SPAR.ready;
+  const { fs, db } = await SPAR.firebase();
+  const today = SPARUI.isoDate();
+
+  const storeCol = (code) => fs.collection(db, "modules", "dap", "stores", code, "posts");
+  const storeDoc = (code, id) => fs.doc(db, "modules", "dap", "stores", code, "posts", id);
+  const masterCol = fs.collection(db, "modules", "dap", "config", "posts", "items");
+  const masterDoc = (id) => fs.doc(db, "modules", "dap", "config", "posts", "items", id);
+
+  // ── Tabs (Head Office only) ──
+  if (me.isHQ) {
+    $("tabs").hidden = false;
+    document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => {
+      document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x === t));
+      document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== t.dataset.tab);
+    });
+  }
+
+  // ═════════ STORE VIEW ═════════
+  let unsub = null;
+  function watchStore() {
+    if (unsub) { unsub(); unsub = null; }
+    const st = me.store();
+    $("kStore").textContent = st ? st.code : "–";
+    if (!st) { $("openList").innerHTML = ""; $("openList").appendChild(E("p", { class: "empty", text: "No store assigned to you yet." })); return; }
+    const q = fs.query(storeCol(st.code), fs.orderBy("createdAt", "desc"), fs.limit(80));
+    let first = true;
+    const timer = setTimeout(() => { if (first) { $("openList").innerHTML = ""; $("openList").appendChild(E("p", { class: "msg warn", text: "Still loading… check your connection." })); } }, 10000);
+    unsub = fs.onSnapshot(q, (qs) => {
+      first = false; clearTimeout(timer);
+      renderStore(st, qs.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (e) => {
+      clearTimeout(timer);
+      $("openList").innerHTML = "";
+      $("openList").appendChild(E("p", { class: "msg err", text: "Couldn't load DAPs: " + (e.code || e.message) }));
+    });
+  }
+
+  const drafts = {}; // unsent notes, kept while the page is open
+
+  function renderStore(st, posts) {
+    const open = posts.filter((p) => p.status !== "done").sort((a, b) =>
+      (b.priority === "urgent") - (a.priority === "urgent") || String(a.due || "9").localeCompare(String(b.due || "9")) || b.createdAt - a.createdAt);
+    const done = posts.filter((p) => p.status === "done").slice(0, 30);
+    const weekAgo = Date.now() - 7 * 864e5;
+    $("kOpen").textContent = open.length;
+    const over = open.filter((p) => p.due && p.due < today).length;
+    $("kOver").textContent = over; $("kOver").className = over ? "bad" : "";
+    $("kDone").textContent = done.filter((p) => (p.ackAt || 0) > weekAgo).length;
+
+    const ol = $("openList"); ol.innerHTML = "";
+    if (!open.length) ol.appendChild(E("div", { class: "card empty", text: "Nothing to do. All DAPs for " + st.name + " are complete." }));
+    open.forEach((p) => ol.appendChild(postCard(st, p)));
+    const dl = $("doneList"); dl.innerHTML = "";
+    if (!done.length) dl.appendChild(E("p", { class: "note", text: "None yet." }));
+    done.forEach((p) => dl.appendChild(postCard(st, p)));
+
+    // Mark as seen
+    open.filter((p) => !p.seenAt).forEach((p) => fs.updateDoc(storeDoc(st.code, p.id), { seenAt: Date.now() }).catch(() => {}));
+  }
+
+  function postCard(st, p) {
+    const isDone = p.status === "done";
+    const items = p.items || [];
+    const doneMap = p.done || {};
+    const card = E("article", { class: "post" + (isDone ? " done" : p.priority === "urgent" ? " urgent" : "") });
+    const pills = E("div", { class: "row" });
+    if (p.priority === "urgent") pills.appendChild(E("span", { class: "pill red", text: "Urgent" }));
+    if (!isDone && p.due) pills.appendChild(E("span", { class: "pill " + (p.due < today ? "red" : "warn"), text: (p.due < today ? "Overdue · " : "Due ") + SPARUI.fmtDate(p.due) }));
+    if (isDone) pills.appendChild(E("span", { class: "pill", text: "Done" }));
+    card.appendChild(E("div", { class: "post-head" }, [
+      E("div", null, [E("h3", { text: p.title }), E("div", { class: "post-meta", text: SPARUI.fmtDate(p.date) + " · from " + (p.fromName || "Head Office") })]),
+      pills
+    ]));
+    if (p.message) card.appendChild(E("p", { class: "post-body", text: p.message }));
+
+    if (items.length) {
+      const ul = E("ul", { class: "items" });
+      items.forEach((text, i) => {
+        const cb = E("input", { type: "checkbox" });
+        cb.checked = !!doneMap[i];
+        cb.disabled = isDone;
+        const span = E("span", { class: cb.checked ? "ticked" : "", text });
+        cb.onchange = async () => {
+          span.className = cb.checked ? "ticked" : "";
+          try { await fs.updateDoc(storeDoc(st.code, p.id), { ["done." + i]: cb.checked }); }
+          catch (e) { cb.checked = !cb.checked; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+        };
+        ul.appendChild(E("li", null, [E("label", null, [cb, span])]));
+      });
+      card.appendChild(ul);
+    }
+
+    if (isDone) {
+      card.appendChild(E("div", { class: "donebox", text: "✓ Completed by " + (p.ackName || "") + " · " + SPARUI.fmtDateTime(p.ackAt) }));
+      if (p.note) card.appendChild(E("p", { class: "post-body note", text: "Note: " + p.note }));
+      return card;
+    }
+    const ta = E("textarea", { class: "in", placeholder: "Note for Head Office (optional)", "aria-label": "Note" });
+    ta.value = drafts[p.id] ?? p.note ?? "";
+    ta.oninput = () => { drafts[p.id] = ta.value; };
+    const btn = E("button", { class: "btn good", type: "button", text: "Mark complete" });
+    btn.onclick = async () => {
+      const ticked = items.filter((_, i) => (p.done || {})[i] || card.querySelectorAll(".items input")[i]?.checked).length;
+      if (items.length && ticked < items.length && !confirm(`Only ${ticked} of ${items.length} action points are ticked. Mark complete anyway?`)) return;
+      btn.disabled = true;
+      try {
+        await fs.updateDoc(storeDoc(st.code, p.id), { status: "done", note: ta.value.trim(), ackBy: me.email, ackName: me.name, ackAt: Date.now() });
+        delete drafts[p.id];
+        SPARUI.toast("Marked complete");
+      } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+    };
+    card.appendChild(E("div", { class: "post-foot" }, [ta, btn]));
+    return card;
+  }
+
+  watchStore();
+  document.addEventListener("spar:store", watchStore);
+
+  // ═════════ POST (Head Office) ═════════
+  if (me.isHQ) {
+    const active = me.allStores.filter((s) => s.active !== false);
+    $("allCount").textContent = active.length;
+    $("fDate").value = today;
+    const box = $("fStores");
+    const byRom = {};
+    active.forEach((s) => { (byRom[s.rom || "No ROM"] ||= []).push(s); });
+    Object.keys(byRom).sort().forEach((rom) => {
+      const all = E("button", { class: "btn secondary small", type: "button", text: "All" });
+      box.appendChild(E("div", { class: "romrow" }, [E("b", { text: rom }), all]));
+      const cbs = byRom[rom].map((s) => {
+        const cb = E("input", { type: "checkbox", value: s.code });
+        box.appendChild(E("label", null, [cb, s.name]));
+        return cb;
+      });
+      all.onclick = () => { const on = !cbs.every((c) => c.checked); cbs.forEach((c) => c.checked = on); };
+    });
+    document.querySelectorAll('input[name="aud"]').forEach((r) => r.onchange = () => { box.hidden = r.value !== "pick" || !r.checked; });
+
+    $("fForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const say = (t, k = "ok") => { $("fMsg").innerHTML = ""; if (t) $("fMsg").appendChild(E("p", { class: "msg " + k, text: t })); };
+      const title = $("fTitle").value.trim();
+      const items = $("fItems").value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 40);
+      const aud = document.querySelector('input[name="aud"]:checked').value;
+      const codes = aud === "all" ? active.map((s) => s.code) : [...box.querySelectorAll("input:checked")].map((c) => c.value);
+      if (!title) return say("Give the DAP a title.", "err");
+      if (!$("fMessage").value.trim() && !items.length) return say("Add a message or at least one action point.", "err");
+      if (!codes.length) return say("Choose at least one store.", "err");
+      if (!confirm(`Send “${title}” to ${codes.length} store${codes.length === 1 ? "" : "s"}?`)) return;
+      const id = SPARUI.uid();
+      const post = {
+        title, message: $("fMessage").value.trim(), items, date: $("fDate").value || today, due: $("fDue").value || "",
+        priority: $("fPriority").value, fromName: me.name, fromEmail: me.email, createdAt: Date.now()
+      };
+      $("fPost").disabled = true;
+      try {
+        const b = fs.writeBatch(db);
+        b.set(masterDoc(id), { ...post, stores: codes });
+        codes.forEach((c) => b.set(storeDoc(c, id), { ...post, status: "open", done: {} }));
+        await b.commit();
+        $("fForm").reset(); $("fDate").value = today; box.hidden = true;
+        say(`Sent to ${codes.length} store${codes.length === 1 ? "" : "s"}.`);
+      } catch (e) { say("Couldn't send: " + (e.code || e.message), "err"); }
+      $("fPost").disabled = false;
+    });
+
+    // ═════════ SENT ═════════
+    let sent = [], current = null;
+    fs.onSnapshot(fs.query(masterCol, fs.orderBy("createdAt", "desc"), fs.limit(60)), (qs) => {
+      sent = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const tb = $("sentRows"); tb.innerHTML = "";
+      if (!sent.length) tb.appendChild(E("tr", null, [E("td", { colspan: "5", class: "empty", text: "No DAPs sent yet." })]));
+      sent.forEach((p) => {
+        const tr = E("tr", { class: "sentrow", tabindex: "0" }, [
+          E("td", { text: SPARUI.fmtDate(p.date) }),
+          E("td", null, [E("b", { text: p.title })]),
+          E("td", null, [E("span", { class: "pill " + (p.priority === "urgent" ? "red" : "grey"), text: p.priority === "urgent" ? "Urgent" : "Normal" })]),
+          E("td", { class: "num", text: (p.stores || []).length }),
+          E("td", { text: p.fromName || "" })
+        ]);
+        tr.onclick = () => openDetail(p);
+        tr.onkeydown = (e) => { if (e.key === "Enter") openDetail(p); };
+        tb.appendChild(tr);
+      });
+    }, () => {});
+
+    async function openDetail(p) {
+      current = p;
+      $("detail").hidden = false;
+      $("dTitle").textContent = p.title;
+      $("dMeta").textContent = SPARUI.fmtDate(p.date) + (p.due ? " · complete by " + SPARUI.fmtDate(p.due) : "") + " · from " + (p.fromName || "") + " · " + (p.items || []).length + " action points";
+      $("dRows").innerHTML = "";
+      $("dRows").appendChild(E("tr", null, [E("td", { colspan: "6", class: "note", text: "Loading…" })]));
+      const snaps = await Promise.all((p.stores || []).map((c) => fs.getDoc(storeDoc(c, p.id)).then((s) => ({ c, d: s.exists() ? s.data() : null }), () => ({ c, d: null }))));
+      if (current !== p) return;
+      const n = (p.items || []).length;
+      let done = 0, unseen = 0;
+      const rows = snaps.map(({ c, d }) => {
+        const st = me.allStores.find((s) => s.code === c) || { name: c, rom: "" };
+        if (d && d.status === "done") done++;
+        if (!d || !d.seenAt) unseen++;
+        const ticks = d ? Object.values(d.done || {}).filter(Boolean).length : 0;
+        return { st, d, ticks };
+      }).sort((a, b) => ((a.d && a.d.status === "done") - (b.d && b.d.status === "done")) || a.st.name.localeCompare(b.st.name));
+      $("dStores").textContent = snaps.length; $("dDone").textContent = done; $("dOpen").textContent = snaps.length - done; $("dUnseen").textContent = unseen;
+      const tb = $("dRows"); tb.innerHTML = "";
+      rows.forEach(({ st, d, ticks }) => {
+        const isDone = d && d.status === "done";
+        const overdue = !isDone && p.due && p.due < today;
+        tb.appendChild(E("tr", null, [
+          E("td", null, [E("b", { text: st.name })]),
+          E("td", { text: st.rom || "" }),
+          E("td", null, [E("span", { class: "pill " + (isDone ? "" : overdue ? "red" : !d || !d.seenAt ? "grey" : "warn"),
+            text: isDone ? "Done" : overdue ? "Overdue" : !d || !d.seenAt ? "Not opened" : "In progress" })]),
+          E("td", null, n ? [E("div", { class: "bar", title: ticks + " of " + n }, [E("i", { style: "width:" + Math.round(100 * ticks / n) + "%" })]), E("small", { class: "note", text: ticks + "/" + n })] : ["—"]),
+          E("td", { text: isDone ? (d.ackName || "") + " · " + SPARUI.fmtDateTime(d.ackAt) : "" }),
+          E("td", { class: "note", text: (d && d.note) || "" })
+        ]));
+      });
+      $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    $("dRefresh").onclick = () => current && openDetail(current);
+    $("dDelete").onclick = async () => {
+      if (!current || !confirm(`Delete “${current.title}” from all ${current.stores.length} stores? This can't be undone.`)) return;
+      try {
+        const b = fs.writeBatch(db);
+        b.delete(masterDoc(current.id));
+        current.stores.forEach((c) => b.delete(storeDoc(c, current.id)));
+        await b.commit();
+        $("detail").hidden = true; current = null;
+        SPARUI.toast("DAP deleted");
+      } catch (e) { SPARUI.toast("Couldn't delete: " + (e.code || e.message), "err"); }
+    };
+  }
+</script>
+</body>
+</html>

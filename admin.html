@@ -4,206 +4,471 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="theme-color" content="#ffffff"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="SPAR Hub"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="spar-page" content="admin">
-<title>Manage access · SPAR Malta Hub</title>
-<script>try{var t=localStorage.getItem("sparHubTheme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<title>Manage people &amp; stores · SPAR Malta Hub</title>
 <script src="firebase-config.js"></script>
 <script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<script src="stores-seed.js"></script>
 <link rel="stylesheet" href="spar.css">
 <style>
-header{padding-block:24px 18px;border-bottom:1px solid var(--line);margin-bottom:22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-h1{font-weight:700;font-size:28px;margin:0}
-h2{font-weight:600;font-size:22px;margin:0 0 4px}
-.lede{color:var(--muted);font-size:14px;margin:0 0 16px}
-section{margin-bottom:22px}
-.addform{display:grid;grid-template-columns:1.4fr 1.2fr .8fr auto;gap:10px;align-items:end}
-.addform .field{margin:0}
-@media (max-width:720px){.addform{grid-template-columns:1fr}}
-table{width:100%;border-collapse:collapse;font-size:15px}
-th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:700;padding:8px 8px;border-bottom:1px solid var(--line)}
-td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
-td select{min-height:38px;padding:6px 8px;width:auto}
-td .btn{min-height:36px;padding:6px 12px;font-size:13.5px}
-.email{color:var(--muted);font-size:13.5px;word-break:break-all}
-.you{font-size:12px;font-weight:700;color:var(--accent);margin-left:6px}
-.tablewrap{overflow-x:auto}
-@media (max-width:560px){
-  thead{display:none}
-  tr{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
-  td{border:0;padding:0}
-  td.r-name{grid-column:1/-1}
+.storeboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--soft)}
+.storeboxes label{display:flex;gap:7px;align-items:center;font-size:13px;font-weight:400}
+.storeboxes .romhead{grid-column:1/-1;font-weight:800;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:6px}
+td .in{padding:6px 8px;font-size:13px}
+td select.in{width:auto}
+.email{color:var(--muted);font-size:12.5px;word-break:break-all}
+.you{font-size:11px;font-weight:800;color:var(--brandd);margin-left:6px}
+.storelist{font-size:12.5px;color:var(--muted);max-width:340px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.roles{font-size:13px;color:var(--muted);line-height:1.6;margin:10px 0 0}
+.roles b{color:var(--ink)}
+.invite-list label{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.invite-list small{color:var(--muted)}
+textarea.code{font:12.5px/1.4 ui-monospace,Menlo,Consolas,monospace;min-height:120px}
+tr.inactive td{color:var(--muted)}
+@media(max-width:700px){
+  .tbl-people thead{display:none}
+  .tbl-people tr{display:grid;grid-template-columns:1fr;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .tbl-people td{border:0;padding:0 4px}
+  .acts{justify-content:flex-start}
 }
-textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--fg);background:var(--panel-2);
-  border:1px solid var(--line);border-radius:8px;padding:10px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.roles{font-size:13.5px;color:var(--muted);margin:14px 0 0;line-height:1.6}
-.roles b{color:var(--fg)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <div class="mark" aria-hidden="true">SP<span class="dot"></span></div>
-      <h1>Manage access</h1>
-    </div>
-    <a class="btn btn-ghost" href="./">← Back to hub</a>
-  </header>
+<header class="top" data-title="Manage people &amp; stores"></header>
 
-  <div id="notAdmin" class="panel" hidden>
-    <h2>Admins only</h2>
-    <p class="lede">Only hub admins can manage who has access.</p>
-  </div>
+<main class="page">
+  <div id="notAdmin" class="card panel" hidden><h2>Admins only</h2><p class="note">Only hub admins can manage people and stores.</p></div>
 
   <div id="adminUi" hidden>
-    <section class="panel">
-      <h2>Add a person</h2>
-      <p class="lede">They'll get an email with a link to choose their own password. Access starts straight away.</p>
-      <div id="addMsg" role="status" aria-live="polite"></div>
-      <form class="addform" id="addForm" novalidate>
-        <div class="field"><label for="nEmail">Email</label><input id="nEmail" type="email" inputmode="email" autocomplete="off" required></div>
-        <div class="field"><label for="nName">Name</label><input id="nName" type="text" autocomplete="off" placeholder="e.g. Maria Borg"></div>
-        <div class="field"><label for="nRole">Access</label>
-          <select id="nRole"><option value="edit">Can edit</option><option value="view">View only</option><option value="admin">Admin</option></select></div>
-        <button class="btn btn-primary" id="addBtn" type="submit">Add</button>
-      </form>
-      <p class="roles"><b>View only</b> — sees everything, changes nothing. <b>Can edit</b> — uses the tools fully (imports, ticks, notes). <b>Admin</b> — can edit, plus manages this page.</p>
-    </section>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="people" type="button">People</button>
+      <button class="tab" data-tab="stores" type="button">Stores</button>
+      <button class="tab" data-tab="import" type="button">Import data</button>
+    </div>
 
-    <section class="panel">
-      <h2>People with access</h2>
-      <p class="lede">Removing someone cuts them off immediately, even if they're signed in.</p>
-      <div id="listMsg" role="status" aria-live="polite"></div>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Person</th><th>Access</th><th></th></tr></thead>
-          <tbody id="rows"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
-        </table>
+    <!-- ── PEOPLE ── -->
+    <section data-pane="people">
+      <div class="card panel">
+        <h2 id="pFormTitle">Add a person</h2>
+        <p class="note" style="margin:-6px 0 14px">They get an email with a link to choose their password. Access starts straight away.</p>
+        <div id="pMsg" role="status" aria-live="polite"></div>
+        <form id="pForm" novalidate>
+          <div class="grid2">
+            <label class="f"><span>Email</span><input class="in" id="pEmail" type="email" inputmode="email" autocomplete="off" required></label>
+            <label class="f"><span>Name</span><input class="in" id="pName" type="text" autocomplete="off" placeholder="e.g. Maria Borg"></label>
+            <label class="f"><span>Role</span>
+              <select class="in" id="pRole">
+                <option value="sm">Store Manager</option>
+                <option value="rom">ROM</option>
+                <option value="support">Support</option>
+                <option value="hq">Head Office</option>
+                <option value="admin">Admin</option>
+              </select></label>
+            <label class="f" id="pStoreOne"><span>Store</span><select class="in" id="pStore"></select></label>
+          </div>
+          <div class="f" id="pStoreMany" hidden>
+            <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Stores <small class="note" id="pStoreHint"></small></span>
+            <div class="storeboxes" id="pStores"></div>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <button class="btn" id="pSave" type="submit">Add person</button>
+            <button class="btn secondary" id="pCancel" type="button" hidden>Cancel</button>
+          </div>
+        </form>
+        <p class="roles"><b>Store Manager</b> — their own store. <b>ROM</b> — their stores. <b>Support</b> — all stores. <b>Head Office</b> — all stores, posts DAPs and sets up modules. <b>Admin</b> — everything, plus this page.</p>
+      </div>
+
+      <div class="card panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <h2 style="margin:0">People with access</h2>
+          <button class="btn secondary small" id="inviteBtn" type="button">Invite ROMs &amp; managers from the store list…</button>
+        </div>
+        <div id="invitePane" hidden style="margin-bottom:16px">
+          <p class="note">These people have an email in the store list but no access yet. Untick anyone you don't want to invite. Each gets a password email.</p>
+          <div class="invite-list" id="inviteList"></div>
+          <div class="row" style="margin-top:10px"><button class="btn" id="inviteGo" type="button">Invite selected</button><button class="btn secondary" id="inviteCancel" type="button">Cancel</button></div>
+        </div>
+        <div id="lMsg" role="status" aria-live="polite"></div>
+        <div class="tablewrap">
+          <table class="tbl-people">
+            <thead><tr><th>Person</th><th>Role</th><th>Stores</th><th></th></tr></thead>
+            <tbody id="rows"><tr><td colspan="4" class="note">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Import saved data</h2>
-      <p class="lede">For moving the data that's saved in the claude.ai versions of the tools. Paste the export file's contents (or choose the file) and press Import. Existing records with the same name are overwritten.</p>
-      <div id="impMsg" role="status" aria-live="polite"></div>
-      <textarea id="impText" spellcheck="false" placeholder='{"tool":"cash-analyser","docs":{"reports/2026-w44":{...}},"storage":{"key":"value"}}'></textarea>
-      <div class="row">
-        <input type="file" id="impFile" accept=".json,application/json" style="width:auto;max-width:100%;min-height:0;padding:6px">
-        <button class="btn btn-primary" id="impBtn" type="button">Import</button>
+    <!-- ── STORES ── -->
+    <section data-pane="stores" hidden>
+      <div class="card panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h2 style="margin:0" id="sFormTitle">Add a store</h2>
+          <button class="btn secondary small" id="seedBtn" type="button">Load SPAR store list</button>
+        </div>
+        <p class="note" style="margin:0 0 14px">“Load SPAR store list” adds the 28 stores from the F&amp;V Dashboard's Store Mapping. Stores already here are left as they are.</p>
+        <div id="sMsg" role="status" aria-live="polite"></div>
+        <form id="sForm" novalidate>
+          <div class="grid2">
+            <label class="f"><span>Store code</span><input class="in" id="sCode" maxlength="12" autocomplete="off" placeholder="e.g. MXK" required></label>
+            <label class="f"><span>Store name</span><input class="in" id="sName" autocomplete="off" required></label>
+            <label class="f"><span>ROM</span><input class="in" id="sRom" autocomplete="off"></label>
+            <label class="f"><span>ROM email</span><input class="in" id="sRomEmail" type="email" autocomplete="off"></label>
+            <label class="f"><span>Store Manager</span><input class="in" id="sManager" autocomplete="off"></label>
+            <label class="f"><span>Store Manager email</span><input class="in" id="sSmEmail" type="email" autocomplete="off"></label>
+            <label class="f"><span>Store email(s)</span><input class="in" id="sStoreEmail" autocomplete="off"></label>
+            <label class="f"><span>Report</span><input class="in" id="sReport" autocomplete="off" placeholder="e.g. report-51"></label>
+          </div>
+          <label class="f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sActive" checked> Active</label>
+          <div class="row"><button class="btn" id="sSave" type="submit">Add store</button><button class="btn secondary" id="sCancel" type="button" hidden>Cancel</button></div>
+        </form>
+      </div>
+      <div class="card panel">
+        <h2>Store list <span class="pill grey" id="sCount"></span></h2>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Store email</th><th>Active</th><th></th></tr></thead>
+            <tbody id="sRows"><tr><td colspan="7" class="note">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── IMPORT ── -->
+    <section data-pane="import" hidden>
+      <div class="card panel">
+        <h2>Import saved data</h2>
+        <p class="note">For data exported from the claude.ai versions of Keith's tools. Paste the export file's contents (or choose the file) and press Import. Records with the same name are overwritten.</p>
+        <div id="impMsg" role="status" aria-live="polite"></div>
+        <textarea class="in code" id="impText" spellcheck="false" placeholder='[{"tool":"shop-tracker","docs":{"months/2026-10":{...}}}]'></textarea>
+        <div class="row" style="margin-top:10px">
+          <input type="file" id="impFile" accept=".json,application/json" style="max-width:100%">
+          <button class="btn" id="impBtn" type="button">Import</button>
+        </div>
       </div>
     </section>
   </div>
-</div>
+</main>
 
 <script type="module">
   const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
   const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
   const say = (where, text, kind = "ok") => {
     $(where).innerHTML = "";
-    if (!text) return;
-    const p = document.createElement("p"); p.className = "msg " + kind; p.textContent = text; $(where).appendChild(p);
+    if (text) $(where).appendChild(E("p", { class: "msg " + kind, text }));
   };
-  const ROLES = { admin: "Admin", edit: "Can edit", view: "View only" };
-  const TOOLS = ["shop-tracker", "gap-check", "weekly-checklist", "staff-unders", "cash-analyser"];
+  const ROLES = { sm: "Store Manager", rom: "ROM", support: "Support", hq: "Head Office", admin: "Admin" };
+  const MULTI = (r) => r === "rom";
+  const SINGLE = (r) => r === "sm";
+  const LEGACY_TOOLS = ["shop-tracker", "gap-check", "weekly-checklist", "staff-unders", "cash-analyser"];
 
   const me = await SPAR.ready;
-  if (me.role !== "admin") { $("notAdmin").hidden = false; throw new Error("not admin"); }
+  if (!me.isAdmin) { $("notAdmin").hidden = false; throw new Error("not admin"); }
   $("adminUi").hidden = false;
 
-  const c = await SPAR.firebase();           // { app, auth, db, fs, authMod }
-  const { fs, db, auth, authMod } = c;
+  const { fs, db, auth, authMod } = await SPAR.firebase();
   const { initializeApp, getApps } = await import(FB + "firebase-app.js");
 
-  // ── People list ──
+  // ── Tabs ──
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => {
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x === t));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== t.dataset.tab);
+  });
+
+  // ── Live data ──
+  let stores = [], members = [];
+  const storeName = (c) => (stores.find((s) => s.code === c) || {}).name || c;
+
+  fs.onSnapshot(fs.collection(db, "stores"), (qs) => {
+    stores = qs.docs.map((d) => ({ code: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
+    renderStores(); renderStorePickers(); renderPeople();
+  }, (e) => say("sMsg", "Couldn't load stores: " + (e.code || e.message), "err"));
+
   fs.onSnapshot(fs.collection(db, "members"), (qs) => {
-    const tb = $("rows"); tb.innerHTML = "";
-    const list = qs.docs.map((d) => ({ email: d.id, ...d.data() }))
+    members = qs.docs.map((d) => ({ email: d.id, ...d.data() }))
       .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
-    if (!list.length) { tb.innerHTML = '<tr><td colspan="3" class="muted">No one yet.</td></tr>'; return; }
-    for (const m of list) {
-      const tr = document.createElement("tr");
-      const tdN = document.createElement("td"); tdN.className = "r-name";
-      const nm = document.createElement("div"); nm.textContent = m.name || m.email;
-      if (m.email === me.email) { const y = document.createElement("span"); y.className = "you"; y.textContent = "YOU"; nm.appendChild(y); }
-      const em = document.createElement("div"); em.className = "email"; em.textContent = m.email;
-      tdN.append(nm, em);
+    renderPeople();
+  }, (e) => say("lMsg", "Couldn't load people: " + (e.code || e.message), "err"));
 
-      const tdR = document.createElement("td");
-      const sel = document.createElement("select");
-      sel.setAttribute("aria-label", "Access for " + m.email);
-      for (const [v, l] of Object.entries(ROLES)) { const o = new Option(l, v, false, m.role === v); sel.add(o); }
-      sel.onchange = async () => {
-        try { await fs.updateDoc(fs.doc(db, "members", m.email), { role: sel.value, updatedAt: Date.now() }); say("listMsg", `${m.name || m.email} is now “${ROLES[sel.value]}”.`); }
-        catch (e) { say("listMsg", "Couldn't change access: " + (e.code || e.message), "err"); sel.value = m.role; }
-      };
-      tdR.appendChild(sel);
+  // ═════════ PEOPLE ═════════
+  let editing = null; // email being edited
 
-      const tdA = document.createElement("td"); tdA.style.textAlign = "right";
-      const actions = document.createElement("div"); actions.className = "row"; actions.style.cssText = "margin:0;justify-content:flex-end";
-      const resend = document.createElement("button"); resend.className = "btn btn-ghost"; resend.type = "button"; resend.textContent = "Send password link";
-      resend.onclick = async () => {
-        try { await authMod.sendPasswordResetEmail(auth, m.email); say("listMsg", "Password link sent to " + m.email + "."); }
-        catch (e) { say("listMsg", "Couldn't send: " + (e.code || e.message), "err"); }
-      };
-      actions.appendChild(resend);
-      if (m.email !== me.email) {
-        const del = document.createElement("button"); del.className = "btn btn-danger"; del.type = "button"; del.textContent = "Remove";
-        del.onclick = async () => {
-          if (!confirm(`Remove ${m.name || m.email}'s access to the hub?`)) return;
-          try { await fs.deleteDoc(fs.doc(db, "members", m.email)); say("listMsg", (m.name || m.email) + " no longer has access."); }
-          catch (e) { say("listMsg", "Couldn't remove: " + (e.code || e.message), "err"); }
-        };
-        actions.appendChild(del);
-      }
-      tdA.appendChild(actions);
-      tr.append(tdN, tdR, tdA);
-      tb.appendChild(tr);
+  function renderStorePickers(selected) {
+    const role = $("pRole").value;
+    $("pStoreOne").hidden = !SINGLE(role);
+    $("pStoreMany").hidden = !MULTI(role);
+    const sel = $("pStore"), keep = sel.value;
+    sel.innerHTML = "";
+    sel.appendChild(new Option(stores.length ? "Choose a store…" : "No stores yet: add them under Stores", ""));
+    stores.filter((s) => s.active !== false).forEach((s) => sel.add(new Option(s.name + " (" + s.code + ")", s.code)));
+    sel.value = (selected && selected[0]) || keep || "";
+
+    const box = $("pStores"), ticked = new Set(selected || [...box.querySelectorAll("input:checked")].map((i) => i.value));
+    box.innerHTML = "";
+    const byRom = {};
+    stores.filter((s) => s.active !== false).forEach((s) => { (byRom[s.rom || "No ROM"] ||= []).push(s); });
+    Object.keys(byRom).sort().forEach((rom) => {
+      box.appendChild(E("div", { class: "romhead", text: rom }));
+      byRom[rom].forEach((s) => {
+        const cb = E("input", { type: "checkbox", value: s.code });
+        cb.checked = ticked.has(s.code);
+        box.appendChild(E("label", null, [cb, s.name]));
+      });
+    });
+  }
+  $("pRole").onchange = () => { renderStorePickers(); prefillStores(); };
+  $("pEmail").addEventListener("change", prefillStores);
+
+  // Pre-select stores from the store list's ROM / manager emails
+  function prefillStores() {
+    if (editing) return;
+    const email = $("pEmail").value.trim().toLowerCase(), role = $("pRole").value;
+    if (!email) return;
+    if (MULTI(role)) {
+      const mine = stores.filter((s) => (s.romEmail || "").toLowerCase() === email).map((s) => s.code);
+      if (mine.length) { renderStorePickers(mine); $("pStoreHint").textContent = "— ticked from the store list"; }
     }
-  }, (e) => say("listMsg", "Couldn't load the list: " + (e.code || e.message), "err"));
+    if (SINGLE(role)) {
+      const mine = stores.find((s) => (s.smEmail || "").toLowerCase() === email);
+      if (mine) $("pStore").value = mine.code;
+    }
+    if (!$("pName").value) {
+      const s1 = stores.find((s) => (s.romEmail || "").toLowerCase() === email);
+      const s2 = stores.find((s) => (s.smEmail || "").toLowerCase() === email);
+      if (s1 && s1.rom) $("pName").value = s1.rom; else if (s2 && s2.manager) $("pName").value = s2.manager;
+    }
+  }
 
-  // ── Add a person ──
+  function chosenStores(role) {
+    if (SINGLE(role)) return $("pStore").value ? [$("pStore").value] : [];
+    if (MULTI(role)) return [...$("pStores").querySelectorAll("input:checked")].map((i) => i.value);
+    return [];
+  }
+
+  function resetForm() {
+    editing = null;
+    $("pForm").reset();
+    $("pEmail").disabled = false;
+    $("pFormTitle").textContent = "Add a person";
+    $("pSave").textContent = "Add person";
+    $("pCancel").hidden = true;
+    $("pStoreHint").textContent = "";
+    renderStorePickers([]);
+  }
+  $("pCancel").onclick = () => { resetForm(); say("pMsg", ""); };
+
   function randomPassword() {
     const a = new Uint8Array(24); crypto.getRandomValues(a);
     return btoa(String.fromCharCode(...a)) + "aA1!";
   }
-  $("addForm").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const email = $("nEmail").value.trim().toLowerCase();
-    const name = $("nName").value.trim();
-    const role = $("nRole").value;
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("addMsg", "Enter a valid email address.", "err"); return; }
-    $("addBtn").disabled = true;
+  async function createLogin(email) {
+    const inviteApp = getApps().find((a) => a.name === "invite") || initializeApp(window.SPAR_FIREBASE_CONFIG, "invite");
+    const inviteAuth = authMod.getAuth(inviteApp);
+    let existed = false;
     try {
-      await fs.setDoc(fs.doc(db, "members", email), { name, role, addedBy: me.email, addedAt: Date.now() });
-      // Create their login with a throwaway password, using a separate
-      // connection so you stay signed in as yourself.
-      const inviteApp = getApps().find((a) => a.name === "invite") || initializeApp(window.SPAR_FIREBASE_CONFIG, "invite");
-      const inviteAuth = authMod.getAuth(inviteApp);
-      let existed = false;
-      try {
-        await authMod.createUserWithEmailAndPassword(inviteAuth, email, randomPassword());
-        await authMod.signOut(inviteAuth);
-      } catch (e) {
-        if (e.code === "auth/email-already-in-use") existed = true; else throw e;
-      }
-      await authMod.sendPasswordResetEmail(auth, email);
-      say("addMsg", existed
-        ? `${name || email} added. They already had a login, so they can sign in now — a password link was sent too in case they need it.`
-        : `${name || email} added. They've been emailed a link to choose their password, then they sign in at this site's address.`);
-      $("addForm").reset();
+      await authMod.createUserWithEmailAndPassword(inviteAuth, email, randomPassword());
+      await authMod.signOut(inviteAuth);
     } catch (e) {
-      say("addMsg", "Couldn't add: " + (e.code || e.message), "err");
+      if (e.code === "auth/email-already-in-use") existed = true; else throw e;
     }
-    $("addBtn").disabled = false;
+    await authMod.sendPasswordResetEmail(auth, email);
+    return existed;
+  }
+
+  $("pForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const email = (editing || $("pEmail").value.trim()).toLowerCase();
+    const name = $("pName").value.trim();
+    const role = $("pRole").value;
+    const st = chosenStores(role);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("pMsg", "Enter a valid email address.", "err"); return; }
+    if (SINGLE(role) && !st.length) { say("pMsg", "Choose the store this manager runs.", "err"); return; }
+    if (MULTI(role) && !st.length) { say("pMsg", "Tick at least one store for this ROM.", "err"); return; }
+    if (editing === me.email && role !== "admin") { say("pMsg", "You can't remove your own admin role.", "err"); return; }
+    $("pSave").disabled = true;
+    try {
+      if (editing) {
+        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, updatedAt: Date.now(), updatedBy: me.email });
+        say("pMsg", `${name || email} updated.`);
+      } else {
+        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, addedBy: me.email, addedAt: Date.now() });
+        const existed = await createLogin(email);
+        say("pMsg", existed
+          ? `${name || email} added. They already had a login, so they can sign in now.`
+          : `${name || email} added and emailed a link to choose their password.`);
+      }
+      resetForm();
+    } catch (e) { say("pMsg", "Couldn't save: " + (e.code || e.message), "err"); }
+    $("pSave").disabled = false;
   });
 
-  // ── Import ──
-  $("impFile").onchange = async () => { const f = $("impFile").files[0]; if (f) $("impText").value = await f.text(); };
+  function renderPeople() {
+    const tb = $("rows"); tb.innerHTML = "";
+    if (!members.length) { tb.appendChild(E("tr", null, [E("td", { colspan: "4", class: "note", text: "No one yet." })])); return; }
+    for (const m of members) {
+      const who = E("td", null, [
+        E("div", null, [m.name || m.email, m.email === me.email ? E("span", { class: "you", text: "YOU" }) : null]),
+        E("div", { class: "email", text: m.email })
+      ]);
+      const roleTd = E("td", null, [E("span", { class: "pill " + (m.role === "admin" || m.role === "hq" ? "brand" : "grey"), text: ROLES[m.role] || m.role })]);
+      const stTd = E("td", { class: "storelist", text:
+        ["admin", "hq", "support"].includes(m.role) ? "All stores"
+        : (m.stores || []).length ? m.stores.map(storeName).join(", ") : "⚠ No store assigned" });
+      const acts = E("div", { class: "acts" });
+      acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }));
+      acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Send password link", onclick: async () => {
+        try { await authMod.sendPasswordResetEmail(auth, m.email); say("lMsg", "Password link sent to " + m.email + "."); }
+        catch (e) { say("lMsg", "Couldn't send: " + (e.code || e.message), "err"); }
+      } }));
+      if (m.email !== me.email) acts.appendChild(E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: async () => {
+        if (!confirm(`Remove ${m.name || m.email}'s access to the hub?`)) return;
+        try { await fs.deleteDoc(fs.doc(db, "members", m.email)); say("lMsg", (m.name || m.email) + " no longer has access."); }
+        catch (e) { say("lMsg", "Couldn't remove: " + (e.code || e.message), "err"); }
+      } }));
+      tb.appendChild(E("tr", null, [who, roleTd, stTd, E("td", null, [acts])]));
+    }
+  }
 
+  function startEdit(m) {
+    editing = m.email;
+    $("pEmail").value = m.email; $("pEmail").disabled = true;
+    $("pName").value = m.name || "";
+    $("pRole").value = ROLES[m.role] ? m.role : "sm";
+    renderStorePickers(m.stores || []);
+    $("pFormTitle").textContent = "Edit " + (m.name || m.email);
+    $("pSave").textContent = "Save changes";
+    $("pCancel").hidden = false;
+    say("pMsg", "");
+    $("pFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ── Invite from the store list ──
+  function candidates() {
+    const have = new Set(members.map((m) => m.email));
+    const out = new Map();
+    for (const s of stores.filter((x) => x.active !== false)) {
+      const re = (s.romEmail || "").trim().toLowerCase();
+      if (re && !have.has(re)) {
+        const c = out.get(re) || { email: re, name: s.rom, role: "rom", stores: [] };
+        if (c.role === "rom") c.stores.push(s.code);
+        out.set(re, c);
+      }
+      const se = (s.smEmail || "").trim().toLowerCase();
+      if (se && !have.has(se) && !out.has(se)) out.set(se, { email: se, name: s.manager, role: "sm", stores: [s.code] });
+    }
+    return [...out.values()].sort((a, b) => a.role.localeCompare(b.role) || (a.name || "").localeCompare(b.name || ""));
+  }
+  $("inviteBtn").onclick = () => {
+    const list = candidates(), box = $("inviteList");
+    box.innerHTML = "";
+    if (!list.length) { box.appendChild(E("p", { class: "note", text: "Everyone with an email in the store list already has access." })); $("inviteGo").hidden = true; }
+    else $("inviteGo").hidden = false;
+    for (const c of list) {
+      const cb = E("input", { type: "checkbox", value: c.email }); cb.checked = true;
+      box.appendChild(E("label", null, [cb, E("div", null, [
+        E("b", { text: (c.name || c.email) + " — " + ROLES[c.role] }), E("br"),
+        E("small", { text: c.email + " · " + c.stores.map(storeName).join(", ") })
+      ])]));
+    }
+    $("invitePane").hidden = false;
+    $("invitePane")._list = list;
+  };
+  $("inviteCancel").onclick = () => { $("invitePane").hidden = true; };
+  $("inviteGo").onclick = async () => {
+    const pick = new Set([...$("inviteList").querySelectorAll("input:checked")].map((i) => i.value));
+    const list = ($("invitePane")._list || []).filter((c) => pick.has(c.email));
+    if (!list.length) return;
+    if (!confirm(`Give access to ${list.length} ${list.length === 1 ? "person" : "people"} and email each a password link?`)) return;
+    $("inviteGo").disabled = true;
+    let ok = 0; const bad = [];
+    for (const c of list) {
+      try {
+        await fs.setDoc(fs.doc(db, "members", c.email), { name: c.name || "", role: c.role, stores: c.stores, addedBy: me.email, addedAt: Date.now() });
+        await createLogin(c.email); ok++;
+      } catch (e) { bad.push(c.email + " (" + (e.code || e.message) + ")"); }
+    }
+    $("inviteGo").disabled = false;
+    $("invitePane").hidden = true;
+    say("lMsg", `Invited ${ok}.` + (bad.length ? " Problems: " + bad.join(", ") : ""), bad.length ? "warn" : "ok");
+  };
+
+  // ═════════ STORES ═════════
+  let editingStore = null;
+  const S = ["Code", "Name", "Rom", "RomEmail", "Manager", "SmEmail", "StoreEmail", "Report"];
+  function resetStoreForm() {
+    editingStore = null; $("sForm").reset(); $("sCode").disabled = false; $("sActive").checked = true;
+    $("sFormTitle").textContent = "Add a store"; $("sSave").textContent = "Add store"; $("sCancel").hidden = true;
+  }
+  $("sCancel").onclick = () => { resetStoreForm(); say("sMsg", ""); };
+
+  function renderStores() {
+    $("sCount").textContent = stores.length + " stores";
+    const tb = $("sRows"); tb.innerHTML = "";
+    if (!stores.length) { tb.appendChild(E("tr", null, [E("td", { colspan: "7", class: "empty", text: "No stores yet. Press “Load SPAR store list”." })])); return; }
+    for (const s of stores) {
+      const tr = E("tr", { class: s.active === false ? "inactive" : "" }, [
+        E("td", null, [E("b", { text: s.code })]),
+        E("td", { text: s.name }),
+        E("td", null, [s.rom || "—", s.romEmail ? E("div", { class: "email", text: s.romEmail }) : null]),
+        E("td", null, [s.manager || "—", s.smEmail ? E("div", { class: "email", text: s.smEmail }) : null]),
+        E("td", { class: "email", text: s.storeEmail || "" }),
+        E("td", null, [E("span", { class: "pill " + (s.active === false ? "grey" : ""), text: s.active === false ? "No" : "Yes" })]),
+        E("td", null, [E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => {
+          editingStore = s.code;
+          $("sCode").value = s.code; $("sCode").disabled = true;
+          $("sName").value = s.name || ""; $("sRom").value = s.rom || ""; $("sRomEmail").value = s.romEmail || "";
+          $("sManager").value = s.manager || ""; $("sSmEmail").value = s.smEmail || ""; $("sStoreEmail").value = s.storeEmail || "";
+          $("sReport").value = s.report || ""; $("sActive").checked = s.active !== false;
+          $("sFormTitle").textContent = "Edit " + s.name; $("sSave").textContent = "Save store"; $("sCancel").hidden = false;
+          say("sMsg", ""); $("sFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+        } })])
+      ]);
+      tb.appendChild(tr);
+    }
+  }
+
+  $("sForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = (editingStore || $("sCode").value.trim()).toUpperCase();
+    if (!/^[A-Z0-9_-]{2,12}$/.test(code)) { say("sMsg", "Store code: 2–12 letters or numbers, e.g. MXK.", "err"); return; }
+    if (!$("sName").value.trim()) { say("sMsg", "Enter the store name.", "err"); return; }
+    if (!editingStore && stores.some((s) => s.code === code)) { say("sMsg", "There's already a store with code " + code + ".", "err"); return; }
+    const body = {
+      name: $("sName").value.trim(), rom: $("sRom").value.trim(), romEmail: $("sRomEmail").value.trim().toLowerCase(),
+      manager: $("sManager").value.trim(), smEmail: $("sSmEmail").value.trim().toLowerCase(),
+      storeEmail: $("sStoreEmail").value.trim(), report: $("sReport").value.trim(), active: $("sActive").checked,
+      updatedAt: Date.now(), updatedBy: me.email
+    };
+    try { await fs.setDoc(fs.doc(db, "stores", code), body, { merge: true }); say("sMsg", body.name + " saved."); resetStoreForm(); }
+    catch (e) { say("sMsg", "Couldn't save: " + (e.code || e.message), "err"); }
+  });
+
+  $("seedBtn").onclick = async () => {
+    const seed = window.SPAR_STORE_SEED || [];
+    const have = new Set(stores.map((s) => s.code));
+    const add = seed.filter((s) => !have.has(s.code));
+    if (!add.length) { say("sMsg", "All " + seed.length + " SPAR stores are already in the list."); return; }
+    if (!confirm(`Add ${add.length} stores from the F&V Dashboard store list?`)) return;
+    try {
+      const b = fs.writeBatch(db);
+      for (const s of add) {
+        const { code, ...rest } = s;
+        b.set(fs.doc(db, "stores", code), { ...rest, updatedAt: Date.now(), updatedBy: me.email });
+      }
+      await b.commit();
+      say("sMsg", `Added ${add.length} stores. Reload the hub to see them.`);
+    } catch (e) { say("sMsg", "Couldn't add stores: " + (e.code || e.message), "err"); }
+  };
+
+  // ═════════ IMPORT (earlier tools) ═════════
+  $("impFile").onchange = async () => { const f = $("impFile").files[0]; if (f) $("impText").value = await f.text(); };
   function toFsPath(tool, path) {
     const s = path.replace(/^\/+|\/+$/g, "").split("/");
     if (s.some((x) => !x)) throw new Error("Bad path: " + path);
-    if (s.length % 2) throw new Error("Not a document path (odd number of parts): " + path);
+    if (s.length % 2) throw new Error("Not a document path: " + path);
     if (s[0] === "data" && s[1] === "users") throw new Error("Private per-person data can't be imported for someone else: " + path);
     return ["apps", tool, ...s];
   }
@@ -215,10 +480,9 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,Consolas,m
     let n = 0;
     try {
       for (const p of packs) {
-        if (!TOOLS.includes(p.tool)) throw new Error(`Unknown tool "${p.tool}". Use one of: ${TOOLS.join(", ")}`);
+        if (!LEGACY_TOOLS.includes(p.tool)) throw new Error(`Unknown tool "${p.tool}". Use one of: ${LEGACY_TOOLS.join(", ")}`);
         const writes = [];
-        for (const [path, body] of Object.entries(p.docs || {}))
-          writes.push([fs.doc(db, ...toFsPath(p.tool, path)), body]);
+        for (const [path, body] of Object.entries(p.docs || {})) writes.push([fs.doc(db, ...toFsPath(p.tool, path)), body]);
         for (const [key, value] of Object.entries(p.storage || {}))
           writes.push([fs.doc(db, "apps", p.tool, "_kv", encodeURIComponent(key).replace(/\./g, "%2E")),
             { key, value: typeof value === "string" ? value : JSON.stringify(value), updatedAt: Date.now() }]);
@@ -230,11 +494,11 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,Consolas,m
         n += writes.length;
       }
       say("impMsg", `Imported ${n} record${n === 1 ? "" : "s"}.`);
-    } catch (e) {
-      say("impMsg", "Import stopped: " + (e.code || e.message), "err");
-    }
+    } catch (e) { say("impMsg", "Import stopped: " + (e.code || e.message), "err"); }
     $("impBtn").disabled = false;
   };
+
+  resetForm();
 </script>
 </body>
 </html>

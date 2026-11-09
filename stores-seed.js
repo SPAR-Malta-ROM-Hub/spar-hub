@@ -1,0 +1,312 @@
+// SPAR Malta store list, taken from the F&V Dashboard Store Mapping (V6.20).
+// Used only by Manage access → "Load SPAR store list". After that, edit stores on that page.
+window.SPAR_STORE_SEED = [
+ {
+  "code": "MXK",
+  "name": "SPAR Marsaxlokk",
+  "report": "report-51",
+  "active": true,
+  "rom": "Kurt Bezzina",
+  "romEmail": "kbezzina@spar.com.mt",
+  "manager": "Marisa Zammit",
+  "smEmail": "mzammit@spar.com.mt",
+  "storeEmail": "mxlokk@spar.com.mt"
+ },
+ {
+  "code": "SLM",
+  "name": "SPAR Sliema",
+  "report": "report-52",
+  "active": true,
+  "rom": "Aaron Mizzi",
+  "romEmail": "amizzi@spar.com.mt",
+  "manager": "Rajesh Tamang",
+  "smEmail": "rtamang@spar.com.mt",
+  "storeEmail": "Tigne@spar.com.mt"
+ },
+ {
+  "code": "DAN",
+  "name": "InterSPAR Daniels Hamrun",
+  "report": "report-53",
+  "active": true,
+  "rom": "Aaron Mizzi",
+  "romEmail": "amizzi@spar.com.mt",
+  "manager": "Ahmad Salem",
+  "smEmail": "asalem@spar.com.mt",
+  "storeEmail": "daniels@spar.com.mt, danielsfresh@spar.com.mt"
+ },
+ {
+  "code": "BUG",
+  "name": "SPAR Bugibba",
+  "report": "report-54",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "Supun Kanishka",
+  "smEmail": "skanishka@spar.com.mt",
+  "storeEmail": "bugibba@spar.com.mt"
+ },
+ {
+  "code": "TXB",
+  "name": "SPAR Ta'Xbiex",
+  "report": "report-55",
+  "active": true,
+  "rom": "Kurt Bezzina",
+  "romEmail": "kbezzina@spar.com.mt",
+  "manager": "Martina Thakuri",
+  "smEmail": "mthakuri@spar.com.mt",
+  "storeEmail": "taxbiex@spar.com.mt"
+ },
+ {
+  "code": "ICE",
+  "name": "Iceland Qwara",
+  "report": "report-58",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "TPT",
+  "name": "EuroSPAR The Point",
+  "report": "report-59",
+  "active": true,
+  "rom": "Aaron Mizzi",
+  "romEmail": "amizzi@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "SGI",
+  "name": "SPAR Siggiewi",
+  "report": "report-60",
+  "active": true,
+  "rom": "Kurt Bezzina",
+  "romEmail": "kbezzina@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "PCV",
+  "name": "SPAR Express Paceville",
+  "report": "report-61",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "SPB",
+  "name": "SPAR St Pauls Bay",
+  "report": "report-62",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "BAL",
+  "name": "SPAR Express Balluta",
+  "report": "report-63",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "ARD",
+  "name": "ARD Mellieha",
+  "report": "report-64",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "VAL",
+  "name": "SPAR Valletta",
+  "report": "report-65",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "MSC",
+  "name": "EuroSPAR Marsacala",
+  "report": "report-66",
+  "active": true,
+  "rom": "Kurt Bezzina",
+  "romEmail": "kbezzina@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "NAX",
+  "name": "EuroSPAR Naxxar",
+  "report": "report-67",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "ANG",
+  "name": "SPAR Express Paceville Steps (Angels)",
+  "report": "report-68",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "MEL",
+  "name": "SPAR Mellieha",
+  "report": "report-69",
+  "active": true,
+  "rom": "Gerry Johnston",
+  "romEmail": "gjohnston@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "RAB",
+  "name": "SPAR Rabat",
+  "report": "report-70",
+  "active": true,
+  "rom": "Kurt Bezzina",
+  "romEmail": "kbezzina@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "STJ",
+  "name": "SPAR Express St Julians Wembley",
+  "report": "report-71",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "WIN",
+  "name": "SPAR Windsor Street",
+  "report": "report-72",
+  "active": true,
+  "rom": "Aaron Mizzi",
+  "romEmail": "amizzi@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "VOC",
+  "name": "SPAR Gourmet Voco",
+  "report": "report-73",
+  "active": true,
+  "rom": "Keith Carauna",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "MSD",
+  "name": "SPAR Msida Stivala",
+  "report": "report-79",
+  "active": true,
+  "rom": "Aaron Mizzi",
+  "romEmail": "amizzi@spar.com.mt",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "PTM",
+  "name": "EuroSPAR Portomaso",
+  "report": "report-81",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "GOZ",
+  "name": "EuroSPAR Gozo",
+  "report": "report-82",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "NPA",
+  "name": "SPAR Naxxar Labour Road",
+  "report": "report-83",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "SWT",
+  "name": "SPAR Swatar",
+  "report": "report-84",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "STB",
+  "name": "SPAR Valletta STB",
+  "report": "report-85",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ },
+ {
+  "code": "PRL",
+  "name": "Pearl Gozo",
+  "report": "report-201",
+  "active": true,
+  "rom": "Michael Formosa",
+  "romEmail": "",
+  "manager": "",
+  "smEmail": "",
+  "storeEmail": ""
+ }
+];
