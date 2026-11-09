@@ -113,7 +113,7 @@ tr.inactive td{color:var(--muted)}
             <input type="file" id="xlFile" accept=".xlsx,.xls,.csv" hidden>
           </div>
         </div>
-        <p class="note" style="margin:0 0 14px"><b>Upload store list</b> takes the same Excel layout as the F&amp;V Dashboard's Store Mapping (Report File, Store Code, Store Name, Active, ROM, Store Manager, ROM Email, SM Email, Store Email, Delivery Schedule). Stores in the file are added or updated; stores not in the file are left as they are. <b>Download as Excel</b> gives you the current list in that layout to edit. <b>Load SPAR store list</b> adds the 28 stores from the F&amp;V Dashboard.</p>
+        <p class="note" style="margin:0 0 14px"><b>Upload store list</b> takes the same Excel layout as the F&amp;V Dashboard's Store Mapping (Report File, Store Code, Store Name, Active, ROM, Store Manager, ROM Email, SM Email, Store Email, Delivery Schedule) plus optional <b>Store Phone</b>, <b>ROM Phone</b> and <b>SM Phone</b> columns. Stores in the file are added or updated; stores not in the file are left as they are. <b>Download as Excel</b> gives you the current list in that layout to edit. <b>Load SPAR store list</b> adds the 28 stores from the F&amp;V Dashboard.</p>
         <div id="xlPreview" hidden style="margin:0 0 16px">
           <div id="xlSummary"></div>
           <div class="tablewrap" style="max-height:300px"><table><thead><tr><th>Change</th><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Active</th></tr></thead><tbody id="xlRows"></tbody></table></div>
@@ -128,7 +128,10 @@ tr.inactive td{color:var(--muted)}
             <label class="f"><span>ROM email</span><input class="in" id="sRomEmail" type="email" autocomplete="off"></label>
             <label class="f"><span>Store Manager</span><input class="in" id="sManager" autocomplete="off"></label>
             <label class="f"><span>Store Manager email</span><input class="in" id="sSmEmail" type="email" autocomplete="off"></label>
+            <label class="f"><span>ROM phone</span><input class="in" id="sRomPhone" type="tel" autocomplete="off"></label>
+            <label class="f"><span>Store Manager phone</span><input class="in" id="sSmPhone" type="tel" autocomplete="off"></label>
             <label class="f"><span>Store email(s)</span><input class="in" id="sStoreEmail" autocomplete="off"></label>
+            <label class="f"><span>Store phone</span><input class="in" id="sStorePhone" type="tel" autocomplete="off"></label>
             <label class="f"><span>Report</span><input class="in" id="sReport" autocomplete="off" placeholder="e.g. report-51"></label>
           </div>
           <label class="f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sActive" checked> Active</label>
@@ -139,7 +142,7 @@ tr.inactive td{color:var(--muted)}
         <h2>Store list <span class="pill grey" id="sCount"></span></h2>
         <div class="tablewrap">
           <table>
-            <thead><tr><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Store email</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Store contact</th><th>Active</th><th></th></tr></thead>
             <tbody id="sRows"><tr><td colspan="7" class="note">Loading…</td></tr></tbody>
           </table>
         </div>
@@ -422,15 +425,16 @@ tr.inactive td{color:var(--muted)}
       const tr = E("tr", { class: s.active === false ? "inactive" : "" }, [
         E("td", null, [E("b", { text: s.code })]),
         E("td", { text: s.name }),
-        E("td", null, [s.rom || "—", s.romEmail ? E("div", { class: "email", text: s.romEmail }) : null]),
-        E("td", null, [s.manager || "—", s.smEmail ? E("div", { class: "email", text: s.smEmail }) : null]),
-        E("td", { class: "email", text: s.storeEmail || "" }),
+        E("td", null, [s.rom || "—", s.romEmail ? E("div", { class: "email", text: s.romEmail }) : null, s.romPhone ? E("div", { class: "email", text: "☎ " + s.romPhone }) : null]),
+        E("td", null, [s.manager || "—", s.smEmail ? E("div", { class: "email", text: s.smEmail }) : null, s.smPhone ? E("div", { class: "email", text: "☎ " + s.smPhone }) : null]),
+        E("td", null, [s.storeEmail ? E("div", { class: "email", text: s.storeEmail }) : null, s.storePhone ? E("div", { class: "email", text: "☎ " + s.storePhone }) : null]),
         E("td", null, [E("span", { class: "pill " + (s.active === false ? "grey" : ""), text: s.active === false ? "No" : "Yes" })]),
         E("td", null, [E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => {
           editingStore = s.code;
           $("sCode").value = s.code; $("sCode").disabled = true;
           $("sName").value = s.name || ""; $("sRom").value = s.rom || ""; $("sRomEmail").value = s.romEmail || "";
           $("sManager").value = s.manager || ""; $("sSmEmail").value = s.smEmail || ""; $("sStoreEmail").value = s.storeEmail || "";
+          $("sRomPhone").value = s.romPhone || ""; $("sSmPhone").value = s.smPhone || ""; $("sStorePhone").value = s.storePhone || "";
           $("sReport").value = s.report || ""; $("sActive").checked = s.active !== false;
           $("sFormTitle").textContent = "Edit " + s.name; $("sSave").textContent = "Save store"; $("sCancel").hidden = false;
           say("sMsg", ""); $("sFormTitle").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -450,6 +454,7 @@ tr.inactive td{color:var(--muted)}
       name: $("sName").value.trim(), rom: $("sRom").value.trim(), romEmail: $("sRomEmail").value.trim().toLowerCase(),
       manager: $("sManager").value.trim(), smEmail: $("sSmEmail").value.trim().toLowerCase(),
       storeEmail: $("sStoreEmail").value.trim(), report: $("sReport").value.trim(), active: $("sActive").checked,
+      romPhone: $("sRomPhone").value.trim(), smPhone: $("sSmPhone").value.trim(), storePhone: $("sStorePhone").value.trim(),
       updatedAt: Date.now(), updatedBy: me.email
     };
     try { await fs.setDoc(fs.doc(db, "stores", code), body, { merge: true }); say("sMsg", body.name + " saved."); resetStoreForm(); }
@@ -495,7 +500,10 @@ tr.inactive td{color:var(--muted)}
     ["romEmail", "ROM Email", ["romemail"]],
     ["smEmail", "SM Email", ["smemail", "storemanageremail", "manageremail"]],
     ["storeEmail", "Store Email", ["storeemail", "storeemails"]],
-    ["schedule", "Delivery Schedule", ["deliveryschedule", "schedule"]]
+    ["schedule", "Delivery Schedule", ["deliveryschedule", "schedule"]],
+    ["storePhone", "Store Phone", ["storephone", "storetel", "storetelephone", "storenumber", "storemobile", "phone", "telephone", "tel"]],
+    ["romPhone", "ROM Phone", ["romphone", "romtel", "romtelephone", "rommobile", "romnumber"]],
+    ["smPhone", "SM Phone", ["smphone", "smtel", "smtelephone", "smmobile", "smnumber", "storemanagerphone", "storemanagermobile", "managerphone", "managermobile"]]
   ];
   const norm = (h) => String(h || "").toLowerCase().replace(/[^a-z]/g, "");
   let xlPending = [];
@@ -581,7 +589,7 @@ tr.inactive td{color:var(--muted)}
       const data = [COLS.map((c) => c[1])].concat(stores.map((s) => COLS.map(([k]) =>
         k === "code" ? s.code : k === "active" ? (s.active === false ? "No" : "Yes") : k === "schedule" ? (s.schedule || "Normal") : (s[k] || ""))));
       const ws = X.utils.aoa_to_sheet(data);
-      ws["!cols"] = [12, 10, 28, 8, 18, 18, 26, 26, 30, 16].map((w) => ({ wch: w }));
+      ws["!cols"] = [12, 10, 28, 8, 18, 18, 26, 26, 30, 16, 16, 16, 16].map((w) => ({ wch: w }));
       const wb = X.utils.book_new();
       X.utils.book_append_sheet(wb, ws, "Store Mapping");
       X.writeFile(wb, "SPAR_Hub_Store_List.xlsx");
