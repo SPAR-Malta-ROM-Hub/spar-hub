@@ -106,9 +106,19 @@ tr.inactive td{color:var(--muted)}
       <div class="card panel">
         <div class="row" style="justify-content:space-between;margin-bottom:6px">
           <h2 style="margin:0" id="sFormTitle">Add a store</h2>
-          <button class="btn secondary small" id="seedBtn" type="button">Load SPAR store list</button>
+          <div class="row">
+            <button class="btn small" id="xlUpBtn" type="button">Upload store list (Excel)</button>
+            <button class="btn secondary small" id="xlDownBtn" type="button">Download as Excel</button>
+            <button class="btn secondary small" id="seedBtn" type="button">Load SPAR store list</button>
+            <input type="file" id="xlFile" accept=".xlsx,.xls,.csv" hidden>
+          </div>
         </div>
-        <p class="note" style="margin:0 0 14px">“Load SPAR store list” adds the 28 stores from the F&amp;V Dashboard's Store Mapping. Stores already here are left as they are.</p>
+        <p class="note" style="margin:0 0 14px"><b>Upload store list</b> takes the same Excel layout as the F&amp;V Dashboard's Store Mapping (Report File, Store Code, Store Name, Active, ROM, Store Manager, ROM Email, SM Email, Store Email, Delivery Schedule). Stores in the file are added or updated; stores not in the file are left as they are. <b>Download as Excel</b> gives you the current list in that layout to edit. <b>Load SPAR store list</b> adds the 28 stores from the F&amp;V Dashboard.</p>
+        <div id="xlPreview" hidden style="margin:0 0 16px">
+          <div id="xlSummary"></div>
+          <div class="tablewrap" style="max-height:300px"><table><thead><tr><th>Change</th><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Active</th></tr></thead><tbody id="xlRows"></tbody></table></div>
+          <div class="row" style="margin-top:10px"><button class="btn" id="xlApply" type="button">Apply changes</button><button class="btn secondary" id="xlCancel" type="button">Cancel</button></div>
+        </div>
         <div id="sMsg" role="status" aria-live="polite"></div>
         <form id="sForm" novalidate>
           <div class="grid2">
@@ -461,6 +471,121 @@ tr.inactive td{color:var(--muted)}
       await b.commit();
       say("sMsg", `Added ${add.length} stores. Reload the hub to see them.`);
     } catch (e) { say("sMsg", "Couldn't add stores: " + (e.code || e.message), "err"); }
+  };
+
+  // ── Store list from / to Excel (F&V Dashboard Store Mapping layout) ──
+  let XLSXlib = null;
+  function loadXLSX() {
+    if (XLSXlib) return Promise.resolve(XLSXlib);
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      s.onload = () => { XLSXlib = window.XLSX; res(XLSXlib); };
+      s.onerror = () => rej(new Error("Couldn't load the Excel reader. Check your connection."));
+      document.head.appendChild(s);
+    });
+  }
+  const COLS = [
+    ["report", "Report File", ["reportfile", "report"]],
+    ["code", "Store Code", ["storecode", "code"]],
+    ["name", "Store Name", ["storename", "name", "store"]],
+    ["active", "Active", ["active"]],
+    ["rom", "ROM", ["rom"]],
+    ["manager", "Store Manager", ["storemanager", "manager", "sm"]],
+    ["romEmail", "ROM Email", ["romemail"]],
+    ["smEmail", "SM Email", ["smemail", "storemanageremail", "manageremail"]],
+    ["storeEmail", "Store Email", ["storeemail", "storeemails"]],
+    ["schedule", "Delivery Schedule", ["deliveryschedule", "schedule"]]
+  ];
+  const norm = (h) => String(h || "").toLowerCase().replace(/[^a-z]/g, "");
+  let xlPending = [];
+
+  $("xlUpBtn").onclick = () => { $("xlFile").value = ""; $("xlFile").click(); };
+  $("xlFile").onchange = async () => {
+    const f = $("xlFile").files[0];
+    if (!f) return;
+    say("sMsg", "Reading " + f.name + "…", "warn");
+    try {
+      const X = await loadXLSX();
+      const wb = X.read(await f.arrayBuffer(), { type: "array" });
+      const ws = wb.Sheets["Store Mapping"] || wb.Sheets[wb.SheetNames[0]];
+      const rows = X.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false });
+      // find the header row (first row that has a Store Code column)
+      let hi = rows.findIndex((r) => r.some((c) => ["storecode", "code"].includes(norm(c))));
+      if (hi < 0) throw new Error("Couldn't find a “Store Code” column in the first sheet.");
+      const head = rows[hi].map(norm);
+      const idx = {};
+      COLS.forEach(([key, , names]) => { const i = head.findIndex((h) => names.includes(h)); if (i >= 0) idx[key] = i; });
+      if (idx.name == null) throw new Error("Couldn't find a “Store Name” column.");
+      const seen = new Set(), problems = [];
+      xlPending = [];
+      rows.slice(hi + 1).forEach((r, n) => {
+        const get = (k) => idx[k] == null ? undefined : String(r[idx[k]] ?? "").trim();
+        const code = (get("code") || "").toUpperCase();
+        if (!code && !get("name")) return; // blank row
+        if (!/^[A-Z0-9_-]{2,12}$/.test(code)) { problems.push(`Row ${hi + n + 2}: store code “${code}” isn't valid`); return; }
+        if (seen.has(code)) { problems.push(`Row ${hi + n + 2}: ${code} appears twice; the first one is used`); return; }
+        seen.add(code);
+        const rec = {};
+        COLS.forEach(([k]) => { if (k !== "code" && idx[k] != null) rec[k] = get(k); });
+        if ("active" in rec) rec.active = !/^(no|n|false|0|inactive)$/i.test(rec.active || "yes");
+        if ("romEmail" in rec) rec.romEmail = rec.romEmail.toLowerCase();
+        if ("smEmail" in rec) rec.smEmail = rec.smEmail.toLowerCase();
+        const old = stores.find((s) => s.code === code);
+        const changed = !old ? true : Object.keys(rec).some((k) => String(old[k] ?? (k === "active" ? true : "")) !== String(rec[k]));
+        xlPending.push({ code, rec, kind: !old ? "New" : changed ? "Updated" : "No change" });
+      });
+      const nNew = xlPending.filter((x) => x.kind === "New").length, nUpd = xlPending.filter((x) => x.kind === "Updated").length;
+      const notInFile = stores.filter((s) => !seen.has(s.code)).length;
+      $("xlSummary").innerHTML = "";
+      $("xlSummary").appendChild(E("p", { class: "msg " + (problems.length ? "warn" : "ok"),
+        text: `${f.name}: ${xlPending.length} stores read — ${nNew} new, ${nUpd} updated, ${xlPending.length - nNew - nUpd} unchanged.` +
+          (notInFile ? ` ${notInFile} store${notInFile === 1 ? "" : "s"} already here aren't in the file and will be left as they are.` : "") +
+          (problems.length ? " Skipped: " + problems.join("; ") + "." : "") }));
+      const tb = $("xlRows"); tb.innerHTML = "";
+      xlPending.slice().sort((a, b) => (a.kind === "No change") - (b.kind === "No change") || a.code.localeCompare(b.code)).forEach((x) => {
+        tb.appendChild(E("tr", null, [
+          E("td", null, [E("span", { class: "pill " + (x.kind === "New" ? "" : x.kind === "Updated" ? "warn" : "grey"), text: x.kind })]),
+          E("td", null, [E("b", { text: x.code })]), E("td", { text: x.rec.name || "" }), E("td", { text: x.rec.rom || "" }),
+          E("td", { text: x.rec.manager || "" }), E("td", { text: x.rec.active === false ? "No" : "Yes" })
+        ]));
+      });
+      $("xlApply").disabled = !(nNew + nUpd);
+      $("xlPreview").hidden = false;
+      say("sMsg", "");
+    } catch (e) {
+      $("xlPreview").hidden = true;
+      say("sMsg", "Couldn't read that file: " + (e.message || e), "err");
+    }
+  };
+  $("xlCancel").onclick = () => { $("xlPreview").hidden = true; xlPending = []; };
+  $("xlApply").onclick = async () => {
+    const todo = xlPending.filter((x) => x.kind !== "No change");
+    if (!todo.length) return;
+    $("xlApply").disabled = true;
+    try {
+      for (let i = 0; i < todo.length; i += 400) {
+        const b = fs.writeBatch(db);
+        todo.slice(i, i + 400).forEach((x) => b.set(fs.doc(db, "stores", x.code), { ...x.rec, updatedAt: Date.now(), updatedBy: me.email }, { merge: true }));
+        await b.commit();
+      }
+      $("xlPreview").hidden = true; xlPending = [];
+      say("sMsg", `Saved ${todo.length} store${todo.length === 1 ? "" : "s"}. Note: people's store access isn't changed — update a ROM's or manager's stores on the People tab if they've moved.`);
+    } catch (e) { say("sMsg", "Couldn't save: " + (e.code || e.message), "err"); }
+    $("xlApply").disabled = false;
+  };
+
+  $("xlDownBtn").onclick = async () => {
+    try {
+      const X = await loadXLSX();
+      const data = [COLS.map((c) => c[1])].concat(stores.map((s) => COLS.map(([k]) =>
+        k === "code" ? s.code : k === "active" ? (s.active === false ? "No" : "Yes") : k === "schedule" ? (s.schedule || "Normal") : (s[k] || ""))));
+      const ws = X.utils.aoa_to_sheet(data);
+      ws["!cols"] = [12, 10, 28, 8, 18, 18, 26, 26, 30, 16].map((w) => ({ wch: w }));
+      const wb = X.utils.book_new();
+      X.utils.book_append_sheet(wb, ws, "Store Mapping");
+      X.writeFile(wb, "SPAR_Hub_Store_List.xlsx");
+    } catch (e) { say("sMsg", e.message || String(e), "err"); }
   };
 
   // ═════════ IMPORT (earlier tools) ═════════
