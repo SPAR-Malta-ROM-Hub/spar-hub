@@ -99,7 +99,9 @@
       return c.fs.getDocs(q);
     }).then(function (qs) {
       b.innerHTML = "";
-      if (qs.size) b.appendChild(SPARUI.el("span", { class: "pill red", text: qs.size + " to do" }));
+      var now = Date.now();
+      var n = qs.docs.filter(function (d) { var r = d.data().releaseAt; return r && r <= now; }).length;
+      if (n) b.appendChild(SPARUI.el("span", { class: "pill red", text: n + " to do" }));
     }).catch(function () {});
   }
 })();

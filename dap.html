@@ -13,32 +13,43 @@
 <script src="spar-ui.js"></script>
 <link rel="stylesheet" href="spar.css">
 <style>
-.post{border:1px solid var(--line);border-left:6px solid var(--brand);border-radius:14px;background:#fff;padding:16px 18px;margin-bottom:12px}
-.post.done{border-left-color:var(--gd);opacity:.92}
-.post.urgent{border-left-color:#8B0A10;background:#FFFBFB}
-.post-head{display:flex;gap:8px 12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
-.post-head h3{font-size:17px;margin:0}
-.post-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
-.post-body{white-space:pre-wrap;margin:10px 0 0;line-height:1.5}
-.items{list-style:none;padding:0;margin:12px 0 0}
-.items li{border-top:1px solid var(--line)}
-.items label{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;cursor:pointer;font-size:14.5px;line-height:1.4}
-.items input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--gd)}
-.items .ticked{color:var(--muted);text-decoration:line-through}
-.post-foot{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
-.post-foot textarea{flex:1 1 260px;min-height:44px}
-.donebox{margin-top:10px;font-size:13px;color:var(--gd);font-weight:700}
+.dap{border:1px solid var(--line);border-left:6px solid var(--brand);border-radius:16px;background:#fff;margin-bottom:14px;overflow:hidden}
+.dap.signed{border-left-color:var(--gd)}
+.dap.overdue{border-left-color:#8B0A10}
+.dap-head{display:flex;gap:8px 14px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;padding:16px 18px 10px}
+.dap-head h3{font-size:18px;margin:0}
+.dap-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+.task{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px 18px;border-top:1px solid var(--line)}
+.task input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--gd);cursor:pointer}
+.task .t-title{font-weight:700;font-size:15px;line-height:1.35;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.task.done .t-title>span:first-child{color:var(--muted);text-decoration:line-through}
+.task .t-body{grid-column:2;white-space:pre-wrap;font-size:14px;line-height:1.5;color:var(--ink)}
+.task .t-links{grid-column:2;display:flex;flex-wrap:wrap;gap:6px}
+.linkchip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:9px;background:#EEF4FB;color:#0B4F8A;font-weight:700;font-size:13px;text-decoration:none;border:1px solid #D6E4F2}
+.linkchip:hover{background:#E1ECF8}
+.task .t-note{grid-column:2}
+.task .t-note input{padding:7px 10px;font-size:13px}
+.task .t-by{grid-column:2;font-size:12px;color:var(--gd);font-weight:700}
+.dap-foot{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 18px 16px;border-top:1px solid var(--line);background:var(--soft)}
+.dap-foot textarea{flex:1 1 260px;min-height:44px}
+.signedbox{padding:12px 18px 16px;border-top:1px solid var(--line);background:var(--goodsoft);color:var(--gd);font-weight:700;font-size:13.5px}
+.signedbox .note{font-weight:400;color:var(--ink);display:block;margin-top:3px}
 .audience{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px}
 .audience label{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px}
 .storeboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--soft)}
 .storeboxes label{display:flex;gap:7px;align-items:center;font-size:13px}
 .romrow{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:6px}
 .romrow b{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.sentrow{cursor:pointer}
-.bar{height:8px;border-radius:99px;background:#E9EBEA;overflow:hidden;min-width:90px}
+.linkrow{display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px}
+@media(max-width:700px){.linkrow{grid-template-columns:1fr auto}.linkrow .lr-url{grid-column:1}}
+.when{border-radius:10px;padding:10px 12px;background:var(--ambersoft);color:var(--amber);font-weight:700;font-size:13.5px;margin:4px 0 14px}
+.when.urgent{background:var(--redsoft);color:var(--red)}
+.qgroup h3{font-size:15px;margin:14px 0 8px}
+.bar{height:8px;border-radius:99px;background:#E9EBEA;overflow:hidden;min-width:80px}
 .bar>i{display:block;height:100%;background:var(--gd)}
-.section-title{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;gap:10px;flex-wrap:wrap}
 .section-title h2{font-size:18px;margin:0}
+td .note{display:block}
 </style>
 </head>
 <body>
@@ -47,40 +58,41 @@
 <main class="page">
   <div class="tabs" id="tabs" hidden>
     <button class="tab active" data-tab="store" type="button">Store view</button>
-    <button class="tab" data-tab="post" type="button">Post a DAP</button>
-    <button class="tab" data-tab="sent" type="button">Sent &amp; progress</button>
+    <button class="tab" data-tab="add" type="button">Add task</button>
+    <button class="tab" data-tab="queue" type="button">Waiting for 3pm<span class="count" id="qCount">0</span></button>
+    <button class="tab" data-tab="progress" type="button">Progress</button>
   </div>
 
-  <!-- ── STORE VIEW ── -->
+  <!-- ═════════ STORE VIEW ═════════ -->
   <section data-pane="store">
     <div class="kpis">
-      <div class="card kpi"><label>To do</label><strong id="kOpen">–</strong></div>
+      <div class="card kpi"><label>Tasks to do</label><strong id="kOpen">–</strong></div>
       <div class="card kpi"><label>Overdue</label><strong id="kOver">–</strong></div>
-      <div class="card kpi"><label>Done this week</label><strong class="good" id="kDone">–</strong></div>
-      <div class="card kpi"><label>Store</label><strong id="kStore" style="font-size:19px">–</strong></div>
+      <div class="card kpi"><label>DAPs to sign off</label><strong id="kSign">–</strong></div>
+      <div class="card kpi"><label>Next DAP</label><strong id="kNext" style="font-size:19px">–</strong></div>
     </div>
-    <div class="section-title"><h2>To do</h2></div>
-    <div id="openList"><p class="empty">Loading…</p></div>
-    <div class="section-title"><h2>Done</h2><span class="note">Last 30</span></div>
-    <div id="doneList"></div>
+    <div class="section-title"><h2>Daily Action Points</h2><span class="note" id="storeNote"></span></div>
+    <div id="dapList"><p class="empty">Loading…</p></div>
   </section>
 
-  <!-- ── POST (Head Office) ── -->
-  <section data-pane="post" hidden>
+  <!-- ═════════ ADD TASK (Head Office) ═════════ -->
+  <section data-pane="add" hidden>
     <div class="card panel">
-      <h2>Post a DAP</h2>
+      <h2 id="fHead">Add a task to the DAP</h2>
       <div id="fMsg" role="status" aria-live="polite"></div>
       <form id="fForm" novalidate>
-        <label class="f"><span>Title</span><input class="in" id="fTitle" maxlength="120" placeholder="e.g. Christmas display ready by Friday" required></label>
+        <label class="f"><span>Task</span><input class="in" id="fTitle" maxlength="140" placeholder="e.g. Put up the new Christmas price cards" required></label>
+        <label class="f"><span>Details <small class="note">(optional)</small></span><textarea class="in" id="fDetails" placeholder="What exactly needs doing, and anything stores should know"></textarea></label>
         <div class="grid2">
-          <label class="f"><span>Date</span><input class="in" id="fDate" type="date" required></label>
-          <label class="f"><span>Complete by <small class="note">(optional)</small></span><input class="in" id="fDue" type="date"></label>
+          <label class="f"><span>Department</span><input class="in" id="fDept" list="deptList" value="Store management" autocomplete="off"><datalist id="deptList"></datalist></label>
+          <label class="f"><span>Priority</span>
+            <select class="in" id="fPriority"><option value="normal">Normal: goes out with the 3pm DAP</option><option value="urgent">Urgent: send straight away</option></select></label>
         </div>
-        <label class="f"><span>Priority</span>
-          <select class="in" id="fPriority" style="max-width:240px"><option value="normal">Normal</option><option value="urgent">Urgent</option></select></label>
-        <label class="f"><span>Message</span><textarea class="in" id="fMessage" placeholder="What stores need to know"></textarea></label>
-        <label class="f"><span>Action points <small class="note">— one per line; stores tick each one off</small></span>
-          <textarea class="in" id="fItems" placeholder="Build the Christmas gondola end&#10;Check all shelf-edge labels in aisle 3&#10;Send a photo to your ROM"></textarea></label>
+        <div class="f">
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Links to information <small class="note">— paste SharePoint / OneDrive links (Share → Copy link)</small></span>
+          <div id="fLinks"></div>
+          <button class="btn secondary small" id="fAddLink" type="button">+ Add a link</button>
+        </div>
         <div class="f">
           <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Send to</span>
           <div class="audience">
@@ -89,42 +101,49 @@
           </div>
           <div class="storeboxes" id="fStores" hidden></div>
         </div>
-        <button class="btn" id="fPost" type="submit">Post DAP</button>
+        <div class="when" id="fWhen"></div>
+        <div class="row">
+          <button class="btn" id="fSave" type="submit">Add to the DAP</button>
+          <button class="btn secondary" id="fCancel" type="button" hidden>Cancel editing</button>
+        </div>
       </form>
     </div>
   </section>
 
-  <!-- ── SENT (Head Office) ── -->
-  <section data-pane="sent" hidden>
+  <!-- ═════════ QUEUE (Head Office) ═════════ -->
+  <section data-pane="queue" hidden>
     <div class="card panel">
-      <h2>Sent DAPs</h2>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Date</th><th>Title</th><th>Priority</th><th>Stores</th><th>From</th></tr></thead>
-          <tbody id="sentRows"><tr><td colspan="5" class="note">Loading…</td></tr></tbody>
-        </table>
-      </div>
+      <h2>Waiting to go out</h2>
+      <p class="note" style="margin:-6px 0 8px">Normal tasks are held here and released together at 3pm. You can still edit or remove them until then.</p>
+      <div id="queueList"></div>
     </div>
-    <div class="card panel" id="detail" hidden>
+  </section>
+
+  <!-- ═════════ PROGRESS (Head Office) ═════════ -->
+  <section data-pane="progress" hidden>
+    <div class="card panel">
       <div class="row" style="justify-content:space-between">
-        <h2 id="dTitle" style="margin:0"></h2>
+        <label class="storepick">DAP <select id="pDate"></select></label>
         <div class="row">
-          <button class="btn secondary small" id="dRefresh" type="button">Refresh</button>
-          <button class="btn danger small" id="dDelete" type="button">Delete DAP</button>
+          <a class="btn good small" id="pWhatsApp" href="#" target="_blank" rel="noopener">Share on WhatsApp</a>
+          <button class="btn secondary small" id="pCopy" type="button">Copy as text</button>
+          <button class="btn secondary small" id="pRefresh" type="button">Refresh</button>
         </div>
       </div>
-      <p class="note" id="dMeta"></p>
-      <div class="kpis" style="margin:10px 0 14px">
-        <div class="card kpi"><label>Stores</label><strong id="dStores">–</strong></div>
-        <div class="card kpi"><label>Completed</label><strong class="good" id="dDone">–</strong></div>
-        <div class="card kpi"><label>Outstanding</label><strong class="bad" id="dOpen">–</strong></div>
-        <div class="card kpi"><label>Not opened yet</label><strong id="dUnseen">–</strong></div>
+      <p class="note" id="pMeta" style="margin:10px 0 0"></p>
+      <div class="kpis" style="margin:14px 0">
+        <div class="card kpi"><label>Stores</label><strong id="pStores">–</strong></div>
+        <div class="card kpi"><label>Signed off</label><strong class="good" id="pSigned">–</strong></div>
+        <div class="card kpi"><label>Overdue</label><strong class="bad" id="pOver">–</strong></div>
+        <div class="card kpi"><label>Not opened</label><strong id="pUnseen">–</strong></div>
       </div>
+      <h3>Tasks</h3>
+      <div class="tablewrap" style="margin-bottom:18px">
+        <table><thead><tr><th>Task</th><th>Department</th><th>Priority</th><th class="num">Stores done</th><th></th></tr></thead><tbody id="pTasks"></tbody></table>
+      </div>
+      <h3>Stores</h3>
       <div class="tablewrap">
-        <table>
-          <thead><tr><th>Store</th><th>ROM</th><th>Status</th><th>Ticked</th><th>Completed by</th><th>Note</th></tr></thead>
-          <tbody id="dRows"></tbody>
-        </table>
+        <table><thead><tr><th>Store</th><th>ROM</th><th>Status</th><th>Tasks done</th><th>Signed off</th><th>Notes</th></tr></thead><tbody id="pRows"></tbody></table>
       </div>
     </div>
   </section>
@@ -135,238 +154,446 @@
   const E = SPARUI.el;
   const me = await SPAR.ready;
   const { fs, db } = await SPAR.firebase();
-  const today = SPARUI.isoDate();
 
-  const storeCol = (code) => fs.collection(db, "modules", "dap", "stores", code, "posts");
-  const storeDoc = (code, id) => fs.doc(db, "modules", "dap", "stores", code, "posts", id);
+  // ── Timing rules ──
+  const RELEASE_HOUR = 15;        // 3pm
+  const HOURS_TO_ACTION = 23;     // stores have 23 hours from release
+  const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
+  function nextRelease(t) {
+    const d = new Date(t);
+    const r = new Date(d.getFullYear(), d.getMonth(), d.getDate(), RELEASE_HOUR, 0, 0, 0);
+    if (t >= r.getTime()) r.setDate(r.getDate() + 1);
+    return r.getTime();
+  }
+  const pad = (n) => (n < 10 ? "0" : "") + n;
+  const hhmm = (ms) => { const d = new Date(ms); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+  const dayName = (ms) => new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const when = (ms) => dayName(ms) + ", " + hhmm(ms);
+  const dateOf = (ms) => SPARUI.isoDate(new Date(ms));
+  const hubUrl = new URL("dap.html", location.href).href;
+  const safeUrl = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
+
+  // ── Paths ──
+  const storeCol = (c) => fs.collection(db, "modules", "dap", "stores", c, "posts");
+  const storeDoc = (c, id) => fs.doc(db, "modules", "dap", "stores", c, "posts", id);
+  const signCol = (c) => fs.collection(db, "modules", "dap", "stores", c, "signoffs");
+  const signDoc = (c, date) => fs.doc(db, "modules", "dap", "stores", c, "signoffs", date);
   const masterCol = fs.collection(db, "modules", "dap", "config", "posts", "items");
   const masterDoc = (id) => fs.doc(db, "modules", "dap", "config", "posts", "items", id);
 
   // ── Tabs (Head Office only) ──
+  function showTab(name) {
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+  }
   if (me.isHQ) {
     $("tabs").hidden = false;
-    document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => {
-      document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x === t));
-      document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== t.dataset.tab);
-    });
+    document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
   }
 
-  // ═════════ STORE VIEW ═════════
-  let unsub = null;
+  // ═════════════════ STORE VIEW ═════════════════
+  let posts = [], signs = {}, unsubs = [];
+  const notesDraft = {}, signDraft = {};
+
   function watchStore() {
-    if (unsub) { unsub(); unsub = null; }
+    unsubs.forEach((u) => u()); unsubs = []; posts = []; signs = {};
     const st = me.store();
-    $("kStore").textContent = st ? st.code : "–";
-    if (!st) { $("openList").innerHTML = ""; $("openList").appendChild(E("p", { class: "empty", text: "No store assigned to you yet." })); return; }
-    const q = fs.query(storeCol(st.code), fs.orderBy("createdAt", "desc"), fs.limit(80));
-    let first = true;
-    const timer = setTimeout(() => { if (first) { $("openList").innerHTML = ""; $("openList").appendChild(E("p", { class: "msg warn", text: "Still loading… check your connection." })); } }, 10000);
-    unsub = fs.onSnapshot(q, (qs) => {
-      first = false; clearTimeout(timer);
-      renderStore(st, qs.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }, (e) => {
-      clearTimeout(timer);
-      $("openList").innerHTML = "";
-      $("openList").appendChild(E("p", { class: "msg err", text: "Couldn't load DAPs: " + (e.code || e.message) }));
+    if (!st) { $("dapList").innerHTML = ""; $("dapList").appendChild(E("p", { class: "empty", text: "No store assigned to you yet." })); return; }
+    $("storeNote").textContent = st.name;
+    let loaded = false;
+    const timer = setTimeout(() => { if (!loaded) { $("dapList").innerHTML = ""; $("dapList").appendChild(E("p", { class: "msg warn", text: "Still loading… check your connection." })); } }, 10000);
+    unsubs.push(fs.onSnapshot(fs.query(storeCol(st.code), fs.orderBy("releaseAt", "desc"), fs.limit(250)), (qs) => {
+      loaded = true; clearTimeout(timer);
+      posts = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderStore();
+    }, (e) => { clearTimeout(timer); $("dapList").innerHTML = ""; $("dapList").appendChild(E("p", { class: "msg err", text: "Couldn't load the DAP: " + (e.code || e.message) })); }));
+    unsubs.push(fs.onSnapshot(fs.query(signCol(st.code), fs.orderBy("date", "desc"), fs.limit(60)), (qs) => {
+      signs = {}; qs.docs.forEach((d) => { signs[d.id] = d.data(); });
+      renderStore();
+    }, () => {}));
+  }
+
+  function groupsFrom(list) {
+    const g = {};
+    list.forEach((p) => { (g[p.dapDate] ||= []).push(p); });
+    return Object.keys(g).sort().reverse().map((date) => {
+      const tasks = g[date].sort((a, b) => (b.priority === "urgent") - (a.priority === "urgent") || a.releaseAt - b.releaseAt || String(a.title).localeCompare(String(b.title)));
+      const normal = tasks.filter((t) => t.priority !== "urgent");
+      return { date, tasks, due: Math.max(...tasks.map((t) => t.dueAt || 0)), sent: Math.min(...(normal.length ? normal : tasks).map((t) => t.releaseAt)) };
     });
   }
 
-  const drafts = {}; // unsent notes, kept while the page is open
-
-  function renderStore(st, posts) {
-    const open = posts.filter((p) => p.status !== "done").sort((a, b) =>
-      (b.priority === "urgent") - (a.priority === "urgent") || String(a.due || "9").localeCompare(String(b.due || "9")) || b.createdAt - a.createdAt);
-    const done = posts.filter((p) => p.status === "done").slice(0, 30);
-    const weekAgo = Date.now() - 7 * 864e5;
-    $("kOpen").textContent = open.length;
-    const over = open.filter((p) => p.due && p.due < today).length;
+  function renderStore() {
+    const st = me.store(); if (!st) return;
+    const t = now();
+    const released = posts.filter((p) => p.releaseAt && p.releaseAt <= t);
+    const groups = groupsFrom(released);
+    const openTasks = released.filter((p) => p.status !== "done");
+    $("kOpen").textContent = openTasks.length;
+    const over = openTasks.filter((p) => p.dueAt && p.dueAt < t).length;
     $("kOver").textContent = over; $("kOver").className = over ? "bad" : "";
-    $("kDone").textContent = done.filter((p) => (p.ackAt || 0) > weekAgo).length;
+    $("kSign").textContent = groups.filter((g) => !signs[g.date]).length;
+    $("kNext").textContent = when(nextRelease(t));
 
-    const ol = $("openList"); ol.innerHTML = "";
-    if (!open.length) ol.appendChild(E("div", { class: "card empty", text: "Nothing to do. All DAPs for " + st.name + " are complete." }));
-    open.forEach((p) => ol.appendChild(postCard(st, p)));
-    const dl = $("doneList"); dl.innerHTML = "";
-    if (!done.length) dl.appendChild(E("p", { class: "note", text: "None yet." }));
-    done.forEach((p) => dl.appendChild(postCard(st, p)));
-
-    // Mark as seen
-    open.filter((p) => !p.seenAt).forEach((p) => fs.updateDoc(storeDoc(st.code, p.id), { seenAt: Date.now() }).catch(() => {}));
+    const list = $("dapList");
+    const focused = document.activeElement && list.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+    list.innerHTML = "";
+    if (!groups.length) { list.appendChild(E("div", { class: "card empty", text: "No DAPs yet for " + st.name + ". The next one arrives " + when(nextRelease(t)) + "." })); return; }
+    // Open ones first, then the last 14 days of signed-off ones
+    const open = groups.filter((g) => !signs[g.date]);
+    const done = groups.filter((g) => signs[g.date]).slice(0, 14);
+    open.concat(done).forEach((g) => list.appendChild(dapCard(st, g, t)));
+    if (focused) { const el = list.querySelector('[data-key="' + focused + '"]'); if (el) el.focus(); }
   }
 
-  function postCard(st, p) {
-    const isDone = p.status === "done";
-    const items = p.items || [];
-    const doneMap = p.done || {};
-    const card = E("article", { class: "post" + (isDone ? " done" : p.priority === "urgent" ? " urgent" : "") });
+  function dapCard(st, g, t) {
+    const sign = signs[g.date];
+    const nDone = g.tasks.filter((p) => p.status === "done").length;
+    const overdue = !sign && g.due && g.due < t;
+    const card = E("article", { class: "dap" + (sign ? " signed" : overdue ? " overdue" : "") });
     const pills = E("div", { class: "row" });
-    if (p.priority === "urgent") pills.appendChild(E("span", { class: "pill red", text: "Urgent" }));
-    if (!isDone && p.due) pills.appendChild(E("span", { class: "pill " + (p.due < today ? "red" : "warn"), text: (p.due < today ? "Overdue · " : "Due ") + SPARUI.fmtDate(p.due) }));
-    if (isDone) pills.appendChild(E("span", { class: "pill", text: "Done" }));
-    card.appendChild(E("div", { class: "post-head" }, [
-      E("div", null, [E("h3", { text: p.title }), E("div", { class: "post-meta", text: SPARUI.fmtDate(p.date) + " · from " + (p.fromName || "Head Office") })]),
+    if (sign) pills.appendChild(E("span", { class: "pill", text: "Signed off" }));
+    else if (overdue) pills.appendChild(E("span", { class: "pill red", text: "Overdue" }));
+    else pills.appendChild(E("span", { class: "pill warn", text: "Due " + when(g.due) }));
+    pills.appendChild(E("span", { class: "pill grey", text: nDone + " of " + g.tasks.length + " done" }));
+    card.appendChild(E("div", { class: "dap-head" }, [
+      E("div", null, [E("h3", { text: "DAP · " + dayName(new Date(g.date + "T12:00:00").getTime()) }),
+        E("div", { class: "dap-meta", text: "Sent " + hhmm(g.sent) + " · complete by " + when(g.due) })]),
       pills
     ]));
-    if (p.message) card.appendChild(E("p", { class: "post-body", text: p.message }));
 
-    if (items.length) {
-      const ul = E("ul", { class: "items" });
-      items.forEach((text, i) => {
-        const cb = E("input", { type: "checkbox" });
-        cb.checked = !!doneMap[i];
-        cb.disabled = isDone;
-        const span = E("span", { class: cb.checked ? "ticked" : "", text });
-        cb.onchange = async () => {
-          span.className = cb.checked ? "ticked" : "";
-          try { await fs.updateDoc(storeDoc(st.code, p.id), { ["done." + i]: cb.checked }); }
-          catch (e) { cb.checked = !cb.checked; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+    g.tasks.forEach((p) => {
+      const isDone = p.status === "done";
+      const row = E("div", { class: "task" + (isDone ? " done" : "") });
+      const cb = E("input", { type: "checkbox", "aria-label": "Done: " + p.title });
+      cb.checked = isDone; cb.disabled = !!sign;
+      cb.onchange = async () => {
+        try {
+          await fs.updateDoc(storeDoc(st.code, p.id), cb.checked
+            ? { status: "done", ackBy: me.email, ackName: me.name, ackAt: Date.now() }
+            : { status: "open", ackBy: "", ackName: "", ackAt: 0 });
+        } catch (e) { cb.checked = !cb.checked; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      const title = E("div", { class: "t-title" }, [E("span", { text: p.title })]);
+      if (p.priority === "urgent") title.appendChild(E("span", { class: "pill red", text: "Urgent" }));
+      if (p.dept) title.appendChild(E("span", { class: "pill grey", text: p.dept }));
+      if (p.dueAt && p.dueAt < t && !isDone) title.appendChild(E("span", { class: "pill red", text: "Overdue" }));
+      row.appendChild(cb); row.appendChild(title);
+      if (p.details) row.appendChild(E("div", { class: "t-body", text: p.details }));
+      const links = (p.links || []).map((l) => ({ ...l, href: safeUrl(l.url) })).filter((l) => l.href);
+      if (links.length) row.appendChild(E("div", { class: "t-links" }, links.map((l) =>
+        E("a", { class: "linkchip", href: l.href, target: "_blank", rel: "noopener", text: "📎 " + (l.label || "Open document") }))));
+      if (isDone && p.ackName) row.appendChild(E("div", { class: "t-by", text: "✓ " + p.ackName + " · " + SPARUI.fmtDateTime(p.ackAt) }));
+      if (!sign) {
+        const key = "n-" + p.id;
+        const inp = E("input", { class: "in", placeholder: "Note (optional)", "aria-label": "Note for " + p.title, "data-key": key });
+        inp.value = notesDraft[p.id] ?? p.note ?? "";
+        inp.oninput = () => { notesDraft[p.id] = inp.value; };
+        inp.onchange = async () => {
+          try { await fs.updateDoc(storeDoc(st.code, p.id), { note: inp.value.trim() }); delete notesDraft[p.id]; SPARUI.toast("Note saved"); }
+          catch (e) { SPARUI.toast("Couldn't save note: " + (e.code || e.message), "err"); }
         };
-        ul.appendChild(E("li", null, [E("label", null, [cb, span])]));
-      });
-      card.appendChild(ul);
+        row.appendChild(E("div", { class: "t-note" }, [inp]));
+      } else if (p.note) row.appendChild(E("div", { class: "t-body note", text: "Note: " + p.note }));
+      card.appendChild(row);
+    });
+
+    if (sign) {
+      card.appendChild(E("div", { class: "signedbox" }, [
+        "✓ Signed off by " + (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at),
+        sign.note ? E("span", { class: "note", text: sign.note }) : null
+      ]));
+    } else {
+      const key = "s-" + g.date;
+      const ta = E("textarea", { class: "in", placeholder: "Sign-off comment (optional)", "aria-label": "Sign-off comment", "data-key": key });
+      ta.value = signDraft[g.date] || "";
+      ta.oninput = () => { signDraft[g.date] = ta.value; };
+      const btn = E("button", { class: "btn good", type: "button", text: "Sign off DAP" });
+      btn.onclick = async () => {
+        const left = g.tasks.length - g.tasks.filter((p) => p.status === "done").length;
+        if (left && !confirm(`${left} task${left === 1 ? " is" : "s are"} not ticked yet. Sign off anyway?`)) return;
+        btn.disabled = true;
+        try {
+          await fs.setDoc(signDoc(st.code, g.date), { date: g.date, by: me.email, name: me.name, at: Date.now(), note: ta.value.trim(),
+            tasks: g.tasks.length, done: g.tasks.length - left, late: g.due < now() });
+          delete signDraft[g.date];
+          SPARUI.toast("DAP signed off");
+        } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't sign off: " + (e.code || e.message), "err"); }
+      };
+      card.appendChild(E("div", { class: "dap-foot" }, [ta, btn]));
     }
 
-    if (isDone) {
-      card.appendChild(E("div", { class: "donebox", text: "✓ Completed by " + (p.ackName || "") + " · " + SPARUI.fmtDateTime(p.ackAt) }));
-      if (p.note) card.appendChild(E("p", { class: "post-body note", text: "Note: " + p.note }));
-      return card;
-    }
-    const ta = E("textarea", { class: "in", placeholder: "Note for Head Office (optional)", "aria-label": "Note" });
-    ta.value = drafts[p.id] ?? p.note ?? "";
-    ta.oninput = () => { drafts[p.id] = ta.value; };
-    const btn = E("button", { class: "btn good", type: "button", text: "Mark complete" });
-    btn.onclick = async () => {
-      const ticked = items.filter((_, i) => (p.done || {})[i] || card.querySelectorAll(".items input")[i]?.checked).length;
-      if (items.length && ticked < items.length && !confirm(`Only ${ticked} of ${items.length} action points are ticked. Mark complete anyway?`)) return;
-      btn.disabled = true;
-      try {
-        await fs.updateDoc(storeDoc(st.code, p.id), { status: "done", note: ta.value.trim(), ackBy: me.email, ackName: me.name, ackAt: Date.now() });
-        delete drafts[p.id];
-        SPARUI.toast("Marked complete");
-      } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
-    };
-    card.appendChild(E("div", { class: "post-foot" }, [ta, btn]));
+    // Mark tasks as seen
+    g.tasks.filter((p) => !p.seenAt).forEach((p) => fs.updateDoc(storeDoc(st.code, p.id), { seenAt: Date.now() }).catch(() => {}));
     return card;
   }
 
   watchStore();
   document.addEventListener("spar:store", watchStore);
+  setInterval(renderStore, 60000); // lets the 3pm DAP appear without a reload
 
-  // ═════════ POST (Head Office) ═════════
   if (me.isHQ) {
-    const active = me.allStores.filter((s) => s.active !== false);
-    $("allCount").textContent = active.length;
-    $("fDate").value = today;
-    const box = $("fStores");
-    const byRom = {};
-    active.forEach((s) => { (byRom[s.rom || "No ROM"] ||= []).push(s); });
-    Object.keys(byRom).sort().forEach((rom) => {
-      const all = E("button", { class: "btn secondary small", type: "button", text: "All" });
-      box.appendChild(E("div", { class: "romrow" }, [E("b", { text: rom }), all]));
-      const cbs = byRom[rom].map((s) => {
-        const cb = E("input", { type: "checkbox", value: s.code });
-        box.appendChild(E("label", null, [cb, s.name]));
-        return cb;
-      });
-      all.onclick = () => { const on = !cbs.every((c) => c.checked); cbs.forEach((c) => c.checked = on); };
-    });
-    document.querySelectorAll('input[name="aud"]').forEach((r) => r.onchange = () => { box.hidden = r.value !== "pick" || !r.checked; });
 
-    $("fForm").addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const say = (t, k = "ok") => { $("fMsg").innerHTML = ""; if (t) $("fMsg").appendChild(E("p", { class: "msg " + k, text: t })); };
-      const title = $("fTitle").value.trim();
-      const items = $("fItems").value.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 40);
-      const aud = document.querySelector('input[name="aud"]:checked').value;
-      const codes = aud === "all" ? active.map((s) => s.code) : [...box.querySelectorAll("input:checked")].map((c) => c.value);
-      if (!title) return say("Give the DAP a title.", "err");
-      if (!$("fMessage").value.trim() && !items.length) return say("Add a message or at least one action point.", "err");
-      if (!codes.length) return say("Choose at least one store.", "err");
-      if (!confirm(`Send “${title}” to ${codes.length} store${codes.length === 1 ? "" : "s"}?`)) return;
-      const id = SPARUI.uid();
-      const post = {
-        title, message: $("fMessage").value.trim(), items, date: $("fDate").value || today, due: $("fDue").value || "",
-        priority: $("fPriority").value, fromName: me.name, fromEmail: me.email, createdAt: Date.now()
-      };
-      $("fPost").disabled = true;
-      try {
-        const b = fs.writeBatch(db);
-        b.set(masterDoc(id), { ...post, stores: codes });
-        codes.forEach((c) => b.set(storeDoc(c, id), { ...post, status: "open", done: {} }));
-        await b.commit();
-        $("fForm").reset(); $("fDate").value = today; box.hidden = true;
-        say(`Sent to ${codes.length} store${codes.length === 1 ? "" : "s"}.`);
-      } catch (e) { say("Couldn't send: " + (e.code || e.message), "err"); }
-      $("fPost").disabled = false;
-    });
+  // ═════════════════ HEAD OFFICE ═════════════════
+  const active = me.allStores.filter((s) => s.active !== false);
+  let masters = [], editing = null;
 
-    // ═════════ SENT ═════════
-    let sent = [], current = null;
-    fs.onSnapshot(fs.query(masterCol, fs.orderBy("createdAt", "desc"), fs.limit(60)), (qs) => {
-      sent = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const tb = $("sentRows"); tb.innerHTML = "";
-      if (!sent.length) tb.appendChild(E("tr", null, [E("td", { colspan: "5", class: "empty", text: "No DAPs sent yet." })]));
-      sent.forEach((p) => {
-        const tr = E("tr", { class: "sentrow", tabindex: "0" }, [
-          E("td", { text: SPARUI.fmtDate(p.date) }),
-          E("td", null, [E("b", { text: p.title })]),
-          E("td", null, [E("span", { class: "pill " + (p.priority === "urgent" ? "red" : "grey"), text: p.priority === "urgent" ? "Urgent" : "Normal" })]),
-          E("td", { class: "num", text: (p.stores || []).length }),
-          E("td", { text: p.fromName || "" })
-        ]);
-        tr.onclick = () => openDetail(p);
-        tr.onkeydown = (e) => { if (e.key === "Enter") openDetail(p); };
-        tb.appendChild(tr);
-      });
-    }, () => {});
+  fs.onSnapshot(fs.query(masterCol, fs.orderBy("releaseAt", "desc"), fs.limit(500)), (qs) => {
+    masters = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderQueue(); renderDates(); renderDepts();
+  }, (e) => SPARUI.toast("Couldn't load DAP list: " + (e.code || e.message), "err"));
+  setInterval(() => { renderQueue(); renderDates(); updateWhen(); }, 60000);
 
-    async function openDetail(p) {
-      current = p;
-      $("detail").hidden = false;
-      $("dTitle").textContent = p.title;
-      $("dMeta").textContent = SPARUI.fmtDate(p.date) + (p.due ? " · complete by " + SPARUI.fmtDate(p.due) : "") + " · from " + (p.fromName || "") + " · " + (p.items || []).length + " action points";
-      $("dRows").innerHTML = "";
-      $("dRows").appendChild(E("tr", null, [E("td", { colspan: "6", class: "note", text: "Loading…" })]));
-      const snaps = await Promise.all((p.stores || []).map((c) => fs.getDoc(storeDoc(c, p.id)).then((s) => ({ c, d: s.exists() ? s.data() : null }), () => ({ c, d: null }))));
-      if (current !== p) return;
-      const n = (p.items || []).length;
-      let done = 0, unseen = 0;
-      const rows = snaps.map(({ c, d }) => {
-        const st = me.allStores.find((s) => s.code === c) || { name: c, rom: "" };
-        if (d && d.status === "done") done++;
-        if (!d || !d.seenAt) unseen++;
-        const ticks = d ? Object.values(d.done || {}).filter(Boolean).length : 0;
-        return { st, d, ticks };
-      }).sort((a, b) => ((a.d && a.d.status === "done") - (b.d && b.d.status === "done")) || a.st.name.localeCompare(b.st.name));
-      $("dStores").textContent = snaps.length; $("dDone").textContent = done; $("dOpen").textContent = snaps.length - done; $("dUnseen").textContent = unseen;
-      const tb = $("dRows"); tb.innerHTML = "";
-      rows.forEach(({ st, d, ticks }) => {
-        const isDone = d && d.status === "done";
-        const overdue = !isDone && p.due && p.due < today;
-        tb.appendChild(E("tr", null, [
-          E("td", null, [E("b", { text: st.name })]),
-          E("td", { text: st.rom || "" }),
-          E("td", null, [E("span", { class: "pill " + (isDone ? "" : overdue ? "red" : !d || !d.seenAt ? "grey" : "warn"),
-            text: isDone ? "Done" : overdue ? "Overdue" : !d || !d.seenAt ? "Not opened" : "In progress" })]),
-          E("td", null, n ? [E("div", { class: "bar", title: ticks + " of " + n }, [E("i", { style: "width:" + Math.round(100 * ticks / n) + "%" })]), E("small", { class: "note", text: ticks + "/" + n })] : ["—"]),
-          E("td", { text: isDone ? (d.ackName || "") + " · " + SPARUI.fmtDateTime(d.ackAt) : "" }),
-          E("td", { class: "note", text: (d && d.note) || "" })
-        ]));
-      });
-      $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+  // ── Add / edit task ──
+  $("allCount").textContent = active.length;
+  const box = $("fStores");
+  const byRom = {};
+  active.forEach((s) => { (byRom[s.rom || "No ROM"] ||= []).push(s); });
+  Object.keys(byRom).sort().forEach((rom) => {
+    const all = E("button", { class: "btn secondary small", type: "button", text: "All" });
+    box.appendChild(E("div", { class: "romrow" }, [E("b", { text: rom }), all]));
+    const cbs = byRom[rom].map((s) => { const cb = E("input", { type: "checkbox", value: s.code }); box.appendChild(E("label", null, [cb, s.name])); return cb; });
+    all.onclick = () => { const on = !cbs.every((c) => c.checked); cbs.forEach((c) => c.checked = on); };
+  });
+  document.querySelectorAll('input[name="aud"]').forEach((r) => r.onchange = () => { box.hidden = document.querySelector('input[name="aud"]:checked').value !== "pick"; });
+
+  function addLinkRow(label = "", url = "") {
+    if ($("fLinks").children.length >= 6) return;
+    const l = E("input", { class: "in", placeholder: "Name, e.g. Price card list", value: label });
+    const u = E("input", { class: "in lr-url", type: "url", placeholder: "https://sparmalta.sharepoint.com/…", value: url });
+    const x = E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove link" });
+    const row = E("div", { class: "linkrow" }, [l, u, x]);
+    x.onclick = () => row.remove();
+    $("fLinks").appendChild(row);
+  }
+  $("fAddLink").onclick = () => addLinkRow();
+
+  function renderDepts() {
+    const set = new Set(["Store management"]);
+    masters.forEach((m) => m.dept && set.add(m.dept));
+    $("deptList").innerHTML = "";
+    [...set].sort().forEach((d) => $("deptList").appendChild(E("option", { value: d })));
+  }
+
+  function plannedRelease() {
+    const t = now();
+    if ($("fPriority").value === "urgent") return editing && editing.releaseAt <= t ? editing.releaseAt : t;
+    return nextRelease(t);
+  }
+  function updateWhen() {
+    const urgent = $("fPriority").value === "urgent";
+    const rel = plannedRelease();
+    $("fWhen").className = "when" + (urgent ? " urgent" : "");
+    $("fWhen").textContent = urgent
+      ? "Sends straight away. Stores have until " + when(rel + HOURS_TO_ACTION * 3600e3) + "."
+      : "Goes out with the DAP on " + when(rel) + ". Stores have until " + when(rel + HOURS_TO_ACTION * 3600e3) + ".";
+    $("fSave").textContent = editing ? "Save changes" : urgent ? "Send now" : "Add to the DAP";
+  }
+  $("fPriority").onchange = updateWhen;
+  updateWhen();
+
+  function resetForm() {
+    editing = null;
+    $("fForm").reset(); $("fDept").value = "Store management";
+    $("fLinks").innerHTML = ""; box.hidden = true;
+    box.querySelectorAll("input").forEach((c) => c.checked = false);
+    $("fHead").textContent = "Add a task to the DAP"; $("fCancel").hidden = true;
+    updateWhen();
+  }
+  $("fCancel").onclick = () => { resetForm(); $("fMsg").innerHTML = ""; };
+
+  function startEdit(m) {
+    editing = m;
+    $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fDept").value = m.dept || "";
+    $("fPriority").value = m.priority === "urgent" ? "urgent" : "normal";
+    $("fLinks").innerHTML = ""; (m.links || []).forEach((l) => addLinkRow(l.label, l.url));
+    const all = active.length === (m.stores || []).length;
+    document.querySelector(`input[name="aud"][value="${all ? "all" : "pick"}"]`).checked = true;
+    box.hidden = all;
+    box.querySelectorAll("input").forEach((c) => c.checked = (m.stores || []).includes(c.value));
+    $("fHead").textContent = "Edit task"; $("fCancel").hidden = false;
+    updateWhen(); showTab("add"); $("fMsg").innerHTML = "";
+  }
+
+  $("fForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const say = (t, k = "ok") => { $("fMsg").innerHTML = ""; if (t) $("fMsg").appendChild(E("p", { class: "msg " + k, text: t })); };
+    const title = $("fTitle").value.trim();
+    if (!title) return say("Enter the task.", "err");
+    const links = [];
+    for (const row of $("fLinks").children) {
+      const [l, u] = row.querySelectorAll("input");
+      if (!u.value.trim() && !l.value.trim()) continue;
+      const href = safeUrl(u.value.trim());
+      if (!href) return say("“" + (u.value.trim() || l.value.trim()) + "” isn't a full web link. Copy it from SharePoint with Share → Copy link.", "err");
+      links.push({ label: l.value.trim() || "Open document", url: href });
     }
-    $("dRefresh").onclick = () => current && openDetail(current);
-    $("dDelete").onclick = async () => {
-      if (!current || !confirm(`Delete “${current.title}” from all ${current.stores.length} stores? This can't be undone.`)) return;
-      try {
-        const b = fs.writeBatch(db);
-        b.delete(masterDoc(current.id));
-        current.stores.forEach((c) => b.delete(storeDoc(c, current.id)));
-        await b.commit();
-        $("detail").hidden = true; current = null;
-        SPARUI.toast("DAP deleted");
-      } catch (e) { SPARUI.toast("Couldn't delete: " + (e.code || e.message), "err"); }
+    const aud = document.querySelector('input[name="aud"]:checked').value;
+    const codes = aud === "all" ? active.map((s) => s.code) : [...box.querySelectorAll("input:checked")].map((c) => c.value);
+    if (!codes.length) return say("Choose at least one store.", "err");
+    const priority = $("fPriority").value;
+    if (editing && editing.releaseAt <= now() && priority !== "urgent") return say("This task has already gone out, so it can't be edited. Remove it from Progress and add a new one if needed.", "err");
+    const releaseAt = plannedRelease();
+    const task = {
+      title, details: $("fDetails").value.trim(), dept: $("fDept").value.trim(), priority, links,
+      releaseAt, dueAt: releaseAt + HOURS_TO_ACTION * 3600e3, dapDate: dateOf(releaseAt),
+      fromName: me.name, fromEmail: me.email, createdAt: editing ? editing.createdAt : Date.now()
     };
+    if (priority === "urgent" && !editing && !confirm(`Send “${title}” to ${codes.length} store${codes.length === 1 ? "" : "s"} now?`)) return;
+    const id = editing ? editing.id : SPARUI.uid();
+    $("fSave").disabled = true;
+    try {
+      const b = fs.writeBatch(db);
+      b.set(masterDoc(id), { ...task, stores: codes, emailed: false });
+      codes.forEach((c) => b.set(storeDoc(c, id), { ...task, status: "open" }));
+      if (editing) (editing.stores || []).filter((c) => !codes.includes(c)).forEach((c) => b.delete(storeDoc(c, id)));
+      await b.commit();
+      say(priority === "urgent" ? `Sent to ${codes.length} store${codes.length === 1 ? "" : "s"}.`
+        : `${editing ? "Saved" : "Added"}. Goes out with the DAP on ${when(releaseAt)}.`);
+      resetForm();
+    } catch (e) { say("Couldn't save: " + (e.code || e.message), "err"); }
+    $("fSave").disabled = false;
+  });
+
+  async function deleteTask(m) {
+    if (!confirm(`Remove “${m.title}” from ${m.stores.length} store${m.stores.length === 1 ? "" : "s"}?`)) return false;
+    try {
+      const b = fs.writeBatch(db);
+      b.delete(masterDoc(m.id));
+      (m.stores || []).forEach((c) => b.delete(storeDoc(c, m.id)));
+      await b.commit();
+      SPARUI.toast("Task removed"); return true;
+    } catch (e) { SPARUI.toast("Couldn't remove: " + (e.code || e.message), "err"); return false; }
+  }
+
+  // ── Queue ──
+  function renderQueue() {
+    const t = now();
+    const q = masters.filter((m) => m.releaseAt > t).sort((a, b) => a.releaseAt - b.releaseAt);
+    $("qCount").textContent = q.length;
+    const list = $("queueList"); list.innerHTML = "";
+    if (!q.length) { list.appendChild(E("p", { class: "empty", text: "Nothing waiting. Tasks you add now go out " + when(nextRelease(t)) + "." })); return; }
+    const byRel = {};
+    q.forEach((m) => { (byRel[m.releaseAt] ||= []).push(m); });
+    Object.keys(byRel).forEach((rel) => {
+      const g = E("div", { class: "qgroup" }, [E("h3", { text: "Goes out " + when(+rel) + " · " + byRel[rel].length + " task" + (byRel[rel].length === 1 ? "" : "s") })]);
+      const tb = E("tbody");
+      byRel[rel].forEach((m) => tb.appendChild(E("tr", null, [
+        E("td", null, [E("b", { text: m.title }), m.details ? E("span", { class: "note", text: m.details.slice(0, 120) + (m.details.length > 120 ? "…" : "") }) : null]),
+        E("td", { text: m.dept || "" }),
+        E("td", { class: "num", text: (m.stores || []).length === active.length ? "All" : (m.stores || []).length }),
+        E("td", { text: (m.links || []).length ? "📎 " + m.links.length : "" }),
+        E("td", null, [E("div", { class: "row", style: "justify-content:flex-end" }, [
+          E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }),
+          E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: () => deleteTask(m) })
+        ])])
+      ])));
+      g.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [
+        E("thead", null, [E("tr", null, [E("th", { text: "Task" }), E("th", { text: "Department" }), E("th", { class: "num", text: "Stores" }), E("th", { text: "Links" }), E("th")])]), tb])]));
+      list.appendChild(g);
+    });
+  }
+
+  // ── Progress ──
+  function renderDates() {
+    const t = now();
+    const dates = [...new Set(masters.filter((m) => m.releaseAt <= t).map((m) => m.dapDate))].sort().reverse();
+    const sel = $("pDate"), keep = sel.value;
+    sel.innerHTML = "";
+    if (!dates.length) { sel.add(new Option("No DAPs sent yet", "")); return; }
+    dates.forEach((d) => sel.add(new Option(dayName(new Date(d + "T12:00:00").getTime()), d)));
+    sel.value = dates.includes(keep) ? keep : dates[0];
+    if (sel.value !== keep) loadProgress();
+  }
+  $("pDate").onchange = loadProgress;
+  $("pRefresh").onclick = loadProgress;
+
+  function dayTasks(date) {
+    const t = now();
+    return masters.filter((m) => m.dapDate === date && m.releaseAt <= t)
+      .sort((a, b) => (b.priority === "urgent") - (a.priority === "urgent") || a.releaseAt - b.releaseAt);
+  }
+
+  function dapText(date) {
+    const tasks = dayTasks(date);
+    if (!tasks.length) return "";
+    const due = Math.max(...tasks.map((m) => m.dueAt));
+    const lines = ["*SPAR DAP · " + dayName(new Date(date + "T12:00:00").getTime()) + "*", "Complete and sign off by " + when(due), ""];
+    tasks.forEach((m, i) => {
+      lines.push((i + 1) + ". *" + m.title + "*" + (m.priority === "urgent" ? " (URGENT)" : "") + (m.dept ? " · " + m.dept : "") +
+        ((m.stores || []).length < active.length ? " · " + (m.stores || []).length + " stores" : ""));
+      if (m.details) lines.push(m.details);
+      (m.links || []).forEach((l) => lines.push("📎 " + l.label + ": " + l.url));
+      lines.push("");
+    });
+    lines.push("Tick off and sign off in the SPAR Hub: " + hubUrl);
+    return lines.join("\n");
+  }
+  $("pCopy").onclick = async () => {
+    const text = dapText($("pDate").value);
+    try { await navigator.clipboard.writeText(text); SPARUI.toast("Copied. Paste it into WhatsApp or an email"); }
+    catch (e) { SPARUI.toast("Couldn't copy on this device", "err"); }
+  };
+
+  let loadSeq = 0;
+  async function loadProgress() {
+    const date = $("pDate").value, seq = ++loadSeq;
+    const tasks = dayTasks(date);
+    $("pWhatsApp").href = "https://wa.me/?text=" + encodeURIComponent(dapText(date));
+    $("pTasks").innerHTML = ""; $("pRows").innerHTML = "";
+    if (!tasks.length) { $("pMeta").textContent = ""; return; }
+    const due = Math.max(...tasks.map((m) => m.dueAt));
+    const emailed = tasks.filter((m) => m.emailed).length;
+    $("pMeta").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s") + " · complete by " + when(due) +
+      " · email: " + (emailed === tasks.length ? "sent" : emailed ? emailed + " of " + tasks.length + " sent" : "not sent yet");
+    const codes = [...new Set(tasks.flatMap((m) => m.stores || []))];
+    $("pRows").appendChild(E("tr", null, [E("td", { colspan: "6", class: "note", text: "Loading " + codes.length + " stores…" })]));
+    const res = await Promise.all(codes.map(async (c) => {
+      const [qs, sg] = await Promise.all([
+        fs.getDocs(fs.query(storeCol(c), fs.where("dapDate", "==", date))).catch(() => null),
+        fs.getDoc(signDoc(c, date)).catch(() => null)
+      ]);
+      const ids = new Set(tasks.map((m) => m.id));
+      const copies = qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => ids.has(p.id)) : [];
+      return { c, copies, sign: sg && sg.exists() ? sg.data() : null };
+    }));
+    if (seq !== loadSeq) return;
+    const t = now();
+    let signed = 0, overdue = 0, unseen = 0;
+    const doneBy = {};
+    const rows = res.map(({ c, copies, sign }) => {
+      const st = me.allStores.find((s) => s.code === c) || { name: c, rom: "" };
+      const n = copies.length, k = copies.filter((p) => p.status === "done").length;
+      copies.forEach((p) => { if (p.status === "done") doneBy[p.id] = (doneBy[p.id] || 0) + 1; });
+      const seen = copies.some((p) => p.seenAt);
+      const isOver = !sign && due < t;
+      if (sign) signed++; if (isOver) overdue++; if (!seen) unseen++;
+      const status = sign ? (sign.late ? ["Signed off late", "warn"] : ["Signed off", ""]) : isOver ? ["Overdue", "red"] : !seen ? ["Not opened", "grey"] : ["In progress", "warn"];
+      const notes = copies.filter((p) => p.note).map((p) => p.title + ": " + p.note);
+      if (sign && sign.note) notes.unshift("Sign-off: " + sign.note);
+      return { st, n, k, sign, status, notes };
+    }).sort((a, b) => (!!a.sign - !!b.sign) || a.st.name.localeCompare(b.st.name));
+    $("pStores").textContent = codes.length; $("pSigned").textContent = signed; $("pOver").textContent = overdue; $("pUnseen").textContent = unseen;
+
+    $("pTasks").innerHTML = "";
+    tasks.forEach((m) => $("pTasks").appendChild(E("tr", null, [
+      E("td", null, [E("b", { text: m.title }), (m.links || []).length ? E("span", { class: "note", text: "📎 " + m.links.map((l) => l.label).join(", ") }) : null]),
+      E("td", { text: m.dept || "" }),
+      E("td", null, [E("span", { class: "pill " + (m.priority === "urgent" ? "red" : "grey"), text: m.priority === "urgent" ? "Urgent · " + hhmm(m.releaseAt) : "Normal" })]),
+      E("td", { class: "num", text: (doneBy[m.id] || 0) + " / " + (m.stores || []).length }),
+      E("td", null, [E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: async () => { if (await deleteTask(m)) setTimeout(loadProgress, 300); } })])
+    ])));
+
+    $("pRows").innerHTML = "";
+    rows.forEach(({ st, n, k, sign, status, notes }) => $("pRows").appendChild(E("tr", null, [
+      E("td", null, [E("b", { text: st.name })]),
+      E("td", { text: st.rom || "" }),
+      E("td", null, [E("span", { class: "pill " + status[1], text: status[0] })]),
+      E("td", null, [E("div", { class: "bar", title: k + " of " + n }, [E("i", { style: "width:" + (n ? Math.round(100 * k / n) : 0) + "%" })]), E("small", { class: "note", text: k + "/" + n })]),
+      E("td", { text: sign ? (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) : "" }),
+      E("td", { class: "note", text: notes.join(" · ") })
+    ])));
+  }
   }
 </script>
 </body>
