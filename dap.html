@@ -419,6 +419,13 @@ th.dcol{text-align:center;font-size:11.5px}
     });
   }
 
+  // A sign-off only covers the tasks that had arrived when it was made. If a task arrives
+  // later the same day (an urgent one, or "Send the DAP now"), the DAP opens up again.
+  function signFor(date, tasks) {
+    const s = signs[date];
+    return s && !tasks.some((p) => (p.releaseAt || 0) > (s.at || 0)) ? s : null;
+  }
+
   function renderStore() {
     const st = me.store(); if (!st || st.all) return;
     // Don't redraw under someone's fingers
@@ -430,7 +437,7 @@ th.dcol{text-align:center;font-size:11.5px}
     $("kOpen").textContent = openTasks.length;
     const over = openTasks.filter((p) => p.dueAt && p.dueAt < t).length;
     $("kOver").textContent = over; $("kOver").className = over ? "bad" : "";
-    $("kSign").textContent = groups.filter((g) => !signs[g.date]).length;
+    $("kSign").textContent = groups.filter((g) => !signFor(g.date, g.tasks)).length;
     $("kNext").textContent = when(nextRelease(t));
 
     const list = $("dapList");
@@ -438,15 +445,17 @@ th.dcol{text-align:center;font-size:11.5px}
     const scrollY = window.scrollY;
     list.innerHTML = "";
     if (!groups.length) { list.appendChild(E("div", { class: "card empty", text: "No DAPs yet for " + st.name + ". The next one arrives " + when(nextRelease(t)) + "." })); return; }
-    const open = groups.filter((g) => !signs[g.date] || (!signs[g.date].romAt && ["rom", "admin", "hq"].includes(me.role)) || g.tasks.some((p) => verifyState(p) === "back"));
+    const open = groups.filter((g) => { const sg = signFor(g.date, g.tasks); return !sg || (!romOk(sg) && ["rom", "admin", "hq"].includes(me.role)) || g.tasks.some((p) => verifyState(p) === "back"); });
     const rest = groups.filter((g) => !open.includes(g)).slice(0, 14);
     open.concat(rest).forEach((g) => list.appendChild(dapCard(st, g, t)));
     if (focused) { const el = list.querySelector('[data-key="' + focused + '"]'); if (el) el.focus(); }
     window.scrollTo(0, scrollY);
   }
 
+  const romOk = (sg) => sg && sg.romAt && sg.romAt >= (sg.at || 0);
   function dapCard(st, g, t) {
-    const sign = signs[g.date];
+    const raw = signs[g.date], sign = signFor(g.date, g.tasks);
+    const newSince = raw && !sign ? g.tasks.filter((p) => (p.releaseAt || 0) > (raw.at || 0)).length : 0;
     const nDone = g.tasks.filter((p) => p.status === "done").length;
     const overdue = !sign && g.due && g.due < t;
     const card = E("article", { class: "dap" + (sign ? " signed" : overdue ? " overdue" : "") });
@@ -461,13 +470,15 @@ th.dcol{text-align:center;font-size:11.5px}
       pills
     ]));
     g.tasks.forEach((p) => card.appendChild(taskRow(st, p, t, !!sign)));
+    if (newSince) card.appendChild(E("p", { class: "msg warn", style: "margin:10px 0 0",
+      text: "Signed off by " + (raw.name || "") + " at " + hhmm(raw.at) + ", but " + newSince + " new task" + (newSince === 1 ? "" : "s") + " arrived after that. Complete " + (newSince === 1 ? "it" : "them") + " and sign off again." }));
 
     if (sign) {
       card.appendChild(E("div", { class: "signedbox" }, [
         "✓ Signed off by " + (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) + (sign.late ? " (late)" : ""),
         sign.note ? E("span", { class: "note", text: sign.note }) : null
       ]));
-      if (sign.romAt) {
+      if (romOk(sign)) {
         card.appendChild(E("div", { class: "rombox ok" }, ["✓ ROM confirmed by " + (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) + (sign.romNote ? " · " + sign.romNote : "")]));
       } else if (["rom", "admin", "hq"].includes(me.role)) {
         const inp = E("input", { class: "in", placeholder: "ROM comment (optional)", style: "flex:1 1 220px;padding:7px 10px;font-size:13px", "data-key": "rom-" + g.date });
@@ -492,8 +503,10 @@ th.dcol{text-align:center;font-size:11.5px}
         if (left && !confirm(`${left} task${left === 1 ? " is" : "s are"} not done yet. Sign off anyway?`)) return;
         btn.disabled = true;
         try {
-          await fs.setDoc(signDoc(st.code, g.date), { date: g.date, by: me.email, name: me.name, at: Date.now(), note: ta.value.trim(),
-            tasks: g.tasks.length, done: g.tasks.length - left, late: g.due < now() });
+          const data = { date: g.date, by: me.email, name: me.name, at: now(), note: ta.value.trim(),
+            tasks: g.tasks.length, done: g.tasks.length - left, late: g.due < now() };
+          // signing off again after a late task: update the day's sign-off (the earlier ROM confirmation no longer counts)
+          if (raw) await fs.updateDoc(signDoc(st.code, g.date), data); else await fs.setDoc(signDoc(st.code, g.date), data);
           delete drafts[key];
           SPARUI.toast("DAP signed off");
         } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't sign off: " + (e.code || e.message), "err"); }
@@ -507,8 +520,9 @@ th.dcol{text-align:center;font-size:11.5px}
   function taskRow(st, p, t, locked) {
     const isDone = p.status === "done";
     const vs = verifyState(p);
-    // Signed-off DAPs are locked, except a task the department has sent back
-    const lockedTask = (locked && vs !== "back") || vs === "ok";
+    // Signed-off DAPs are locked, except a task the department has sent back,
+    // and a task that still isn't done (the store can always finish it late)
+    const lockedTask = (locked && isDone && vs !== "back") || vs === "ok";
     const row = E("div", { class: "task" + (isDone ? " done" : "") });
     const upd = (data) => fs.updateDoc(storeDoc(st.code, p.id), data);
 
@@ -729,9 +743,9 @@ th.dcol{text-align:center;font-size:11.5px}
       const list = byDate[d], sg = r.sign[d];
       const due = Math.max(...list.map((p) => p.dueAt || 0));
       const k = list.filter((p) => p.status === "done").length;
-      if (sg) { signed++; if (sg.late) late++; if (sg.romAt) rom++; }
+      if (sg) { signed++; if (sg.late) late++; if (romOk(sg)) rom++; }
       if (sg || due < t) due0++;   // DAPs that count towards on-time: signed, or past their deadline
-      cells[d] = sg ? { cls: sg.late ? "c-late" : "c-ok", text: (sg.late ? "✓ late" : "✓") + (sg.romAt ? " R" : ""), tip: "Signed off by " + (sg.name || "") + " " + SPARUI.fmtDateTime(sg.at) + (sg.romAt ? " · ROM " + (sg.romName || "") : "") }
+      cells[d] = sg ? { cls: sg.late ? "c-late" : "c-ok", text: (sg.late ? "✓ late" : "✓") + (romOk(sg) ? " R" : ""), tip: "Signed off by " + (sg.name || "") + " " + SPARUI.fmtDateTime(sg.at) + (romOk(sg) ? " · ROM " + (sg.romName || "") : "") }
         : due < t ? { cls: "c-over", text: "Overdue", tip: k + " of " + list.length + " tasks done" }
         : { cls: "c-prog", text: k + "/" + list.length, tip: "Due " + when(due) };
     });
@@ -1180,7 +1194,8 @@ th.dcol{text-align:center;font-size:11.5px}
       ]);
       const copies = qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => ids.has(p.id)) : [];
       const st = me.allStores.find((s) => s.code === c) || { code: c, name: c, rom: "" };
-      return { c, st, copies, sign: sg && sg.exists() ? sg.data() : null };
+      const sd = sg && sg.exists() ? sg.data() : null;
+      return { c, st, copies, sign: sd && !copies.some((p) => (p.releaseAt || 0) > (sd.at || 0)) ? sd : null };
     }));
     if (seq !== loadSeq) return;
     lastRes = res;
@@ -1234,7 +1249,7 @@ th.dcol{text-align:center;font-size:11.5px}
       E("td", null, [E("span", { class: "pill " + status[1], text: status[0] })]),
       E("td", null, [E("div", { class: "bar", title: k + " of " + n }, [E("i", { style: "width:" + (n ? Math.round(100 * k / n) : 0) + "%" })]), E("small", { class: "note", text: k + "/" + n })]),
       E("td", { text: sign ? (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) : "" }),
-      E("td", { text: sign && sign.romAt ? (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) : "" }),
+      E("td", { text: romOk(sign) ? (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) : "" }),
       E("td", { class: "note", text: notes.join(" · ") })
     ])));
   }
