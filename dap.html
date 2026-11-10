@@ -93,6 +93,14 @@ th.dcol{text-align:center;font-size:11.5px}
 .yn button.on.yes{background:var(--gd);border-color:var(--gd);color:#fff}
 .yn button.on.no{background:var(--red);border-color:var(--red);color:#fff}
 .yn button:disabled{opacity:.6;cursor:default}
+.romday{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}
+.romday.ready{border-color:#2a7a3f}
+.romday-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:#F7F8F8}
+.romday-h h3{margin:0;font-size:16px}
+.romday table{width:100%}
+.romday td,.romday th{padding:8px 14px}
+.romday .storelink{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--ink);text-decoration:underline;cursor:pointer;text-align:left}
+.romday-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:#FBFCFB}
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0;align-items:center}
 </style>
 </head>
@@ -102,6 +110,7 @@ th.dcol{text-align:center;font-size:11.5px}
 <main class="page">
   <div class="tabs" id="tabs" hidden>
     <button class="tab active" data-tab="store" type="button">Store view</button>
+    <button class="tab" data-tab="rom" type="button" hidden>ROM check<span class="count" id="rCount" hidden>0</span></button>
     <button class="tab" data-tab="add" type="button">Add task</button>
     <button class="tab" data-tab="queue" type="button">Waiting for 3pm<span class="count" id="qCount">0</span></button>
     <button class="tab" data-tab="progress" type="button">Progress<span class="count" id="vCount" hidden>0</span></button>
@@ -149,6 +158,21 @@ th.dcol{text-align:center;font-size:11.5px}
     </div>
     <div class="section-title"><h2>Daily Action Points</h2><span class="note" id="storeNote"></span></div>
     <div id="dapList"><p class="empty">Loading…</p></div>
+    </div>
+  </section>
+
+  <!-- ═════════ ROM CHECK ═════════ -->
+  <section data-pane="rom" hidden>
+    <div class="card panel" style="margin-top:0">
+      <div class="row" style="justify-content:space-between;margin-bottom:4px">
+        <h2 style="margin:0">ROM check</h2>
+        <div class="row">
+          <label class="note" id="rRomWrap" hidden style="display:flex;gap:6px;align-items:center">ROM <select class="in" id="rRom" style="padding:6px 8px;width:auto"></select></label>
+          <button class="btn secondary small" id="rRefresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <p class="note" style="margin:0 0 12px">Each Store Manager signs off their store's DAP. Once every one of your stores has signed off a day's DAP, check it here and confirm it once for all of them (four eyes: the store has done it, the ROM has seen it). Click a store to open its DAP.</p>
+      <div id="rList"><p class="note">Loading…</p></div>
     </div>
   </section>
 
@@ -338,8 +362,12 @@ th.dcol{text-align:center;font-size:11.5px}
   }
   const isDept = me.role === "dept";
   const canPost = me.isHQ || isDept;
-  if (canPost) {
+  const isRom = me.role === "rom";
+  const romCheck = isRom || me.isHQ;
+  if (canPost || isRom) {
     $("tabs").hidden = false;
+    document.querySelector('.tab[data-tab="rom"]').hidden = !romCheck;
+    if (isRom) ["add", "queue", "progress"].forEach((n) => { document.querySelector('.tab[data-tab="' + n + '"]').hidden = true; });
     if (isDept) {
       // Departments post and follow their own tasks; they don't work a store's DAP.
       document.querySelector('.tab[data-tab="store"]').hidden = true;
@@ -445,7 +473,7 @@ th.dcol{text-align:center;font-size:11.5px}
     const scrollY = window.scrollY;
     list.innerHTML = "";
     if (!groups.length) { list.appendChild(E("div", { class: "card empty", text: "No DAPs yet for " + st.name + ". The next one arrives " + when(nextRelease(t)) + "." })); return; }
-    const open = groups.filter((g) => { const sg = signFor(g.date, g.tasks); return !sg || (!romOk(sg) && ["rom", "admin", "hq"].includes(me.role)) || g.tasks.some((p) => verifyState(p) === "back"); });
+    const open = groups.filter((g) => { const sg = signFor(g.date, g.tasks); return !sg || g.tasks.some((p) => verifyState(p) === "back"); });
     const rest = groups.filter((g) => !open.includes(g)).slice(0, 14);
     open.concat(rest).forEach((g) => list.appendChild(dapCard(st, g, t)));
     if (focused) { const el = list.querySelector('[data-key="' + focused + '"]'); if (el) el.focus(); }
@@ -478,20 +506,6 @@ th.dcol{text-align:center;font-size:11.5px}
         "✓ Signed off by " + (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) + (sign.late ? " (late)" : ""),
         sign.note ? E("span", { class: "note", text: sign.note }) : null
       ]));
-      if (romOk(sign)) {
-        card.appendChild(E("div", { class: "rombox ok" }, ["✓ ROM confirmed by " + (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) + (sign.romNote ? " · " + sign.romNote : "")]));
-      } else if (["rom", "admin", "hq"].includes(me.role)) {
-        const inp = E("input", { class: "in", placeholder: "ROM comment (optional)", style: "flex:1 1 220px;padding:7px 10px;font-size:13px", "data-key": "rom-" + g.date });
-        const b = E("button", { class: "btn small", type: "button", text: "ROM confirm" });
-        b.onclick = async () => {
-          b.disabled = true;
-          try { await fs.updateDoc(signDoc(st.code, g.date), { romBy: me.email, romName: me.name, romAt: Date.now(), romNote: inp.value.trim() }); SPARUI.toast("Confirmed"); }
-          catch (e) { b.disabled = false; SPARUI.toast("Couldn't confirm: " + (e.code || e.message), "err"); }
-        };
-        card.appendChild(E("div", { class: "rombox" }, [inp, b]));
-      } else {
-        card.appendChild(E("div", { class: "rombox note", text: "Waiting for ROM confirmation" }));
-      }
     } else {
       const key = "s-" + g.date;
       const ta = E("textarea", { class: "in", placeholder: "Sign-off comment (optional)", "aria-label": "Sign-off comment", "data-key": key });
@@ -505,7 +519,7 @@ th.dcol{text-align:center;font-size:11.5px}
         try {
           const data = { date: g.date, by: me.email, name: me.name, at: now(), note: ta.value.trim(),
             tasks: g.tasks.length, done: g.tasks.length - left, late: g.due < now() };
-          // signing off again after a late task: update the day's sign-off (the earlier ROM confirmation no longer counts)
+          // signing off again after a late task: update the day's sign-off (the ROM then checks it again)
           if (raw) await fs.updateDoc(signDoc(st.code, g.date), data); else await fs.setDoc(signDoc(st.code, g.date), data);
           delete drafts[key];
           SPARUI.toast("DAP signed off");
@@ -822,6 +836,116 @@ th.dcol{text-align:center;font-size:11.5px}
   }
 
   watchStore();
+
+  // ═════════════════ ROM CHECK ═════════════════
+  // Stores sign off; the ROM sees which of their stores have, and confirms the day once for all of them.
+  if (romCheck) {
+    const ROM_DAYS = 14;
+    let romSeq = 0;
+    const romStores = () => {
+      if (isRom) return me.stores;
+      const r = $("rRom").value;
+      return me.allStores.filter((s) => s.active !== false && (s.rom || "No ROM") === r);
+    };
+    if (!isRom) {
+      const roms = [...new Set(me.allStores.filter((s) => s.active !== false).map((s) => s.rom || "No ROM"))].sort();
+      roms.forEach((r) => $("rRom").add(new Option(r, r)));
+      $("rRomWrap").hidden = false;
+      $("rRom").onchange = loadRom;
+    }
+    $("rRefresh").onclick = loadRom;
+    document.querySelector('.tab[data-tab="rom"]').addEventListener("click", loadRom);
+
+    async function loadRom() {
+      const seq = ++romSeq, t = now(), stores = romStores();
+      const since = t - ROM_DAYS * 864e5, sinceDay = isoDay(new Date(since));
+      $("rList").innerHTML = ""; $("rList").appendChild(E("p", { class: "note", text: "Loading " + stores.length + " stores…" }));
+      const res = await Promise.all(stores.map(async (st) => {
+        const [qs, sg] = await Promise.all([
+          fs.getDocs(fs.query(storeCol(st.code), fs.where("releaseAt", ">=", since), fs.orderBy("releaseAt", "desc"))).catch(() => null),
+          fs.getDocs(fs.query(signCol(st.code), fs.where("date", ">=", sinceDay))).catch(() => null)
+        ]);
+        const sign = {}; if (sg) sg.docs.forEach((d) => { sign[d.id] = d.data(); });
+        return { st, tasks: qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.releaseAt <= t) : [], sign };
+      }));
+      if (seq !== romSeq) return;
+      renderRom(res, t);
+    }
+
+    function renderRom(res, t) {
+      const byDate = {};
+      res.forEach((r) => {
+        const mine = {};
+        r.tasks.forEach((p) => { (mine[p.dapDate] ||= []).push(p); });
+        Object.keys(mine).forEach((d) => {
+          const tasks = mine[d], sd = r.sign[d];
+          const sign = sd && !tasks.some((p) => (p.releaseAt || 0) > (sd.at || 0)) ? sd : null;
+          (byDate[d] ||= []).push({ st: r.st, tasks, sign, due: Math.max(...tasks.map((p) => p.dueAt || 0)) });
+        });
+      });
+      const dates = Object.keys(byDate).sort().reverse();
+      const list = $("rList"); list.innerHTML = "";
+      let ready = 0;
+      if (!dates.length) { list.appendChild(E("p", { class: "empty", text: "No DAPs in the last " + ROM_DAYS + " days." })); }
+      dates.forEach((d) => {
+        const rows = byDate[d].sort((a, b) => (!!a.sign - !!b.sign) || a.st.name.localeCompare(b.st.name));
+        const signed = rows.filter((x) => x.sign).length, all = rows.length;
+        const confirmed = rows.every((x) => romOk(x.sign));
+        const isReady = signed === all && !confirmed;
+        if (isReady) ready++;
+        const head = E("div", { class: "romday-h" }, [
+          E("h3", { text: "DAP · " + dayOf(d) }),
+          confirmed ? E("span", { class: "pill", text: "✓ ROM confirmed" + (rows[0].sign.romName ? " by " + rows[0].sign.romName : "") + " · " + SPARUI.fmtDateTime(Math.max(...rows.map((x) => x.sign.romAt))) })
+            : isReady ? E("span", { class: "pill warn", text: "All " + all + " stores signed off: ready for you to confirm" })
+            : E("span", { class: "pill grey", text: signed + " of " + all + " stores signed off" })
+        ]);
+        const tb = E("tbody");
+        rows.forEach((x) => {
+          const k = x.tasks.filter((p) => p.status === "done").length;
+          const over = !x.sign && x.due < t;
+          const open = E("button", { class: "storelink", type: "button", text: x.st.name, onclick: () => {
+            me.setStore(x.st.code);
+            const sel = document.querySelector(".storepick select"); if (sel) sel.value = x.st.code;
+            document.dispatchEvent(new CustomEvent("spar:store", { detail: me.store() }));
+            showTab("store"); window.scrollTo(0, 0);
+          } });
+          tb.appendChild(E("tr", null, [
+            E("td", null, [open]),
+            E("td", { class: "num", text: k + " / " + x.tasks.length }),
+            E("td", null, [x.sign
+              ? E("span", { class: "pill" + (x.sign.late ? " warn" : ""), text: "✓ " + (x.sign.late ? "Signed off late" : "Signed off") })
+              : E("span", { class: "pill " + (over ? "red" : "grey"), text: over ? "Not signed off: overdue" : "Not signed off yet" })]),
+            E("td", { class: "note", text: x.sign ? (x.sign.name || "") + " · " + SPARUI.fmtDateTime(x.sign.at) + (x.sign.note ? " · “" + x.sign.note + "”" : "") : "" }),
+            E("td", { text: romOk(x.sign) ? "✓ ROM" : "" })
+          ]));
+        });
+        const box = E("div", { class: "romday" + (isReady ? " ready" : "") }, [head,
+          E("div", { class: "tablewrap" }, [E("table", null, [
+            E("thead", null, [E("tr", null, [E("th", { text: "Store" }), E("th", { class: "num", text: "Tasks done" }), E("th", { text: "Store sign-off" }), E("th", { text: "Signed by" }), E("th")])]), tb])])]);
+        if (isReady) {
+          const inp = E("input", { class: "in", placeholder: "ROM comment (optional)", style: "flex:1 1 240px;padding:7px 10px;font-size:13px" });
+          const b = E("button", { class: "btn good small", type: "button", text: "ROM confirm all " + all + " stores" });
+          b.onclick = async () => {
+            if (!confirm("Confirm you've checked the " + dayOf(d) + " DAP for all " + all + " stores?")) return;
+            b.disabled = true;
+            const data = { romBy: me.email, romName: me.name, romAt: now(), romNote: inp.value.trim() };
+            try {
+              await commitAll(rows.filter((x) => !romOk(x.sign)).map((x) => ["update", signDoc(x.st.code, d), data]));
+              SPARUI.toast("Confirmed for all " + all + " stores"); loadRom();
+            } catch (e) { b.disabled = false; SPARUI.toast("Couldn't confirm: " + (e.code || e.message), "err"); }
+          };
+          box.appendChild(E("div", { class: "romday-f" }, [inp, b]));
+        } else if (!confirmed) {
+          const left = rows.filter((x) => !x.sign).map((x) => x.st.name);
+          box.appendChild(E("div", { class: "romday-f note", text: "You can confirm once every store has signed off. Still waiting for: " + left.join(", ") + "." }));
+        }
+        list.appendChild(box);
+      });
+      $("rCount").textContent = ready; $("rCount").hidden = !ready;
+    }
+    loadRom();
+    if (isRom) showTab("rom");
+  }
   document.addEventListener("spar:store", watchStore);
   setInterval(renderStore, 60000); // lets the 3pm DAP appear without a reload
 
