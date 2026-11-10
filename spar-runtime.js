@@ -122,9 +122,11 @@
     if (!ctx) return null;
     var role = ctx.member.role || "";
     var stores = ctx.stores.slice();
+    var ALL = { code: "__ALL__", name: "All stores", all: true };
     function current() {
       var saved = null;
       try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
+      if (saved === ALL.code && ctx.seesAll && stores.length > 1) return ALL;
       var hit = stores.filter(function (s) { return s.code === saved; })[0];
       return hit || stores[0] || null;
     }
@@ -139,7 +141,8 @@
       seesAll: ctx.seesAll,
       stores: stores,                 // stores this person may see (active only)
       allStores: ctx.allStores.slice(),
-      store: function () { return current(); },
+      store: function () { return current(); },          // may be { all: true } on pages that allow "All stores"
+      firstStore: function () { var c = current(); return c && c.all ? (stores[0] || null) : c; },
       setStore: function (code) { try { localStorage.setItem(STORE_KEY, code); } catch (e) {} },
       storeName: function (code) {
         var hit = ctx.allStores.filter(function (s) { return s.code === code; })[0];

@@ -88,10 +88,12 @@
       return wrap;
     }
     var sel = el("select", { "aria-label": "Store" });
+    var allowAll = me.seesAll && document.querySelector("header.top[data-allstores='1']");
+    if (allowAll) sel.appendChild(el("option", { value: "__ALL__", text: "All stores" }));
     me.stores.forEach(function (s) {
       sel.appendChild(el("option", { value: s.code, text: s.name }));
     });
-    var cur = me.store();
+    var cur = allowAll ? me.store() : me.firstStore();
     if (cur) sel.value = cur.code;
     sel.addEventListener("change", function () {
       me.setStore(sel.value);

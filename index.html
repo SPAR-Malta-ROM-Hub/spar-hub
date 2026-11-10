@@ -92,7 +92,7 @@
   // Number of open DAPs for the selected store
   function dapBadge(me) {
     var b = document.getElementById("dapBadge");
-    var st = me.store();
+    var st = me.firstStore();
     if (!b || !st) return;
     SPAR.firebase().then(function (c) {
       var q = c.fs.query(c.fs.collection(c.db, "modules", "dap", "stores", st.code, "posts"), c.fs.where("status", "==", "open"));

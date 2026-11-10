@@ -73,10 +73,20 @@ tr.sel td{background:#FFF6F6}
 .minithumbs{display:flex;gap:4px;flex-wrap:wrap}
 .minithumbs a{display:block;width:44px;height:44px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font-size:10px;text-align:center;line-height:44px;color:var(--ink);text-decoration:none;background:#fff}
 .minithumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.allbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.allbar label{font-weight:700;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
+.allbar input,.allbar select{font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.cell{display:inline-block;min-width:54px;text-align:center;padding:4px 6px;border-radius:7px;font-weight:700;font-size:12px;white-space:nowrap}
+.c-ok{background:var(--goodsoft);color:var(--gd)} .c-late{background:var(--ambersoft);color:var(--amber)}
+.c-over{background:var(--redsoft);color:var(--red)} .c-prog{background:#EEF0EF;color:var(--muted)} .c-none{color:#C9CDCB}
+.storelink{background:none;border:0;padding:0;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer;text-align:left}
+.storelink:hover{color:var(--brandd);text-decoration:underline}
+th.dcol{text-align:center;font-size:11.5px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0;align-items:center}
 </style>
 </head>
 <body>
-<header class="top" data-title="DAP" data-store="1"></header>
+<header class="top" data-title="DAP" data-store="1" data-allstores="1"></header>
 
 <main class="page">
   <div class="tabs" id="tabs" hidden>
@@ -88,6 +98,38 @@ tr.sel td{background:#FFF6F6}
 
   <!-- ═════════ STORE VIEW ═════════ -->
   <section data-pane="store">
+    <div id="allView" hidden>
+      <div class="card panel" style="margin-top:0">
+        <h2>All stores overview</h2>
+        <div class="allbar">
+          <label>From<input type="date" id="aFrom"></label>
+          <label>To<input type="date" id="aTo"></label>
+          <div class="row">
+            <button class="btn secondary small" type="button" data-range="today">Today</button>
+            <button class="btn secondary small" type="button" data-range="7">Last 7 days</button>
+            <button class="btn secondary small" type="button" data-range="month">This month</button>
+          </div>
+          <label>ROM<select id="aRom"><option value="">All ROMs</option></select></label>
+          <div class="row" style="margin-left:auto">
+            <button class="btn secondary small" id="aRefresh" type="button">Refresh</button>
+            <button class="btn secondary small" id="aExcel" type="button">Download (Excel)</button>
+          </div>
+        </div>
+        <div class="kpis">
+          <div class="card kpi"><label>DAPs in range</label><strong id="aDaps">–</strong></div>
+          <div class="card kpi"><label>Signed off</label><strong class="good" id="aSigned">–</strong></div>
+          <div class="card kpi"><label>Signed off on time</label><strong id="aOnTime">–</strong></div>
+          <div class="card kpi"><label>Tasks overdue now</label><strong class="bad" id="aOver">–</strong></div>
+        </div>
+        <p class="note" id="aMeta" style="margin:12px 0 8px"></p>
+        <div class="tablewrap" style="max-height:70vh">
+          <table><thead id="aHead"></thead><tbody id="aRows"><tr><td class="note">Loading…</td></tr></tbody></table>
+        </div>
+        <div class="legend"><span class="cell c-ok">✓</span> signed off on time <span class="cell c-late">✓ late</span> signed off late
+          <span class="cell c-over">Overdue</span> not signed off, past deadline <span class="cell c-prog">2/4</span> in progress (tasks done) · <b>R</b> = ROM confirmed · click a store to open it</div>
+      </div>
+    </div>
+    <div id="oneView">
     <div class="kpis">
       <div class="card kpi"><label>Tasks to do</label><strong id="kOpen">–</strong></div>
       <div class="card kpi"><label>Overdue</label><strong id="kOver">–</strong></div>
@@ -96,6 +138,7 @@ tr.sel td{background:#FFF6F6}
     </div>
     <div class="section-title"><h2>Daily Action Points</h2><span class="note" id="storeNote"></span></div>
     <div id="dapList"><p class="empty">Loading…</p></div>
+    </div>
   </section>
 
   <!-- ═════════ ADD TASK (Head Office) ═════════ -->
@@ -308,6 +351,8 @@ tr.sel td{background:#FFF6F6}
   function watchStore() {
     unsubs.forEach((u) => u()); unsubs = []; posts = []; signs = {};
     const st = me.store();
+    $("allView").hidden = !(st && st.all); $("oneView").hidden = !!(st && st.all);
+    if (st && st.all) { loadAll(); return; }
     if (!st) { $("dapList").innerHTML = ""; $("dapList").appendChild(E("p", { class: "empty", text: "No store assigned to you yet." })); return; }
     $("storeNote").textContent = st.name;
     let loaded = false;
@@ -334,7 +379,7 @@ tr.sel td{background:#FFF6F6}
   }
 
   function renderStore() {
-    const st = me.store(); if (!st) return;
+    const st = me.store(); if (!st || st.all) return;
     // Don't redraw under someone's fingers
     if (Object.values(busy).some(Boolean)) return;
     const t = now();
@@ -558,6 +603,131 @@ tr.sel td{background:#FFF6F6}
     if (vs === "ok") row.appendChild(E("div", { class: "t-verify ok", text: "✓ Checked by " + (p.verifyName || "") + " · " + SPARUI.fmtDateTime(p.verifyAt) }));
     if (vs === "back") row.appendChild(E("div", { class: "t-verify back", text: "↩ Sent back by " + (p.verifyName || "") + ": " + (p.verifyNote || "please redo") }));
     return row;
+  }
+
+  // ═════════════════ ALL STORES OVERVIEW ═════════════════
+  let allRes = [], allSeq = 0;
+  const isoDay = (d) => SPARUI.isoDate(d);
+  function setRange(kind) {
+    const t = new Date(now());
+    let from = new Date(t);
+    if (kind === "7") from.setDate(from.getDate() - 6);
+    if (kind === "month") from = new Date(t.getFullYear(), t.getMonth(), 1);
+    $("aFrom").value = isoDay(from); $("aTo").value = isoDay(t);
+    loadAll();
+  }
+  document.querySelectorAll("[data-range]").forEach((b) => b.onclick = () => setRange(b.dataset.range));
+  $("aFrom").onchange = () => loadAll(); $("aTo").onchange = () => loadAll();
+  $("aRom").onchange = renderAll; $("aRefresh").onclick = () => loadAll();
+  [...new Set(me.stores.map((s) => s.rom).filter(Boolean))].sort().forEach((r) => $("aRom").add(new Option(r, r)));
+
+  async function loadAll() {
+    if (!$("aFrom").value) { const t = new Date(now()), f = new Date(t); f.setDate(f.getDate() - 6); $("aFrom").value = isoDay(f); $("aTo").value = isoDay(t); }
+    let fromV = $("aFrom").value, toV = $("aTo").value;
+    if (toV < fromV) { [fromV, toV] = [toV, fromV]; $("aFrom").value = fromV; $("aTo").value = toV; }
+    const days = Math.round((new Date(toV) - new Date(fromV)) / 864e5) + 1;
+    if (days > 92) { $("aRows").innerHTML = ""; $("aRows").appendChild(E("tr", null, [E("td", { class: "msg warn", text: "Please choose a range of 3 months or less." })])); return; }
+    const seq = ++allSeq;
+    const from = new Date(fromV + "T00:00:00").getTime(), to = Math.min(new Date(toV + "T23:59:59").getTime() + 999, now());
+    $("aRows").innerHTML = ""; $("aRows").appendChild(E("tr", null, [E("td", { class: "note", text: "Loading " + me.stores.length + " stores…" })]));
+    const res = await Promise.all(me.stores.map(async (st) => {
+      const [qs, sg] = await Promise.all([
+        fs.getDocs(fs.query(storeCol(st.code), fs.where("releaseAt", ">=", from), fs.where("releaseAt", "<=", to), fs.orderBy("releaseAt", "desc"))).catch(() => null),
+        fs.getDocs(fs.query(signCol(st.code), fs.where("date", ">=", fromV), fs.where("date", "<=", toV))).catch(() => null)
+      ]);
+      const sign = {}; if (sg) sg.docs.forEach((d) => { sign[d.id] = d.data(); });
+      return { st, tasks: qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })) : [], sign, failed: !qs };
+    }));
+    if (seq !== allSeq) return;
+    allRes = res; renderAll();
+  }
+
+  function storeStats(r, t) {
+    const byDate = {};
+    r.tasks.forEach((p) => { (byDate[p.dapDate] ||= []).push(p); });
+    const dates = Object.keys(byDate);
+    const cells = {};
+    let signed = 0, late = 0, rom = 0, due0 = 0;
+    dates.forEach((d) => {
+      const list = byDate[d], sg = r.sign[d];
+      const due = Math.max(...list.map((p) => p.dueAt || 0));
+      const k = list.filter((p) => p.status === "done").length;
+      if (sg) { signed++; if (sg.late) late++; if (sg.romAt) rom++; }
+      if (sg || due < t) due0++;   // DAPs that count towards on-time: signed, or past their deadline
+      cells[d] = sg ? { cls: sg.late ? "c-late" : "c-ok", text: (sg.late ? "✓ late" : "✓") + (sg.romAt ? " R" : ""), tip: "Signed off by " + (sg.name || "") + " " + SPARUI.fmtDateTime(sg.at) + (sg.romAt ? " · ROM " + (sg.romName || "") : "") }
+        : due < t ? { cls: "c-over", text: "Overdue", tip: k + " of " + list.length + " tasks done" }
+        : { cls: "c-prog", text: k + "/" + list.length, tip: "Due " + when(due) };
+    });
+    const done = r.tasks.filter((p) => p.status === "done").length;
+    const overNow = r.tasks.filter((p) => p.status !== "done" && p.dueAt && p.dueAt < t).length;
+    return { dates, cells, daps: dates.length, signed, late, rom, done, total: r.tasks.length, overNow, dueDaps: due0 };
+  }
+
+  function renderAll() {
+    const t = now(), romF = $("aRom").value;
+    const rows = allRes.filter((r) => !romF || r.st.rom === romF).map((r) => ({ ...r, s: storeStats(r, t) }));
+    const allDates = [...new Set(rows.flatMap((r) => r.s.dates))].sort().reverse();
+    let daps = 0, signed = 0, onTime = 0, over = 0, dueDaps = 0;
+    rows.forEach((r) => { daps += r.s.daps; signed += r.s.signed; onTime += r.s.signed - r.s.late; over += r.s.overNow; dueDaps += r.s.dueDaps; });
+    $("aDaps").textContent = allDates.length;
+    $("aSigned").textContent = signed + " / " + daps;
+    $("aOnTime").textContent = dueDaps ? Math.round(100 * onTime / dueDaps) + "%" : "–";
+    $("aOver").textContent = over;
+    $("aMeta").textContent = rows.length + " stores · " + dayOf($("aFrom").value) + " to " + dayOf($("aTo").value) + (rows.some((r) => r.failed) ? " · some stores couldn't be loaded" : "");
+    const head = E("tr", null, [E("th", { text: "Store" }), E("th", { text: "ROM" }), E("th", { text: "Tasks done" }), E("th", { class: "num", text: "Overdue now" }),
+      E("th", { class: "num", text: "Signed off" }), E("th", { class: "num", text: "Late" }), E("th", { class: "num", text: "ROM confirmed" })]
+      .concat(allDates.map((d) => E("th", { class: "dcol", text: dayOf(d) }))));
+    $("aHead").innerHTML = ""; $("aHead").appendChild(head);
+    const tb = $("aRows"); tb.innerHTML = "";
+    if (!rows.length) { tb.appendChild(E("tr", null, [E("td", { class: "empty", text: "No stores." })])); return; }
+    rows.sort((a, b) => b.s.overNow - a.s.overNow || (a.s.signed - a.s.daps) - (b.s.signed - b.s.daps) || a.st.name.localeCompare(b.st.name));
+    rows.forEach(({ st, s }) => {
+      const link = E("button", { class: "storelink", type: "button", text: st.name, onclick: () => {
+        me.setStore(st.code);
+        const sel = document.querySelector(".storepick select"); if (sel) sel.value = st.code;
+        document.dispatchEvent(new CustomEvent("spar:store", { detail: st }));
+        window.scrollTo(0, 0);
+      } });
+      tb.appendChild(E("tr", null, [
+        E("td", null, [link]),
+        E("td", { text: st.rom || "" }),
+        E("td", null, s.total ? [E("div", { class: "bar", title: s.done + " of " + s.total }, [E("i", { style: "width:" + Math.round(100 * s.done / s.total) + "%" })]), E("small", { class: "note", text: s.done + "/" + s.total })] : ["—"]),
+        E("td", { class: "num" }, [s.overNow ? E("span", { class: "pill red", text: String(s.overNow) }) : "0"]),
+        E("td", { class: "num", text: s.daps ? s.signed + " / " + s.daps : "—" }),
+        E("td", { class: "num", text: String(s.late) }),
+        E("td", { class: "num", text: s.daps ? s.rom + " / " + s.daps : "—" })
+      ].concat(allDates.map((d) => {
+        const c = s.cells[d];
+        return E("td", { style: "text-align:center" }, [c ? E("span", { class: "cell " + c.cls, title: c.tip, text: c.text }) : E("span", { class: "cell c-none", text: "—" })]);
+      }))));
+    });
+  }
+
+  $("aExcel").onclick = async () => {
+    try {
+      const X = await loadXLSXAll();
+      const t = now(), romF = $("aRom").value;
+      const rows = allRes.filter((r) => !romF || r.st.rom === romF).map((r) => ({ ...r, s: storeStats(r, t) }));
+      const dates = [...new Set(rows.flatMap((r) => r.s.dates))].sort();
+      const aoa = [["Store code", "Store", "ROM", "Tasks", "Tasks done", "Overdue now", "DAPs", "Signed off", "Signed off late", "ROM confirmed"].concat(dates.map(dayOf))];
+      rows.forEach(({ st, s }) => aoa.push([st.code, st.name, st.rom || "", s.total, s.done, s.overNow, s.daps, s.signed, s.late, s.rom]
+        .concat(dates.map((d) => s.cells[d] ? s.cells[d].text : ""))));
+      const ws = X.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = [10, 26, 16, 7, 9, 10, 6, 10, 12, 12].concat(dates.map(() => 11)).map((w) => ({ wch: w }));
+      const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, "All stores");
+      X.writeFile(wb, "DAP overview " + $("aFrom").value + " to " + $("aTo").value + ".xlsx");
+    } catch (e) { SPARUI.toast(e.message || String(e), "err"); }
+  };
+  let XLSXall = null;
+  function loadXLSXAll() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (XLSXall) return XLSXall;
+    return XLSXall = new Promise((res, rej) => {
+      const sc = document.createElement("script");
+      sc.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      sc.onload = () => res(window.XLSX); sc.onerror = () => { XLSXall = null; rej(new Error("Couldn't load the Excel writer. Check your connection.")); };
+      document.head.appendChild(sc);
+    });
   }
 
   watchStore();
