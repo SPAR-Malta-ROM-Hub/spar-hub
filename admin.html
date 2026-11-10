@@ -88,10 +88,10 @@ tr.inactive td{color:var(--muted)}
       <div class="card panel">
         <div class="row" style="justify-content:space-between;margin-bottom:12px">
           <h2 style="margin:0">People with access</h2>
-          <button class="btn secondary small" id="inviteBtn" type="button">Invite ROMs &amp; managers from the store list…</button>
+          <button class="btn secondary small" id="inviteBtn" type="button">Invite ROMs, managers &amp; stores from the store list…</button>
         </div>
         <div id="invitePane" hidden style="margin-bottom:16px">
-          <p class="note">These people have an email in the store list but no access yet. Untick anyone you don't want to invite. Each gets a password email.</p>
+          <p class="note">These ROMs, Store Managers and store email addresses are in the store list but have no access yet. A store login sees only that store, like its Store Manager. Untick anyone you don't want to invite. Each gets a password email.</p>
           <div class="invite-list" id="inviteList"></div>
           <div class="row" style="margin-top:10px"><button class="btn" id="inviteGo" type="button">Invite selected</button><button class="btn secondary" id="inviteCancel" type="button">Cancel</button></div>
         </div>
@@ -379,9 +379,18 @@ tr.inactive td{color:var(--muted)}
         out.set(re, c);
       }
       const se = (s.smEmail || "").trim().toLowerCase();
-      if (se && !have.has(se) && !out.has(se)) out.set(se, { email: se, name: s.manager, role: "sm", stores: [s.code] });
+      if (se && !have.has(se) && !out.has(se)) out.set(se, { email: se, name: s.manager, role: "sm", stores: [s.code], kind: 1 });
+      // The store's own email(s): a shared store login, set up like a Store Manager for that store
+      for (const raw of String(s.storeEmail || "").split(/[,;\s]+/)) {
+        const e = raw.trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) || have.has(e)) continue;
+        const c = out.get(e);
+        if (!c) out.set(e, { email: e, name: s.name, role: "sm", stores: [s.code], kind: 2, label: "Store login" });
+        else if (c.kind === 2 && !c.stores.includes(s.code)) c.stores.push(s.code);
+      }
     }
-    return [...out.values()].sort((a, b) => a.role.localeCompare(b.role) || (a.name || "").localeCompare(b.name || ""));
+    const rank = (c) => c.role === "rom" ? 0 : c.kind || 1;
+    return [...out.values()].sort((a, b) => rank(a) - rank(b) || (a.name || "").localeCompare(b.name || ""));
   }
   $("inviteBtn").onclick = () => {
     const list = candidates(), box = $("inviteList");
@@ -391,7 +400,7 @@ tr.inactive td{color:var(--muted)}
     for (const c of list) {
       const cb = E("input", { type: "checkbox", value: c.email }); cb.checked = true;
       box.appendChild(E("label", null, [cb, E("div", null, [
-        E("b", { text: (c.name || c.email) + " — " + ROLES[c.role] }), E("br"),
+        E("b", { text: (c.name || c.email) + " — " + (c.label || ROLES[c.role]) }), E("br"),
         E("small", { text: c.email + " · " + c.stores.map(storeName).join(", ") })
       ])]));
     }
