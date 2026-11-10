@@ -66,7 +66,11 @@ tr.inactive td{color:var(--muted)}
                 <option value="support">Support</option>
                 <option value="hq">Head Office</option>
                 <option value="admin">Admin</option>
+                <option value="dept">Department (posts DAP tasks)</option>
               </select></label>
+            <label class="f" id="pDeptWrap" hidden><span>Department <small class="note">(shown as “From” on their DAP tasks)</small></span>
+              <input class="in" id="pDept" list="pDeptList" autocomplete="off" placeholder="e.g. Maintenance"><datalist id="pDeptList">
+              <option value="Maintenance"></option><option value="Sales Support"></option><option value="Commercials"></option><option value="Admin"></option><option value="Accounts"></option><option value="HR"></option><option value="Marketing"></option><option value="IT"></option></datalist></label>
             <label class="f" id="pStoreOne"><span>Store</span><select class="in" id="pStore"></select></label>
           </div>
           <div class="f" id="pStoreMany" hidden>
@@ -173,7 +177,7 @@ tr.inactive td{color:var(--muted)}
     $(where).innerHTML = "";
     if (text) $(where).appendChild(E("p", { class: "msg " + kind, text }));
   };
-  const ROLES = { sm: "Store Manager", rom: "ROM", support: "Support", hq: "Head Office", admin: "Admin" };
+  const ROLES = { sm: "Store Manager", rom: "ROM", support: "Support", hq: "Head Office", admin: "Admin", dept: "Department" };
   const MULTI = (r) => r === "rom";
   const SINGLE = (r) => r === "sm";
   const LEGACY_TOOLS = ["shop-tracker", "gap-check", "weekly-checklist", "staff-unders", "cash-analyser"];
@@ -213,6 +217,7 @@ tr.inactive td{color:var(--muted)}
     const role = $("pRole").value;
     $("pStoreOne").hidden = !SINGLE(role);
     $("pStoreMany").hidden = !MULTI(role);
+    $("pDeptWrap").hidden = role !== "dept";
     const sel = $("pStore"), keep = sel.value;
     sel.innerHTML = "";
     sel.appendChild(new Option(stores.length ? "Choose a store…" : "No stores yet: add them under Stores", ""));
@@ -300,14 +305,16 @@ tr.inactive td{color:var(--muted)}
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("pMsg", "Enter a valid email address.", "err"); return; }
     if (SINGLE(role) && !st.length) { say("pMsg", "Choose the store this manager runs.", "err"); return; }
     if (MULTI(role) && !st.length) { say("pMsg", "Tick at least one store for this ROM.", "err"); return; }
+    const dept = role === "dept" ? $("pDept").value.trim() : "";
+    if (role === "dept" && !dept) { say("pMsg", "Enter the department, e.g. Maintenance.", "err"); return; }
     if (editing === me.email && role !== "admin") { say("pMsg", "You can't remove your own admin role.", "err"); return; }
     $("pSave").disabled = true;
     try {
       if (editing) {
-        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, updatedAt: Date.now(), updatedBy: me.email });
+        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, updatedAt: Date.now(), updatedBy: me.email });
         say("pMsg", `${name || email} updated.`);
       } else {
-        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, addedBy: me.email, addedAt: Date.now() });
+        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, addedBy: me.email, addedAt: Date.now() });
         const existed = await createLogin(email);
         say("pMsg", existed
           ? `${name || email} added. They already had a login, so they can sign in now.`
@@ -328,7 +335,8 @@ tr.inactive td{color:var(--muted)}
       ]);
       const roleTd = E("td", null, [E("span", { class: "pill " + (m.role === "admin" || m.role === "hq" ? "brand" : "grey"), text: ROLES[m.role] || m.role })]);
       const stTd = E("td", { class: "storelist", text:
-        ["admin", "hq", "support"].includes(m.role) ? "All stores"
+        m.role === "dept" ? "DAP tasks for " + (m.dept || "?")
+        : ["admin", "hq", "support"].includes(m.role) ? "All stores"
         : (m.stores || []).length ? m.stores.map(storeName).join(", ") : "⚠ No store assigned" });
       const acts = E("div", { class: "acts" });
       acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }));
@@ -350,6 +358,7 @@ tr.inactive td{color:var(--muted)}
     $("pEmail").value = m.email; $("pEmail").disabled = true;
     $("pName").value = m.name || "";
     $("pRole").value = ROLES[m.role] ? m.role : "sm";
+    $("pDept").value = m.dept || "";
     renderStorePickers(m.stores || []);
     $("pFormTitle").textContent = "Edit " + (m.name || m.email);
     $("pSave").textContent = "Save changes";

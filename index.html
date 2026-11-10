@@ -41,13 +41,16 @@
   SPAR.ready.then(function (me) {
     var first = (me.name || "").split(" ")[0];
     document.getElementById("hi").textContent = "Hello " + first;
-    document.getElementById("sub").textContent = me.seesAll
+    var isDept = me.role === "dept";
+    document.getElementById("sub").textContent = isDept ? "You post DAP tasks for " + (me.dept || "your department") + " and see the stores' answers." : me.seesAll
       ? "You can see all " + me.stores.length + " stores."
       : me.stores.length === 1 ? "Your store: " + me.stores[0].name
       : me.stores.length + " stores: " + me.stores.map(function (s) { return s.name; }).join(", ");
     if (me.isAdmin) document.getElementById("adminbar").hidden = false;
 
-    if (!me.allStores.length) {
+    if (isDept) {
+      // departments only use the DAP
+    } else if (!me.allStores.length) {
       document.getElementById("warn").innerHTML = "";
       var m = E("p", { class: "msg warn" }, [me.isAdmin
         ? "No stores set up yet. Open Manage people & stores and press “Load SPAR store list”."
@@ -59,7 +62,7 @@
 
     var groups = {}, order = [];
     SPARUI.MODULES.forEach(function (m) {
-      if (m.who !== "all" && m.who.indexOf(me.role) < 0) return;
+      if (isDept ? m.id !== "dap" : (m.who !== "all" && m.who.indexOf(me.role) < 0)) return;
       if (!groups[m.group]) { groups[m.group] = []; order.push(m.group); }
       groups[m.group].push(m);
     });
@@ -85,7 +88,7 @@
       root.appendChild(grid);
     });
 
-    dapBadge(me);
+    if (!isDept) dapBadge(me);
     document.addEventListener("spar:store", function () { dapBadge(me); });
   });
 

@@ -115,7 +115,7 @@
   }
 
   var SEES_ALL = ["admin", "hq", "support"];
-  var ROLE_LABELS = { admin: "Admin", hq: "Head Office", support: "Support", rom: "ROM", sm: "Store Manager" };
+  var ROLE_LABELS = { admin: "Admin", hq: "Head Office", support: "Support", rom: "ROM", sm: "Store Manager", dept: "Department" };
   var STORE_KEY = "sparStore";
 
   function publicCtx() {
@@ -135,7 +135,8 @@
       email: (ctx.user.email || "").toLowerCase(),
       name: ctx.member.name || ctx.user.email,
       role: role,
-      roleLabel: ROLE_LABELS[role] || role,
+      roleLabel: role === "dept" && ctx.member.dept ? ctx.member.dept : (ROLE_LABELS[role] || role),
+      dept: ctx.member.dept || "",          // for role "dept": the department they post DAP tasks for
       isAdmin: role === "admin",
       isHQ: role === "admin" || role === "hq",
       seesAll: ctx.seesAll,

@@ -58,7 +58,7 @@
     if (!h) return;
     var base = (window.SPAR && SPAR.base) || "./";
     var title = h.getAttribute("data-title") || "";
-    var withStore = h.getAttribute("data-store") === "1";
+    var withStore = h.getAttribute("data-store") === "1" && me.role !== "dept";
     h.innerHTML = "";
 
     var logo = el("a", { href: base, "aria-label": "SPAR Malta Hub home" }, [el("img", { class: "brand-logo", src: base + "spar-logo.png", alt: "SPAR" })]);

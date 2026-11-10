@@ -53,8 +53,9 @@
 .storeboxes label{display:flex;gap:7px;align-items:center;font-size:13px}
 .romrow{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:6px}
 .romrow b{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.linkrow{display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px}
-@media(max-width:700px){.linkrow{grid-template-columns:1fr auto}.linkrow .lr-url{grid-column:1}}
+.linkrow{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px;align-items:center;max-width:720px}
+#fFrom[readonly]{background:#F3F4F4;color:#60727a}
+.linkrow .lr-open{font-size:13px;font-weight:700;color:#10252b;white-space:nowrap}
 .when{border-radius:10px;padding:10px 12px;background:var(--ambersoft);color:var(--amber);font-weight:700;font-size:13.5px;margin:4px 0 14px}
 .when.urgent{background:var(--redsoft);color:var(--red)}
 .checkline{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13.5px;margin:0 0 12px}
@@ -166,10 +167,9 @@ th.dcol{text-align:center;font-size:11.5px}
         <label class="f"><span>What you need to do</span><textarea class="in" id="fDetails" placeholder="Exactly what the store needs to do, and anything they should know"></textarea></label>
 
         <div class="f">
-          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Documents for the stores <small class="note">— attach a file from your computer, or paste a SharePoint / OneDrive link (Share → Copy link)</small></span>
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Documents for the stores <small class="note">— attach files from your computer; stores get a button to open each one</small></span>
           <div id="fLinks"></div>
           <div class="row" style="margin-bottom:14px">
-            <button class="btn secondary small" id="fAddLink" type="button">+ Add a link</button>
             <button class="btn secondary small" id="fAttachBtn" type="button">📎 Attach a file</button>
             <input type="file" id="fAttach" multiple hidden>
             <span class="note" id="fAttachInfo"></span>
@@ -336,8 +336,15 @@ th.dcol{text-align:center;font-size:11.5px}
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
     document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
   }
-  if (me.isHQ) {
+  const isDept = me.role === "dept";
+  const canPost = me.isHQ || isDept;
+  if (canPost) {
     $("tabs").hidden = false;
+    if (isDept) {
+      // Departments post and follow their own tasks; they don't work a store's DAP.
+      document.querySelector('.tab[data-tab="store"]').hidden = true;
+      showTab("add");
+    }
     document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
   }
 
@@ -804,13 +811,13 @@ th.dcol{text-align:center;font-size:11.5px}
   document.addEventListener("spar:store", watchStore);
   setInterval(renderStore, 60000); // lets the 3pm DAP appear without a reload
 
-  if (me.isHQ) {
-  // ═════════════════ HEAD OFFICE ═════════════════
+  if (canPost) {
+  // ═════════════════ HEAD OFFICE & DEPARTMENTS ═════════════════
   const active = me.allStores.filter((s) => s.active !== false);
   let masters = [], editing = null;
 
   fs.onSnapshot(fs.query(masterCol, fs.orderBy("releaseAt", "desc"), fs.limit(500)), (qs) => {
-    masters = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+    masters = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((m) => !isDept || m.dept === me.dept);
     renderQueue(); renderDates(); renderFrom();
   }, (e) => SPARUI.toast("Couldn't load DAP list: " + (e.code || e.message), "err"));
   setInterval(() => { renderQueue(); renderDates(); updateWhen(); }, 60000);
@@ -830,14 +837,14 @@ th.dcol{text-align:center;font-size:11.5px}
 
   function addLinkRow(label = "", url = "") {
     if ($("fLinks").children.length >= 6) return;
-    const l = E("input", { class: "in", placeholder: "Name, e.g. Coin Delivery – Day 1&2", value: label });
-    const u = E("input", { class: "in lr-url", type: "url", placeholder: "https://sparmalta.sharepoint.com/…", value: url });
-    const x = E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove link" });
-    const row = E("div", { class: "linkrow" }, [l, u, x]);
+    const l = E("input", { class: "in", placeholder: "Name the stores will see, e.g. Coin Delivery – Day 1&2", value: label, "aria-label": "Document name" });
+    const u = E("input", { type: "hidden", value: url });
+    const o = E("a", { class: "lr-open", href: url, target: "_blank", rel: "noopener", text: "📄 Open" });
+    const x = E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove document" });
+    const row = E("div", { class: "linkrow" }, [l, u, o, x]);
     x.onclick = () => row.remove();
     $("fLinks").appendChild(row);
   }
-  $("fAddLink").onclick = () => addLinkRow();
   // Attach a document from your computer: it goes to the DAP Google Drive folder and becomes a link stores can open.
   $("fAttachBtn").onclick = () => $("fAttach").click();
   $("fAttach").onchange = async () => {
@@ -852,13 +859,11 @@ th.dcol{text-align:center;font-size:11.5px}
       try {
         const up = await uploadOne({ code: "HQ", name: "Documents for stores" },
           { id: "", title: $("fTitle").value.trim(), dapDate: SPARUI.isoDate(new Date(now())) }, f, true);
-        // drop any empty link row first, then add this file as a link
-        [...$("fLinks").children].forEach((r) => { const [l, u] = r.querySelectorAll("input"); if (!l.value.trim() && !u.value.trim()) r.remove(); });
         addLinkRow(f.name.replace(/\.[^.]+$/, ""), up.url);
         ok++;
       } catch (e) { SPARUI.toast(e.message || "Upload failed", "err"); }
     }
-    info.textContent = ok ? "✓ " + ok + " file" + (ok === 1 ? "" : "s") + " attached. Stores will see a button to open " + (ok === 1 ? "it" : "them") + "." : "";
+    info.textContent = ok ? "✓ " + ok + " file" + (ok === 1 ? "" : "s") + " attached. You can rename " + (ok === 1 ? "it" : "them") + " above." : "";
     btn.disabled = false;
   };
 
@@ -962,11 +967,18 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fSave").textContent = editing ? "Save changes" : urgent ? "Send now" : "Add to the DAP";
   }
   $("fPriority").onchange = updateWhen;
-  updateWhen();
+  setFrom(); updateWhen();
 
+  // "From": Sales Support by default; a department login is fixed to its own department,
+  // and the compiled answers go back to that person unless they change it.
+  function setFrom() {
+    $("fFrom").value = isDept ? me.dept : "Sales Support";
+    $("fFrom").readOnly = isDept;
+    if (isDept) $("fCompileTo").value = me.email;
+  }
   function resetForm() {
     editing = null;
-    $("fForm").reset(); $("fFrom").value = "Sales Support";
+    $("fForm").reset(); setFrom();
     $("fLinks").innerHTML = ""; box.hidden = true;
     box.querySelectorAll("input").forEach((c) => c.checked = false);
     $("fRespLabelWrap").hidden = true; $("fDueWrap").hidden = true; $("fCompileWrap").hidden = true;
@@ -978,7 +990,7 @@ th.dcol{text-align:center;font-size:11.5px}
 
   function startEdit(m) {
     editing = m;
-    $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fFrom").value = m.dept || "";
+    $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fFrom").value = isDept ? me.dept : (m.dept || "");
     $("fPriority").value = m.priority === "urgent" ? "urgent" : "normal";
     $("fLinks").innerHTML = ""; (m.links || []).forEach((l) => addLinkRow(l.label, l.url));
     $("fFields").innerHTML = ""; sheetMeta = null;
@@ -1008,7 +1020,7 @@ th.dcol{text-align:center;font-size:11.5px}
       const [l, u] = row.querySelectorAll("input");
       if (!u.value.trim() && !l.value.trim()) continue;
       const href = safeUrl(u.value.trim());
-      if (!href || /^file:/i.test(u.value.trim())) return say("“" + (u.value.trim() || l.value.trim()) + "” isn't a web link stores can open. Copy it from SharePoint with Share → Copy link.", "err");
+      if (!href || /^file:/i.test(u.value.trim())) return say("“" + (l.value.trim() || u.value.trim()) + "” can't be opened by stores. Remove it and attach the file again.", "err");
       links.push({ label: l.value.trim() || "Open document", url: href });
     }
     const aud = document.querySelector('input[name="aud"]:checked').value;
@@ -1026,7 +1038,7 @@ th.dcol{text-align:center;font-size:11.5px}
     const badMail = compileTo.split(", ").filter((x) => x && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
     if (badMail.length) return say("“" + badMail[0] + "” isn't an email address.", "err");
     const task = {
-      title, details: $("fDetails").value.trim(), dept: $("fFrom").value.trim() || "Head Office", priority, links,
+      title, details: $("fDetails").value.trim(), dept: isDept ? me.dept : ($("fFrom").value.trim() || "Sales Support"), priority, links,
       resp: rtype === "form"
         ? { type: "form", label: fields.map((f) => f.label).join(", "), fields, sheet: sheetMeta }
         : { type: rtype, label: rtype === "none" ? "" : $("fRespLabel").value.trim() },
@@ -1082,7 +1094,7 @@ th.dcol{text-align:center;font-size:11.5px}
       const group = byRel[rel];
       const head = E("div", { class: "qhead" }, [
         E("h3", { text: "Goes out " + when(+rel) + " · " + group.length + " task" + (group.length === 1 ? "" : "s") }),
-        E("button", { class: "btn good small", type: "button", text: "Send the DAP now", onclick: () => releaseNow(group) })
+        isDept ? null : E("button", { class: "btn good small", type: "button", text: "Send the DAP now", onclick: () => releaseNow(group) })
       ]);
       const g = E("div", { class: "qgroup" }, [head]);
       const tb = E("tbody");
@@ -1162,7 +1174,8 @@ th.dcol{text-align:center;font-size:11.5px}
     const ids = new Set(tasks.map((m) => m.id));
     const res = await Promise.all(codes.map(async (c) => {
       const [qs, sg] = await Promise.all([
-        fs.getDocs(fs.query(storeCol(c), fs.where("dapDate", "==", date))).catch(() => null),
+        fs.getDocs(isDept ? fs.query(storeCol(c), fs.where("dapDate", "==", date), fs.where("dept", "==", me.dept))
+          : fs.query(storeCol(c), fs.where("dapDate", "==", date))).catch(() => null),
         fs.getDoc(signDoc(c, date)).catch(() => null)
       ]);
       const copies = qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => ids.has(p.id)) : [];
