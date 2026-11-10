@@ -82,6 +82,16 @@ tr.sel td{background:#FFF6F6}
 .storelink{background:none;border:0;padding:0;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer;text-align:left}
 .storelink:hover{color:var(--brandd);text-decoration:underline}
 th.dcol{text-align:center;font-size:11.5px}
+.fieldrow{display:grid;grid-template-columns:1fr 150px auto;gap:8px;margin-bottom:8px}
+@media(max-width:700px){.fieldrow{grid-template-columns:1fr auto}.fieldrow select{grid-column:1}}
+.qa{display:grid;grid-template-columns:minmax(140px,1fr) 2fr;gap:8px 12px;align-items:center;margin:4px 0}
+@media(max-width:700px){.qa{grid-template-columns:1fr}}
+.qa .q{font-weight:700;font-size:13.5px}
+.yn{display:flex;gap:6px}
+.yn button{min-width:64px;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:#fff;font:700 14px Arial,sans-serif;cursor:pointer;color:var(--ink)}
+.yn button.on.yes{background:var(--gd);border-color:var(--gd);color:#fff}
+.yn button.on.no{background:var(--red);border-color:var(--red);color:#fff}
+.yn button:disabled{opacity:.6;cursor:default}
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0;align-items:center}
 </style>
 </head>
@@ -169,8 +179,23 @@ th.dcol{text-align:center;font-size:11.5px}
               <option value="text">A short written answer</option>
               <option value="photo">Photo(s)</option>
               <option value="file">A file (e.g. a filled-in Excel)</option>
+              <option value="form">Fill in a count sheet / form (stores answer in the hub)</option>
             </select></label>
           <label class="f" id="fRespLabelWrap" hidden><span>What exactly? <small class="note">(shown to the store)</small></span><input class="in" id="fRespLabel" maxlength="80" placeholder="e.g. Safe count in €"></label>
+        </div>
+        <div class="resp" id="fFormWrap" hidden style="margin:0 0 14px">
+          <div class="r-label">Count sheet / form</div>
+          <p class="note" style="margin:0 0 8px">Upload the department's count sheet (Excel) and the hub turns its columns into questions, or type the questions yourself. Stores answer in the hub; you download one compiled sheet in the same layout.</p>
+          <div class="row" style="margin-bottom:10px">
+            <button class="btn secondary small" id="fSheetBtn" type="button">📄 Upload count sheet (Excel)</button>
+            <input type="file" id="fSheet" accept=".xlsx,.xls,.csv" hidden>
+            <span class="note" id="fSheetInfo"></span>
+          </div>
+          <div id="fFields"></div>
+          <div class="row">
+            <button class="btn secondary small" id="fAddField" type="button">+ Add a question</button>
+            <button class="btn secondary small" id="fSheetStores" type="button" hidden></button>
+          </div>
         </div>
         <label class="checkline"><input type="checkbox" id="fVerify"> Verification required: the department checks each store's answer</label>
         <label class="checkline"><input type="checkbox" id="fCustomDue"> Set a specific deadline <small class="note" style="font-weight:400">(otherwise 23 hours after it goes out)</small></label>
@@ -244,7 +269,8 @@ th.dcol{text-align:center;font-size:11.5px}
   const RELEASE_HOUR = 15;        // 3pm
   const HOURS_TO_ACTION = 23;     // default time to complete
   const FROM_LIST = ["Sales Support", "Commercials", "Retail Operations Manager", "Admin", "Accounts"];
-  const RESP_TEXT = { number: "Send back a number", text: "Send back an answer", photo: "Send back photo(s)", file: "Send back a file" };
+  const RESP_TEXT = { number: "Send back a number", text: "Send back an answer", photo: "Send back photo(s)", file: "Send back a file", form: "Fill in" };
+  const FIELD_TYPES = { yesno: "Yes / No", number: "Number", text: "Text" };
   const UPLOAD_URL = window.SPAR_UPLOAD_URL || "";
   const MAX_FILES = 6;
 
@@ -270,6 +296,7 @@ th.dcol{text-align:center;font-size:11.5px}
     const t = respType(p);
     if (t === "number" || t === "text") return String(p.answer ?? "").trim() !== "";
     if (t === "photo" || t === "file") return (p.files || []).length > 0;
+    if (t === "form") return ((p.resp && p.resp.fields) || []).every((f, i) => String(((p.answers || {})[i]) ?? "").trim() !== "");
     return true;
   };
   // verification state of one store copy: none | wait | ok | back
@@ -493,8 +520,42 @@ th.dcol{text-align:center;font-size:11.5px}
     const rt = respType(p);
     let answerInput = null;
     if (rt !== "none") {
-      const box = E("div", { class: "resp" }, [E("div", { class: "r-label", text: RESP_TEXT[rt] + (respLabel(p) ? ": " + respLabel(p) : "") })]);
-      if (rt === "number" || rt === "text") {
+      const box = E("div", { class: "resp" }, [E("div", { class: "r-label", text: rt === "form" ? "Fill in for " + (p.dept || "Head Office") : RESP_TEXT[rt] + (respLabel(p) ? ": " + respLabel(p) : "") })]);
+      if (rt === "form") {
+        const fields = (p.resp && p.resp.fields) || [];
+        const ans = p.answers || {};
+        fields.forEach((f, i) => {
+          const key = "f-" + p.id + "-" + i;
+          const save = async (v) => {
+            try { await upd({ ["answers." + i]: v }); delete drafts[key]; }
+            catch (e) { SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+          };
+          let ctrl;
+          if (f.type === "yesno") {
+            const cur = drafts[key] ?? ans[i] ?? "";
+            ctrl = E("div", { class: "yn", role: "group", "aria-label": f.label });
+            ["Yes", "No"].forEach((v) => {
+              const b = E("button", { type: "button", class: (v === "Yes" ? "yes" : "no") + (cur === v ? " on" : ""), text: v, "aria-pressed": cur === v ? "true" : "false" });
+              b.disabled = lockedTask;
+              b.onclick = () => { ctrl.querySelectorAll("button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); drafts[key] = v; save(v); };
+              ctrl.appendChild(b);
+            });
+          } else {
+            ctrl = E("input", { class: "in", type: f.type === "number" ? "number" : "text", inputmode: f.type === "number" ? "decimal" : "text", step: "any", "aria-label": f.label, "data-key": key });
+            ctrl.value = drafts[key] ?? (ans[i] ?? "");
+            ctrl.disabled = lockedTask;
+            ctrl.onfocus = () => { busy[key] = true; };
+            ctrl.oninput = () => { drafts[key] = ctrl.value; };
+            ctrl.onblur = () => {
+              busy[key] = false;
+              const v = ctrl.value.trim();
+              if (v === String(ans[i] ?? "")) { delete drafts[key]; return; }
+              save(f.type === "number" && v !== "" ? Number(v) : v);
+            };
+          }
+          box.appendChild(E("div", { class: "qa" }, [E("div", { class: "q", text: f.label }), ctrl]));
+        });
+      } else if (rt === "number" || rt === "text") {
         const key = "a-" + p.id;
         answerInput = E("input", { class: "in", type: rt === "number" ? "number" : "text", inputmode: rt === "number" ? "decimal" : "text", step: "any",
           placeholder: rt === "number" ? "Enter the number" : "Type your answer", "aria-label": respLabel(p) || "Answer", "data-key": key });
@@ -583,12 +644,14 @@ th.dcol{text-align:center;font-size:11.5px}
 
       cb.onchange = async () => {
         if (cb.checked) {
-          const cur = { ...p, answer: answerInput ? answerInput.value.trim() : p.answer };
-          if (!hasResponse(cur)) { cb.checked = false; SPARUI.toast(RESP_TEXT[rt] + " first", "err"); return; }
+          const cur = { ...p, answer: answerInput ? answerInput.value.trim() : p.answer, answers: { ...(p.answers || {}) } };
+          ((p.resp && p.resp.fields) || []).forEach((f, i) => { const d = drafts["f-" + p.id + "-" + i]; if (d !== undefined) cur.answers[i] = d; });
+          if (!hasResponse(cur)) { cb.checked = false; SPARUI.toast(rt === "form" ? "Answer every question first" : RESP_TEXT[rt] + " first", "err"); return; }
           const name = by.value.trim() || "";
           if (!name) { cb.checked = false; by.focus(); SPARUI.toast("Enter who did it (Done by)", "err"); return; }
           const data = { status: "done", ackBy: me.email, ackName: me.name, ackAt: Date.now(), doneByName: name };
           if (answerInput) data.answer = rt === "number" && cur.answer !== "" ? Number(cur.answer) : cur.answer;
+          if (rt === "form") data.answers = cur.answers;
           try { await upd(data); try { localStorage.setItem("sparDoneBy", name); } catch (e) {} }
           catch (e) { cb.checked = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
         } else {
@@ -777,9 +840,71 @@ th.dcol{text-align:center;font-size:11.5px}
   }
   renderFrom();
 
+  // ── Count sheet / form builder ──
+  let sheetMeta = null; // { name, codeHeader, codes: [...] }
+  function addFieldRow(label = "", type = "text") {
+    if ($("fFields").children.length >= 15) return;
+    const l = E("input", { class: "in", placeholder: "Question, e.g. Temp guns available", value: label });
+    const t = E("select", { class: "in", "aria-label": "Answer type" });
+    Object.entries(FIELD_TYPES).forEach(([v, n]) => t.add(new Option(n, v, false, v === type)));
+    const x = E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove question" });
+    const row = E("div", { class: "fieldrow" }, [l, t, x]);
+    x.onclick = () => row.remove();
+    $("fFields").appendChild(row);
+  }
+  $("fAddField").onclick = () => addFieldRow();
+  $("fSheetBtn").onclick = () => { $("fSheet").value = ""; $("fSheet").click(); };
+  const guessType = (h) => /\(\s*y\s*\/\s*n\s*\)|yes\s*\/\s*no|available\?|^is |^are |^do |^does /i.test(h) ? "yesno"
+    : /count|qty|quantity|how many|number of|no\. of|total|amount|€|kg/i.test(h) ? "number" : "text";
+  $("fSheet").onchange = async () => {
+    const f = $("fSheet").files[0]; if (!f) return;
+    try {
+      const X = await loadXLSX();
+      const wb = X.read(await f.arrayBuffer(), { type: "array" });
+      const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false });
+      const known = new Set(me.allStores.map((s) => s.code));
+      // the column holding store codes = the one with most known codes
+      let codeCol = 0, best = -1;
+      for (let c = 0; c < 10; c++) {
+        const n = rows.filter((r) => known.has(String(r[c] || "").trim().toUpperCase())).length;
+        if (n > best) { best = n; codeCol = c; }
+      }
+      if (best < 1) throw new Error("Couldn't find any store codes (like MXK, SLM) in the first sheet.");
+      const firstCodeRow = rows.findIndex((r) => known.has(String(r[codeCol] || "").trim().toUpperCase()));
+      let hi = firstCodeRow - 1; while (hi >= 0 && !rows[hi].some((v) => String(v).trim())) hi--;
+      const head = hi >= 0 ? rows[hi] : [];
+      const codes = rows.slice(firstCodeRow).map((r) => String(r[codeCol] || "").trim().toUpperCase()).filter(Boolean);
+      const unknown = codes.filter((c) => !known.has(c));
+      $("fFields").innerHTML = "";
+      head.forEach((h, c) => { h = String(h).trim(); if (c !== codeCol && h) addFieldRow(h, guessType(h)); });
+      if (!$("fFields").children.length) addFieldRow();
+      sheetMeta = { name: f.name.replace(/\.[^.]+$/, ""), codeHeader: String(head[codeCol] || "").trim() || "Store", codes: codes.filter((c) => known.has(c)) };
+      if (!$("fTitle").value.trim()) $("fTitle").value = sheetMeta.name.replace(/[_-]+/g, " ");
+      $("fSheetInfo").textContent = "✓ " + f.name + ": " + $("fFields").children.length + " question(s), " + sheetMeta.codes.length + " stores" +
+        (unknown.length ? " · not recognised: " + unknown.join(", ") : "");
+      $("fSheetStores").hidden = false;
+      $("fSheetStores").textContent = "Send only to the " + sheetMeta.codes.length + " stores in this sheet";
+    } catch (e) { $("fSheetInfo").textContent = ""; SPARUI.toast("Couldn't read that sheet: " + (e.message || e), "err"); }
+  };
+  $("fSheetStores").onclick = () => {
+    if (!sheetMeta) return;
+    document.querySelector('input[name="aud"][value="pick"]').checked = true;
+    box.hidden = false;
+    box.querySelectorAll("input").forEach((c) => c.checked = sheetMeta.codes.includes(c.value));
+    SPARUI.toast(sheetMeta.codes.length + " stores ticked");
+  };
+  function readFields() {
+    return [...$("fFields").children].map((row) => {
+      const [l, t] = row.querySelectorAll("input,select");
+      return { label: l.value.trim(), type: t.value };
+    }).filter((f) => f.label);
+  }
+
   $("fResp").onchange = () => {
     const t = $("fResp").value;
-    $("fRespLabelWrap").hidden = t === "none";
+    $("fFormWrap").hidden = t !== "form";
+    if (t === "form" && !$("fFields").children.length) addFieldRow();
+    $("fRespLabelWrap").hidden = t === "none" || t === "form";
     $("fRespLabel").placeholder = { number: "e.g. Safe count in €", text: "e.g. Name of the person trained", photo: "e.g. Photo of the gondola end", file: "e.g. Completed consumables order form" }[t] || "";
   };
   $("fCustomDue").onchange = () => {
@@ -814,6 +939,7 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fLinks").innerHTML = ""; box.hidden = true;
     box.querySelectorAll("input").forEach((c) => c.checked = false);
     $("fRespLabelWrap").hidden = true; $("fDueWrap").hidden = true;
+    $("fFormWrap").hidden = true; $("fFields").innerHTML = ""; $("fSheetInfo").textContent = ""; $("fSheetStores").hidden = true; sheetMeta = null;
     $("fHead").textContent = "Add a task to the DAP"; $("fCancel").hidden = true;
     updateWhen();
   }
@@ -824,7 +950,12 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fFrom").value = m.dept || "";
     $("fPriority").value = m.priority === "urgent" ? "urgent" : "normal";
     $("fLinks").innerHTML = ""; (m.links || []).forEach((l) => addLinkRow(l.label, l.url));
-    $("fResp").value = respType(m); $("fRespLabel").value = respLabel(m); $("fResp").onchange();
+    $("fFields").innerHTML = ""; sheetMeta = null;
+    if (respType(m) === "form") {
+      ((m.resp && m.resp.fields) || []).forEach((f) => addFieldRow(f.label, f.type));
+      if (m.resp.sheet) { sheetMeta = m.resp.sheet; $("fSheetInfo").textContent = "✓ " + m.resp.sheet.name; }
+    }
+    $("fResp").value = respType(m); $("fRespLabel").value = respType(m) === "form" ? "" : respLabel(m); $("fResp").onchange();
     $("fVerify").checked = !!m.verifyReq;
     $("fCustomDue").checked = !!m.dueCustom; $("fDueWrap").hidden = !m.dueCustom; $("fDue").value = m.dueCustom ? localInput(m.dueAt) : "";
     const all = active.length === (m.stores || []).length;
@@ -857,9 +988,13 @@ th.dcol{text-align:center;font-size:11.5px}
     const dueAt = plannedDue(releaseAt);
     if (!(dueAt > releaseAt)) return say("The deadline must be after the task goes out (" + when(releaseAt) + ").", "err");
     const rtype = $("fResp").value;
+    const fields = rtype === "form" ? readFields() : [];
+    if (rtype === "form" && !fields.length) return say("Add at least one question for the store to answer.", "err");
     const task = {
       title, details: $("fDetails").value.trim(), dept: $("fFrom").value.trim() || "Head Office", priority, links,
-      resp: { type: rtype, label: rtype === "none" ? "" : $("fRespLabel").value.trim() },
+      resp: rtype === "form"
+        ? { type: "form", label: fields.map((f) => f.label).join(", "), fields, sheet: sheetMeta }
+        : { type: rtype, label: rtype === "none" ? "" : $("fRespLabel").value.trim() },
       verifyReq: $("fVerify").checked,
       releaseAt, dueAt, dueCustom: $("fCustomDue").checked, dapDate: dateOf(releaseAt),
       fromName: me.name, fromEmail: me.email, createdAt: editing ? editing.createdAt : Date.now()
@@ -1073,7 +1208,8 @@ th.dcol{text-align:center;font-size:11.5px}
     box.innerHTML = "";
     if (!m) { box.hidden = true; return; }
     box.hidden = false;
-    const xl = E("button", { class: "btn secondary small", type: "button", text: "Download answers (Excel)", onclick: () => downloadAnswers(m) });
+    const xl = E("button", { class: respType(m) === "form" ? "btn small" : "btn secondary small", type: "button",
+      text: respType(m) === "form" ? "Download compiled sheet (Excel)" : "Download answers (Excel)", onclick: () => respType(m) === "form" ? downloadCompiled(m) : downloadAnswers(m) });
     box.appendChild(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
       E("h3", { text: "Answers: " + m.title }), xl]));
     const tb = E("tbody");
@@ -1094,7 +1230,7 @@ th.dcol{text-align:center;font-size:11.5px}
       tb.appendChild(E("tr", null, [
         E("td", null, [E("b", { text: st.name })]),
         E("td", null, [E("span", { class: "pill " + (p.status === "done" ? "" : p.dueAt < now() ? "red" : "grey"), text: p.status === "done" ? "Done" : p.dueAt < now() ? "Overdue" : "Open" })]),
-        E("td", { text: p.answer ?? "" }),
+        E("td", { text: respType(m) === "form" ? ((m.resp.fields) || []).map((f, i) => f.label + ": " + ((p.answers || {})[i] ?? "–")).join(" · ") : (p.answer ?? "") }),
         E("td", null, [filesCell(p)]),
         E("td", { text: p.status === "done" ? (p.doneByName || p.ackName || "") + " · " + SPARUI.fmtDateTime(p.ackAt) : "" }),
         E("td", { class: "note", text: p.note || "" }),
@@ -1133,6 +1269,32 @@ th.dcol{text-align:center;font-size:11.5px}
       document.head.appendChild(s);
     });
   }
+  // The department's count sheet, rebuilt with every store's answers
+  async function downloadCompiled(m) {
+    try {
+      const X = await loadXLSX();
+      const fields = m.resp.fields || [], sheet = m.resp.sheet || { name: m.title, codeHeader: "Store", codes: [] };
+      const byCode = {};
+      lastRes.forEach(({ st, copies }) => { const p = copies.find((x) => x.id === m.id); if (p) byCode[st.code] = { st, p }; });
+      const order = sheet.codes.concat(Object.keys(byCode).filter((c) => !sheet.codes.includes(c)).sort());
+      const rows = [[sheet.codeHeader].concat(fields.map((f) => f.label), ["Store name", "Done by", "Completed", "Note"])];
+      order.forEach((c) => {
+        const hit = byCode[c], p = hit && hit.p, a = (p && p.answers) || {};
+        const st = (hit && hit.st) || me.allStores.find((s) => s.code === c) || { name: "" };
+        rows.push([c].concat(fields.map((f, i) => a[i] ?? ""),
+          [st.name, p && p.status === "done" ? (p.doneByName || p.ackName || "") : (p ? "Not done yet" : "Not sent"),
+           p && p.ackAt && p.status === "done" ? new Date(p.ackAt).toLocaleString("en-GB") : "", (p && p.note) || ""]));
+      });
+      const ws = X.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [10].concat(fields.map((f) => Math.max(12, Math.min(40, f.label.length + 2))), [28, 18, 18, 30]).map((w) => ({ wch: w }));
+      const wb = X.utils.book_new();
+      X.utils.book_append_sheet(wb, ws, "Compiled");
+      const done = Object.values(byCode).filter((x) => x.p.status === "done").length;
+      X.writeFile(wb, sheet.name.replace(/[^\w\- ]+/g, "").trim() + " - compiled " + m.dapDate + ".xlsx");
+      SPARUI.toast("Compiled: " + done + " of " + Object.keys(byCode).length + " stores answered");
+    } catch (e) { SPARUI.toast(e.message || String(e), "err"); }
+  }
+
   async function downloadAnswers(m) {
     try {
       const X = await loadXLSX();
