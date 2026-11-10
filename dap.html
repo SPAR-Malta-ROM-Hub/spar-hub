@@ -185,7 +185,7 @@ th.dcol{text-align:center;font-size:11.5px}
         <div class="grid2">
           <label class="f"><span>From</span><input class="in" id="fFrom" list="fromList" value="Sales Support" autocomplete="off"><datalist id="fromList"></datalist></label>
           <label class="f"><span>Priority</span>
-            <select class="in" id="fPriority"><option value="normal">Normal: goes out with the 3pm DAP</option><option value="urgent">Urgent: send straight away</option></select></label>
+            <select class="in" id="fPriority"><option value="normal">Normal: goes out with the 3pm DAP</option><option value="urgent" id="fUrgentOpt">Urgent: send straight away (Admin only)</option></select></label>
         </div>
         <label class="f"><span>Action point</span><input class="in" id="fTitle" maxlength="140" placeholder="e.g. Coin order 11.11.2026" required></label>
         <label class="f"><span>What you need to do</span><textarea class="in" id="fDetails" placeholder="Exactly what the store needs to do, and anything they should know"></textarea></label>
@@ -227,7 +227,8 @@ th.dcol{text-align:center;font-size:11.5px}
           </div>
         </div>
         <label class="f" id="fCompileWrap" hidden><span>When every store has done it, email the compiled answers to <small class="note">(e.g. the Maintenance Manager; Sales Support is copied in automatically)</small></span>
-          <input class="in" id="fCompileTo" type="text" inputmode="email" placeholder="e.g. maintenance@spar.com.mt (leave empty for no email)" style="max-width:520px"></label>
+          <input class="in" id="fCompileTo" type="text" inputmode="email" placeholder="e.g. maintenance@spar.com.mt" style="max-width:520px">
+          <small class="note" style="display:block;margin-top:4px">Photos and files are sent as one PDF / ZIP and then deleted from the hub.</small></label>
         <label class="checkline"><input type="checkbox" id="fVerify"> Verification required: the department checks each store's answer</label>
         <label class="checkline"><input type="checkbox" id="fCustomDue"> Set a specific deadline <small class="note" style="font-weight:400">(otherwise 23 hours after it goes out)</small></label>
         <label class="f" id="fDueWrap" hidden><span>Deadline</span><input class="in" id="fDue" type="datetime-local" style="max-width:280px"></label>
@@ -632,7 +633,9 @@ th.dcol{text-align:center;font-size:11.5px}
           thumbs.appendChild(a);
         });
         box.appendChild(thumbs);
-        if (!lockedTask && (p.files || []).length < MAX_FILES) {
+        if (p.filesArchived && !(p.files || []).length && vs !== "back")
+          box.appendChild(E("p", { class: "note", style: "margin:4px 0 0", text: "✓ Sent to " + (p.dept || "Head Office") + " in the compiled report." }));
+        else if (!lockedTask && (p.files || []).length < MAX_FILES) {
           const fileIn = E("input", { type: "file", hidden: "", multiple: "" });
           if (rt === "photo") { fileIn.accept = "image/*"; fileIn.setAttribute("capture", "environment"); }
           const status = E("span", { class: "uploading" });
@@ -1112,8 +1115,10 @@ th.dcol{text-align:center;font-size:11.5px}
   function setFrom() {
     $("fFrom").value = isDept ? me.dept : "Sales Support";
     $("fFrom").readOnly = isDept;
-    if (isDept) $("fCompileTo").value = me.email;
+    $("fCompileTo").value = me.email;          // answers come back to whoever posts, unless they change it
   }
+  // Only Admins (Paul, Marie Claire) can send a task straight away; everyone else goes out with the 3pm DAP
+  if (!me.isAdmin) $("fUrgentOpt").remove();
   function resetForm() {
     editing = null;
     $("fForm").reset(); setFrom();
@@ -1174,6 +1179,7 @@ th.dcol{text-align:center;font-size:11.5px}
     if (rtype === "form" && !fields.length) return say("Add at least one question for the store to answer.", "err");
     const compileTo = rtype === "none" ? "" : $("fCompileTo").value.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean).join(", ");
     const badMail = compileTo.split(", ").filter((x) => x && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+    if ((rtype === "photo" || rtype === "file") && !compileTo) return say("Enter who gets the compiled " + (rtype === "photo" ? "photos" : "files") + ": store uploads are deleted once they're sent.", "err");
     if (badMail.length) return say("“" + badMail[0] + "” isn't an email address.", "err");
     const task = {
       title, details: $("fDetails").value.trim(), dept: isDept ? me.dept : ($("fFrom").value.trim() || "Sales Support"), priority, links,
@@ -1385,6 +1391,7 @@ th.dcol{text-align:center;font-size:11.5px}
 
   function filesCell(p) {
     const files = p.files || [];
+    if (!files.length && p.filesArchived) return E("a", { href: p.filesArchived, target: "_blank", rel: "noopener", class: "note", text: (p.filesArchivedCount || "") + " in the compiled report" });
     if (!files.length) return "";
     return E("div", { class: "minithumbs" }, files.map((f) => {
       const a = E("a", { href: f.url, target: "_blank", rel: "noopener", title: f.name });
@@ -1409,7 +1416,13 @@ th.dcol{text-align:center;font-size:11.5px}
       if (m.compiledAt) {
         line.appendChild(document.createTextNode("📧 Compiled sheet emailed to " + m.compileTo + " (copy to Sales Support) on " + when(m.compiledAt) +
           (m.compiledDone < m.compiledOf ? " — deadline passed, " + m.compiledDone + " of " + m.compiledOf + " stores. " : ". ")));
-        if (m.compiledUrl) line.appendChild(E("a", { href: m.compiledUrl, target: "_blank", rel: "noopener", text: "Open it" }));
+        if (m.compiledUrl) line.appendChild(E("a", { href: m.compiledUrl, target: "_blank", rel: "noopener", text: "Open the sheet" }));
+        if (m.purgedAt) line.appendChild(document.createTextNode(" · photo report / files deleted after 30 days"));
+        else if (m.compiledPdf || m.compiledZip) {
+          line.appendChild(document.createTextNode(" · "));
+          line.appendChild(E("a", { href: m.compiledPdf || m.compiledZip, target: "_blank", rel: "noopener", text: m.compiledPdf ? "Photo report (PDF)" : "All files (ZIP)" }));
+          line.appendChild(document.createTextNode(" (store originals deleted; this link works for 30 days)"));
+        }
       } else line.textContent = "📧 Will email the compiled sheet to " + m.compileTo + " (copy to Sales Support) when every store has done it, or at the deadline (" + when(m.dueAt) + ").";
       box.appendChild(line);
     }
