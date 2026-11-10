@@ -166,9 +166,14 @@ th.dcol{text-align:center;font-size:11.5px}
         <label class="f"><span>What you need to do</span><textarea class="in" id="fDetails" placeholder="Exactly what the store needs to do, and anything they should know"></textarea></label>
 
         <div class="f">
-          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Links to documents <small class="note">— SharePoint / OneDrive links (Share → Copy link)</small></span>
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Documents for the stores <small class="note">— attach a file from your computer, or paste a SharePoint / OneDrive link (Share → Copy link)</small></span>
           <div id="fLinks"></div>
-          <button class="btn secondary small" id="fAddLink" type="button">+ Add a link</button>
+          <div class="row" style="margin-bottom:14px">
+            <button class="btn secondary small" id="fAddLink" type="button">+ Add a link</button>
+            <button class="btn secondary small" id="fAttachBtn" type="button">📎 Attach a file</button>
+            <input type="file" id="fAttach" multiple hidden>
+            <span class="note" id="fAttachInfo"></span>
+          </div>
         </div>
 
         <div class="grid2">
@@ -197,6 +202,8 @@ th.dcol{text-align:center;font-size:11.5px}
             <button class="btn secondary small" id="fSheetStores" type="button" hidden></button>
           </div>
         </div>
+        <label class="f" id="fCompileWrap" hidden><span>When every store has done it, email the compiled answers to <small class="note">(e.g. the Maintenance Manager; Sales Support is copied in automatically)</small></span>
+          <input class="in" id="fCompileTo" type="text" inputmode="email" placeholder="e.g. maintenance@spar.com.mt (leave empty for no email)" style="max-width:520px"></label>
         <label class="checkline"><input type="checkbox" id="fVerify"> Verification required: the department checks each store's answer</label>
         <label class="checkline"><input type="checkbox" id="fCustomDue"> Set a specific deadline <small class="note" style="font-weight:400">(otherwise 23 hours after it goes out)</small></label>
         <label class="f" id="fDueWrap" hidden><span>Deadline</span><input class="in" id="fDue" type="datetime-local" style="max-width:280px"></label>
@@ -356,10 +363,10 @@ th.dcol{text-align:center;font-size:11.5px}
     r.onerror = () => rej(new Error("Couldn't read the file"));
     r.readAsDataURL(blob);
   });
-  async function uploadOne(st, p, file) {
+  async function uploadOne(st, p, file, keepOriginal) {
     if (!UPLOAD_URL) throw new Error("Uploads aren't switched on yet. Ask a hub admin.");
     let blob = file, name = file.name || "upload", mime = file.type || "application/octet-stream";
-    if (/^image\//.test(mime) && !/gif|svg/.test(mime)) { blob = await shrinkImage(file); mime = "image/jpeg"; name = name.replace(/\.[^.]+$/, "") + ".jpg"; }
+    if (!keepOriginal && /^image\//.test(mime) && !/gif|svg/.test(mime)) { blob = await shrinkImage(file); mime = "image/jpeg"; name = name.replace(/\.[^.]+$/, "") + ".jpg"; }
     if (blob.size > 20e6) throw new Error(name + " is too big (max 20 MB)");
     const data = await toBase64(blob);
     const idToken = fb.user && fb.user.getIdToken ? await fb.user.getIdToken() : "";
@@ -831,6 +838,29 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fLinks").appendChild(row);
   }
   $("fAddLink").onclick = () => addLinkRow();
+  // Attach a document from your computer: it goes to the DAP Google Drive folder and becomes a link stores can open.
+  $("fAttachBtn").onclick = () => $("fAttach").click();
+  $("fAttach").onchange = async () => {
+    const files = [...$("fAttach").files]; $("fAttach").value = "";
+    if (!files.length) return;
+    const btn = $("fAttachBtn"), info = $("fAttachInfo");
+    btn.disabled = true;
+    let ok = 0;
+    for (const [i, f] of files.entries()) {
+      if ($("fLinks").children.length >= 6) { SPARUI.toast("Up to 6 links or files per task", "err"); break; }
+      info.textContent = "Uploading " + f.name + (files.length > 1 ? " (" + (i + 1) + " of " + files.length + ")" : "") + "…";
+      try {
+        const up = await uploadOne({ code: "HQ", name: "Documents for stores" },
+          { id: "", title: $("fTitle").value.trim(), dapDate: SPARUI.isoDate(new Date(now())) }, f, true);
+        // drop any empty link row first, then add this file as a link
+        [...$("fLinks").children].forEach((r) => { const [l, u] = r.querySelectorAll("input"); if (!l.value.trim() && !u.value.trim()) r.remove(); });
+        addLinkRow(f.name.replace(/\.[^.]+$/, ""), up.url);
+        ok++;
+      } catch (e) { SPARUI.toast(e.message || "Upload failed", "err"); }
+    }
+    info.textContent = ok ? "✓ " + ok + " file" + (ok === 1 ? "" : "s") + " attached. Stores will see a button to open " + (ok === 1 ? "it" : "them") + "." : "";
+    btn.disabled = false;
+  };
 
   function renderFrom() {
     const set = new Set(FROM_LIST);
@@ -905,6 +935,7 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fFormWrap").hidden = t !== "form";
     if (t === "form" && !$("fFields").children.length) addFieldRow();
     $("fRespLabelWrap").hidden = t === "none" || t === "form";
+    $("fCompileWrap").hidden = t === "none";
     $("fRespLabel").placeholder = { number: "e.g. Safe count in €", text: "e.g. Name of the person trained", photo: "e.g. Photo of the gondola end", file: "e.g. Completed consumables order form" }[t] || "";
   };
   $("fCustomDue").onchange = () => {
@@ -938,8 +969,8 @@ th.dcol{text-align:center;font-size:11.5px}
     $("fForm").reset(); $("fFrom").value = "Sales Support";
     $("fLinks").innerHTML = ""; box.hidden = true;
     box.querySelectorAll("input").forEach((c) => c.checked = false);
-    $("fRespLabelWrap").hidden = true; $("fDueWrap").hidden = true;
-    $("fFormWrap").hidden = true; $("fFields").innerHTML = ""; $("fSheetInfo").textContent = ""; $("fSheetStores").hidden = true; sheetMeta = null;
+    $("fRespLabelWrap").hidden = true; $("fDueWrap").hidden = true; $("fCompileWrap").hidden = true;
+    $("fAttachInfo").textContent = ""; $("fFormWrap").hidden = true; $("fFields").innerHTML = ""; $("fSheetInfo").textContent = ""; $("fSheetStores").hidden = true; sheetMeta = null;
     $("fHead").textContent = "Add a task to the DAP"; $("fCancel").hidden = true;
     updateWhen();
   }
@@ -957,6 +988,7 @@ th.dcol{text-align:center;font-size:11.5px}
     }
     $("fResp").value = respType(m); $("fRespLabel").value = respType(m) === "form" ? "" : respLabel(m); $("fResp").onchange();
     $("fVerify").checked = !!m.verifyReq;
+    $("fCompileTo").value = m.compileTo || "";
     $("fCustomDue").checked = !!m.dueCustom; $("fDueWrap").hidden = !m.dueCustom; $("fDue").value = m.dueCustom ? localInput(m.dueAt) : "";
     const all = active.length === (m.stores || []).length;
     document.querySelector(`input[name="aud"][value="${all ? "all" : "pick"}"]`).checked = true;
@@ -990,6 +1022,9 @@ th.dcol{text-align:center;font-size:11.5px}
     const rtype = $("fResp").value;
     const fields = rtype === "form" ? readFields() : [];
     if (rtype === "form" && !fields.length) return say("Add at least one question for the store to answer.", "err");
+    const compileTo = rtype === "none" ? "" : $("fCompileTo").value.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean).join(", ");
+    const badMail = compileTo.split(", ").filter((x) => x && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+    if (badMail.length) return say("“" + badMail[0] + "” isn't an email address.", "err");
     const task = {
       title, details: $("fDetails").value.trim(), dept: $("fFrom").value.trim() || "Head Office", priority, links,
       resp: rtype === "form"
@@ -1003,7 +1038,7 @@ th.dcol{text-align:center;font-size:11.5px}
     const id = editing ? editing.id : SPARUI.uid();
     $("fSave").disabled = true;
     try {
-      const ops = [["set", masterDoc(id), { ...task, stores: codes, emailed: false }]];
+      const ops = [["set", masterDoc(id), { ...task, stores: codes, emailed: false, compileTo }]];
       codes.forEach((c) => ops.push(["set", storeDoc(c, id), { ...task, status: "open" }]));
       if (editing) (editing.stores || []).filter((c) => !codes.includes(c)).forEach((c) => ops.push(["delete", storeDoc(c, id)]));
       await commitAll(ops);
@@ -1212,6 +1247,15 @@ th.dcol{text-align:center;font-size:11.5px}
       text: respType(m) === "form" ? "Download compiled sheet (Excel)" : "Download answers (Excel)", onclick: () => respType(m) === "form" ? downloadCompiled(m) : downloadAnswers(m) });
     box.appendChild(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
       E("h3", { text: "Answers: " + m.title }), xl]));
+    if (m.compileTo) {
+      const line = E("p", { class: "note", style: "margin:0 0 10px" });
+      if (m.compiledAt) {
+        line.appendChild(document.createTextNode("📧 Compiled sheet emailed to " + m.compileTo + " (copy to Sales Support) on " + when(m.compiledAt) +
+          (m.compiledDone < m.compiledOf ? " — deadline passed, " + m.compiledDone + " of " + m.compiledOf + " stores. " : ". ")));
+        if (m.compiledUrl) line.appendChild(E("a", { href: m.compiledUrl, target: "_blank", rel: "noopener", text: "Open it" }));
+      } else line.textContent = "📧 Will email the compiled sheet to " + m.compileTo + " (copy to Sales Support) when every store has done it, or at the deadline (" + when(m.dueAt) + ").";
+      box.appendChild(line);
+    }
     const tb = E("tbody");
     const order = { wait: 0, back: 1, ok: 2, none: 3 };
     lastRes.map(({ st, copies }) => ({ st, p: copies.find((x) => x.id === m.id) })).filter((x) => x.p)
