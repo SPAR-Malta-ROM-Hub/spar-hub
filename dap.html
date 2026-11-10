@@ -19,21 +19,34 @@
 .dap-head{display:flex;gap:8px 14px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;padding:16px 18px 10px}
 .dap-head h3{font-size:18px;margin:0}
 .dap-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
-.task{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px 18px;border-top:1px solid var(--line)}
-.task input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--gd);cursor:pointer}
+.task{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;padding:14px 18px;border-top:1px solid var(--line)}
+.task>*:not(:first-child){grid-column:2}
+.task>input[type=checkbox]{grid-column:1;grid-row:1;width:24px;height:24px;margin:1px 0 0;accent-color:var(--gd);cursor:pointer}
 .task .t-title{font-weight:700;font-size:15px;line-height:1.35;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .task.done .t-title>span:first-child{color:var(--muted);text-decoration:line-through}
-.task .t-body{grid-column:2;white-space:pre-wrap;font-size:14px;line-height:1.5;color:var(--ink)}
-.task .t-links{grid-column:2;display:flex;flex-wrap:wrap;gap:6px}
+.task .t-body{white-space:pre-wrap;font-size:14px;line-height:1.5}
+.t-links{display:flex;flex-wrap:wrap;gap:6px}
 .linkchip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:9px;background:#EEF4FB;color:#0B4F8A;font-weight:700;font-size:13px;text-decoration:none;border:1px solid #D6E4F2}
 .linkchip:hover{background:#E1ECF8}
-.task .t-note{grid-column:2}
-.task .t-note input{padding:7px 10px;font-size:13px}
-.task .t-by{grid-column:2;font-size:12px;color:var(--gd);font-weight:700}
+.resp{border:1px dashed #C9CDCB;border-radius:12px;padding:10px 12px;background:var(--soft)}
+.resp .r-label{font-weight:800;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--brandd);margin-bottom:6px}
+.resp input.in{max-width:320px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.thumb{position:relative;width:86px;height:86px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;padding:4px;color:var(--ink);text-decoration:none;word-break:break-all}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.thumb .x{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:13px;line-height:22px;cursor:pointer;z-index:2;padding:0}
+.uploading{font-size:12.5px;color:var(--amber);font-weight:700}
+.row2{display:flex;gap:8px;flex-wrap:wrap}
+.row2 input{flex:1 1 200px;padding:7px 10px;font-size:13px}
+.t-by{font-size:12px;color:var(--gd);font-weight:700}
+.t-verify{font-size:12.5px;font-weight:700}
+.t-verify.ok{color:var(--gd)} .t-verify.wait{color:var(--amber)} .t-verify.back{color:var(--red)}
 .dap-foot{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 18px 16px;border-top:1px solid var(--line);background:var(--soft)}
 .dap-foot textarea{flex:1 1 260px;min-height:44px}
-.signedbox{padding:12px 18px 16px;border-top:1px solid var(--line);background:var(--goodsoft);color:var(--gd);font-weight:700;font-size:13.5px}
+.signedbox{padding:12px 18px 14px;border-top:1px solid var(--line);background:var(--goodsoft);color:var(--gd);font-weight:700;font-size:13.5px}
 .signedbox .note{font-weight:400;color:var(--ink);display:block;margin-top:3px}
+.rombox{padding:10px 18px 14px;border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13.5px}
+.rombox.ok{background:#EEF4FB;color:#0B4F8A;font-weight:700}
 .audience{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px}
 .audience label{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px}
 .storeboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--soft)}
@@ -44,12 +57,22 @@
 @media(max-width:700px){.linkrow{grid-template-columns:1fr auto}.linkrow .lr-url{grid-column:1}}
 .when{border-radius:10px;padding:10px 12px;background:var(--ambersoft);color:var(--amber);font-weight:700;font-size:13.5px;margin:4px 0 14px}
 .when.urgent{background:var(--redsoft);color:var(--red)}
-.qgroup h3{font-size:15px;margin:14px 0 8px}
+.checkline{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13.5px;margin:0 0 12px}
+.checkline input{width:18px;height:18px}
+.qgroup h3{font-size:15px;margin:0}
+.qhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 8px}
 .bar{height:8px;border-radius:99px;background:#E9EBEA;overflow:hidden;min-width:80px}
 .bar>i{display:block;height:100%;background:var(--gd)}
 .section-title{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;gap:10px;flex-wrap:wrap}
 .section-title h2{font-size:18px;margin:0}
 td .note{display:block}
+tr.sel td{background:#FFF6F6}
+.taskrow{cursor:pointer}
+#pResp{margin:0 0 18px}
+#pResp h3{margin:0}
+.minithumbs{display:flex;gap:4px;flex-wrap:wrap}
+.minithumbs a{display:block;width:44px;height:44px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font-size:10px;text-align:center;line-height:44px;color:var(--ink);text-decoration:none;background:#fff}
+.minithumbs img{width:100%;height:100%;object-fit:cover;display:block}
 </style>
 </head>
 <body>
@@ -60,7 +83,7 @@ td .note{display:block}
     <button class="tab active" data-tab="store" type="button">Store view</button>
     <button class="tab" data-tab="add" type="button">Add task</button>
     <button class="tab" data-tab="queue" type="button">Waiting for 3pm<span class="count" id="qCount">0</span></button>
-    <button class="tab" data-tab="progress" type="button">Progress</button>
+    <button class="tab" data-tab="progress" type="button">Progress<span class="count" id="vCount" hidden>0</span></button>
   </div>
 
   <!-- ═════════ STORE VIEW ═════════ -->
@@ -81,20 +104,37 @@ td .note{display:block}
       <h2 id="fHead">Add a task to the DAP</h2>
       <div id="fMsg" role="status" aria-live="polite"></div>
       <form id="fForm" novalidate>
-        <label class="f"><span>Task</span><input class="in" id="fTitle" maxlength="140" placeholder="e.g. Put up the new Christmas price cards" required></label>
-        <label class="f"><span>Details <small class="note">(optional)</small></span><textarea class="in" id="fDetails" placeholder="What exactly needs doing, and anything stores should know"></textarea></label>
         <div class="grid2">
-          <label class="f"><span>Department</span><input class="in" id="fDept" list="deptList" value="Store management" autocomplete="off"><datalist id="deptList"></datalist></label>
+          <label class="f"><span>From</span><input class="in" id="fFrom" list="fromList" value="Sales Support" autocomplete="off"><datalist id="fromList"></datalist></label>
           <label class="f"><span>Priority</span>
             <select class="in" id="fPriority"><option value="normal">Normal: goes out with the 3pm DAP</option><option value="urgent">Urgent: send straight away</option></select></label>
         </div>
+        <label class="f"><span>Action point</span><input class="in" id="fTitle" maxlength="140" placeholder="e.g. Coin order 11.11.2026" required></label>
+        <label class="f"><span>What you need to do</span><textarea class="in" id="fDetails" placeholder="Exactly what the store needs to do, and anything they should know"></textarea></label>
+
         <div class="f">
-          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Links to information <small class="note">— paste SharePoint / OneDrive links (Share → Copy link)</small></span>
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Links to documents <small class="note">— SharePoint / OneDrive links (Share → Copy link)</small></span>
           <div id="fLinks"></div>
           <button class="btn secondary small" id="fAddLink" type="button">+ Add a link</button>
         </div>
+
+        <div class="grid2">
+          <label class="f"><span>The store needs to send back</span>
+            <select class="in" id="fResp">
+              <option value="none">Nothing: just tick it done</option>
+              <option value="number">A number (e.g. a count)</option>
+              <option value="text">A short written answer</option>
+              <option value="photo">Photo(s)</option>
+              <option value="file">A file (e.g. a filled-in Excel)</option>
+            </select></label>
+          <label class="f" id="fRespLabelWrap" hidden><span>What exactly? <small class="note">(shown to the store)</small></span><input class="in" id="fRespLabel" maxlength="80" placeholder="e.g. Safe count in €"></label>
+        </div>
+        <label class="checkline"><input type="checkbox" id="fVerify"> Verification required: the department checks each store's answer</label>
+        <label class="checkline"><input type="checkbox" id="fCustomDue"> Set a specific deadline <small class="note" style="font-weight:400">(otherwise 23 hours after it goes out)</small></label>
+        <label class="f" id="fDueWrap" hidden><span>Deadline</span><input class="in" id="fDue" type="datetime-local" style="max-width:280px"></label>
+
         <div class="f">
-          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Send to</span>
+          <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">To</span>
           <div class="audience">
             <label><input type="radio" name="aud" value="all" checked> All active stores (<span id="allCount">0</span>)</label>
             <label><input type="radio" name="aud" value="pick"> Choose stores</label>
@@ -114,7 +154,7 @@ td .note{display:block}
   <section data-pane="queue" hidden>
     <div class="card panel">
       <h2>Waiting to go out</h2>
-      <p class="note" style="margin:-6px 0 8px">Normal tasks are held here and released together at 3pm. You can still edit or remove them until then.</p>
+      <p class="note" style="margin:-6px 0 8px">Normal tasks are held here and released together at 3pm. Edit or remove them until then, or press <b>Send the DAP now</b> to release them straight away.</p>
       <div id="queueList"></div>
     </div>
   </section>
@@ -135,15 +175,16 @@ td .note{display:block}
         <div class="card kpi"><label>Stores</label><strong id="pStores">–</strong></div>
         <div class="card kpi"><label>Signed off</label><strong class="good" id="pSigned">–</strong></div>
         <div class="card kpi"><label>Overdue</label><strong class="bad" id="pOver">–</strong></div>
-        <div class="card kpi"><label>Not opened</label><strong id="pUnseen">–</strong></div>
+        <div class="card kpi"><label>To check</label><strong id="pToCheck">–</strong></div>
       </div>
-      <h3>Tasks</h3>
-      <div class="tablewrap" style="margin-bottom:18px">
-        <table><thead><tr><th>Task</th><th>Department</th><th>Priority</th><th class="num">Stores done</th><th></th></tr></thead><tbody id="pTasks"></tbody></table>
+      <h3>Tasks <small class="note" style="font-weight:400">— click a task to see each store's answers</small></h3>
+      <div class="tablewrap" style="margin:8px 0 18px">
+        <table><thead><tr><th>Action point</th><th>From</th><th>Send back</th><th>Deadline</th><th class="num">Stores done</th><th class="num">To check</th><th></th></tr></thead><tbody id="pTasks"></tbody></table>
       </div>
+      <div id="pResp" hidden></div>
       <h3>Stores</h3>
-      <div class="tablewrap">
-        <table><thead><tr><th>Store</th><th>ROM</th><th>Status</th><th>Tasks done</th><th>Signed off</th><th>Notes</th></tr></thead><tbody id="pRows"></tbody></table>
+      <div class="tablewrap" style="margin-top:8px">
+        <table><thead><tr><th>Store</th><th>ROM</th><th>Status</th><th>Tasks done</th><th>Signed off (SM)</th><th>ROM confirmed</th><th>Notes</th></tr></thead><tbody id="pRows"></tbody></table>
       </div>
     </div>
   </section>
@@ -153,11 +194,17 @@ td .note{display:block}
   const $ = (id) => document.getElementById(id);
   const E = SPARUI.el;
   const me = await SPAR.ready;
-  const { fs, db } = await SPAR.firebase();
+  const fb = await SPAR.firebase();
+  const { fs, db } = fb;
 
-  // ── Timing rules ──
+  // ── Settings ──
   const RELEASE_HOUR = 15;        // 3pm
-  const HOURS_TO_ACTION = 23;     // stores have 23 hours from release
+  const HOURS_TO_ACTION = 23;     // default time to complete
+  const FROM_LIST = ["Sales Support", "Commercials", "Retail Operations Manager", "Admin", "Accounts"];
+  const RESP_TEXT = { number: "Send back a number", text: "Send back an answer", photo: "Send back photo(s)", file: "Send back a file" };
+  const UPLOAD_URL = window.SPAR_UPLOAD_URL || "";
+  const MAX_FILES = 6;
+
   const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
   function nextRelease(t) {
     const d = new Date(t);
@@ -170,8 +217,25 @@ td .note{display:block}
   const dayName = (ms) => new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const when = (ms) => dayName(ms) + ", " + hhmm(ms);
   const dateOf = (ms) => SPARUI.isoDate(new Date(ms));
+  const dayOf = (iso) => dayName(new Date(iso + "T12:00:00").getTime());
+  const localInput = (ms) => { const d = new Date(ms); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); };
   const hubUrl = new URL("dap.html", location.href).href;
   const safeUrl = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } };
+  const respType = (p) => (p.resp && p.resp.type) || "none";
+  const respLabel = (p) => (p.resp && p.resp.label) || "";
+  const hasResponse = (p) => {
+    const t = respType(p);
+    if (t === "number" || t === "text") return String(p.answer ?? "").trim() !== "";
+    if (t === "photo" || t === "file") return (p.files || []).length > 0;
+    return true;
+  };
+  // verification state of one store copy: none | wait | ok | back
+  function verifyState(p) {
+    if (!p.verifyReq) return "none";
+    if (p.verify === "ok") return "ok";
+    if (p.verify === "back" && !(p.status === "done" && (p.ackAt || 0) > (p.verifyAt || 0))) return "back";
+    return p.status === "done" ? "wait" : "none";
+  }
 
   // ── Paths ──
   const storeCol = (c) => fs.collection(db, "modules", "dap", "stores", c, "posts");
@@ -180,6 +244,15 @@ td .note{display:block}
   const signDoc = (c, date) => fs.doc(db, "modules", "dap", "stores", c, "signoffs", date);
   const masterCol = fs.collection(db, "modules", "dap", "config", "posts", "items");
   const masterDoc = (id) => fs.doc(db, "modules", "dap", "config", "posts", "items", id);
+
+  // Commit many writes in chunks (Firestore allows 500 per batch)
+  async function commitAll(ops) {
+    for (let i = 0; i < ops.length; i += 450) {
+      const b = fs.writeBatch(db);
+      ops.slice(i, i + 450).forEach(([kind, ref, data]) => kind === "set" ? b.set(ref, data) : kind === "update" ? b.update(ref, data) : b.delete(ref));
+      await b.commit();
+    }
+  }
 
   // ── Tabs (Head Office only) ──
   function showTab(name) {
@@ -191,9 +264,46 @@ td .note{display:block}
     document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
   }
 
+  // ── Uploads (photos & files → Google Drive via the DAP script) ──
+  function shrinkImage(file) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(img.src);
+        c.toBlob((b) => b ? res(b) : rej(new Error("Couldn't read that photo")), "image/jpeg", 0.82);
+      };
+      img.onerror = () => rej(new Error("Couldn't read that photo"));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  const toBase64 = (blob) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1]);
+    r.onerror = () => rej(new Error("Couldn't read the file"));
+    r.readAsDataURL(blob);
+  });
+  async function uploadOne(st, p, file) {
+    if (!UPLOAD_URL) throw new Error("Uploads aren't switched on yet. Ask a hub admin.");
+    let blob = file, name = file.name || "upload", mime = file.type || "application/octet-stream";
+    if (/^image\//.test(mime) && !/gif|svg/.test(mime)) { blob = await shrinkImage(file); mime = "image/jpeg"; name = name.replace(/\.[^.]+$/, "") + ".jpg"; }
+    if (blob.size > 20e6) throw new Error(name + " is too big (max 20 MB)");
+    const data = await toBase64(blob);
+    const idToken = fb.user && fb.user.getIdToken ? await fb.user.getIdToken() : "";
+    const r = await fetch(UPLOAD_URL, { method: "POST", body: JSON.stringify({
+      action: "upload", idToken, store: st.code, storeName: st.name, taskId: p.id, title: p.title, dapDate: p.dapDate, filename: name, mime, data }) });
+    const j = await r.json().catch(() => ({ ok: false, error: "Upload service didn't answer" }));
+    if (!j.ok) throw new Error(j.error || "Upload failed");
+    return { id: j.id, url: j.url, thumb: j.thumb || "", name, mime, size: blob.size, by: me.name, at: Date.now() };
+  }
+
   // ═════════════════ STORE VIEW ═════════════════
   let posts = [], signs = {}, unsubs = [];
-  const notesDraft = {}, signDraft = {};
+  const drafts = {}, busy = {};
+  let lastName = ""; try { lastName = localStorage.getItem("sparDoneBy") || ""; } catch (e) {}
 
   function watchStore() {
     unsubs.forEach((u) => u()); unsubs = []; posts = []; signs = {};
@@ -225,6 +335,8 @@ td .note{display:block}
 
   function renderStore() {
     const st = me.store(); if (!st) return;
+    // Don't redraw under someone's fingers
+    if (Object.values(busy).some(Boolean)) return;
     const t = now();
     const released = posts.filter((p) => p.releaseAt && p.releaseAt <= t);
     const groups = groupsFrom(released);
@@ -237,13 +349,14 @@ td .note{display:block}
 
     const list = $("dapList");
     const focused = document.activeElement && list.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+    const scrollY = window.scrollY;
     list.innerHTML = "";
     if (!groups.length) { list.appendChild(E("div", { class: "card empty", text: "No DAPs yet for " + st.name + ". The next one arrives " + when(nextRelease(t)) + "." })); return; }
-    // Open ones first, then the last 14 days of signed-off ones
-    const open = groups.filter((g) => !signs[g.date]);
-    const done = groups.filter((g) => signs[g.date]).slice(0, 14);
-    open.concat(done).forEach((g) => list.appendChild(dapCard(st, g, t)));
+    const open = groups.filter((g) => !signs[g.date] || (!signs[g.date].romAt && ["rom", "admin", "hq"].includes(me.role)) || g.tasks.some((p) => verifyState(p) === "back"));
+    const rest = groups.filter((g) => !open.includes(g)).slice(0, 14);
+    open.concat(rest).forEach((g) => list.appendChild(dapCard(st, g, t)));
     if (focused) { const el = list.querySelector('[data-key="' + focused + '"]'); if (el) el.focus(); }
+    window.scrollTo(0, scrollY);
   }
 
   function dapCard(st, g, t) {
@@ -257,75 +370,194 @@ td .note{display:block}
     else pills.appendChild(E("span", { class: "pill warn", text: "Due " + when(g.due) }));
     pills.appendChild(E("span", { class: "pill grey", text: nDone + " of " + g.tasks.length + " done" }));
     card.appendChild(E("div", { class: "dap-head" }, [
-      E("div", null, [E("h3", { text: "DAP · " + dayName(new Date(g.date + "T12:00:00").getTime()) }),
-        E("div", { class: "dap-meta", text: "Sent " + hhmm(g.sent) + " · complete by " + when(g.due) })]),
+      E("div", null, [E("h3", { text: "DAP · " + dayOf(g.date) }),
+        E("div", { class: "dap-meta", text: "Sent " + hhmm(g.sent) + " · " + g.tasks.length + " task" + (g.tasks.length === 1 ? "" : "s") })]),
       pills
     ]));
-
-    g.tasks.forEach((p) => {
-      const isDone = p.status === "done";
-      const row = E("div", { class: "task" + (isDone ? " done" : "") });
-      const cb = E("input", { type: "checkbox", "aria-label": "Done: " + p.title });
-      cb.checked = isDone; cb.disabled = !!sign;
-      cb.onchange = async () => {
-        try {
-          await fs.updateDoc(storeDoc(st.code, p.id), cb.checked
-            ? { status: "done", ackBy: me.email, ackName: me.name, ackAt: Date.now() }
-            : { status: "open", ackBy: "", ackName: "", ackAt: 0 });
-        } catch (e) { cb.checked = !cb.checked; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
-      };
-      const title = E("div", { class: "t-title" }, [E("span", { text: p.title })]);
-      if (p.priority === "urgent") title.appendChild(E("span", { class: "pill red", text: "Urgent" }));
-      if (p.dept) title.appendChild(E("span", { class: "pill grey", text: p.dept }));
-      if (p.dueAt && p.dueAt < t && !isDone) title.appendChild(E("span", { class: "pill red", text: "Overdue" }));
-      row.appendChild(cb); row.appendChild(title);
-      if (p.details) row.appendChild(E("div", { class: "t-body", text: p.details }));
-      const links = (p.links || []).map((l) => ({ ...l, href: safeUrl(l.url) })).filter((l) => l.href);
-      if (links.length) row.appendChild(E("div", { class: "t-links" }, links.map((l) =>
-        E("a", { class: "linkchip", href: l.href, target: "_blank", rel: "noopener", text: "📎 " + (l.label || "Open document") }))));
-      if (isDone && p.ackName) row.appendChild(E("div", { class: "t-by", text: "✓ " + p.ackName + " · " + SPARUI.fmtDateTime(p.ackAt) }));
-      if (!sign) {
-        const key = "n-" + p.id;
-        const inp = E("input", { class: "in", placeholder: "Note (optional)", "aria-label": "Note for " + p.title, "data-key": key });
-        inp.value = notesDraft[p.id] ?? p.note ?? "";
-        inp.oninput = () => { notesDraft[p.id] = inp.value; };
-        inp.onchange = async () => {
-          try { await fs.updateDoc(storeDoc(st.code, p.id), { note: inp.value.trim() }); delete notesDraft[p.id]; SPARUI.toast("Note saved"); }
-          catch (e) { SPARUI.toast("Couldn't save note: " + (e.code || e.message), "err"); }
-        };
-        row.appendChild(E("div", { class: "t-note" }, [inp]));
-      } else if (p.note) row.appendChild(E("div", { class: "t-body note", text: "Note: " + p.note }));
-      card.appendChild(row);
-    });
+    g.tasks.forEach((p) => card.appendChild(taskRow(st, p, t, !!sign)));
 
     if (sign) {
       card.appendChild(E("div", { class: "signedbox" }, [
-        "✓ Signed off by " + (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at),
+        "✓ Signed off by " + (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) + (sign.late ? " (late)" : ""),
         sign.note ? E("span", { class: "note", text: sign.note }) : null
       ]));
+      if (sign.romAt) {
+        card.appendChild(E("div", { class: "rombox ok" }, ["✓ ROM confirmed by " + (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) + (sign.romNote ? " · " + sign.romNote : "")]));
+      } else if (["rom", "admin", "hq"].includes(me.role)) {
+        const inp = E("input", { class: "in", placeholder: "ROM comment (optional)", style: "flex:1 1 220px;padding:7px 10px;font-size:13px", "data-key": "rom-" + g.date });
+        const b = E("button", { class: "btn small", type: "button", text: "ROM confirm" });
+        b.onclick = async () => {
+          b.disabled = true;
+          try { await fs.updateDoc(signDoc(st.code, g.date), { romBy: me.email, romName: me.name, romAt: Date.now(), romNote: inp.value.trim() }); SPARUI.toast("Confirmed"); }
+          catch (e) { b.disabled = false; SPARUI.toast("Couldn't confirm: " + (e.code || e.message), "err"); }
+        };
+        card.appendChild(E("div", { class: "rombox" }, [inp, b]));
+      } else {
+        card.appendChild(E("div", { class: "rombox note", text: "Waiting for ROM confirmation" }));
+      }
     } else {
       const key = "s-" + g.date;
       const ta = E("textarea", { class: "in", placeholder: "Sign-off comment (optional)", "aria-label": "Sign-off comment", "data-key": key });
-      ta.value = signDraft[g.date] || "";
-      ta.oninput = () => { signDraft[g.date] = ta.value; };
-      const btn = E("button", { class: "btn good", type: "button", text: "Sign off DAP" });
+      ta.value = drafts[key] || "";
+      ta.oninput = () => { drafts[key] = ta.value; };
+      const btn = E("button", { class: "btn good", type: "button", text: "Sign off DAP (Store Manager)" });
       btn.onclick = async () => {
-        const left = g.tasks.length - g.tasks.filter((p) => p.status === "done").length;
-        if (left && !confirm(`${left} task${left === 1 ? " is" : "s are"} not ticked yet. Sign off anyway?`)) return;
+        const left = g.tasks.filter((p) => p.status !== "done").length;
+        if (left && !confirm(`${left} task${left === 1 ? " is" : "s are"} not done yet. Sign off anyway?`)) return;
         btn.disabled = true;
         try {
           await fs.setDoc(signDoc(st.code, g.date), { date: g.date, by: me.email, name: me.name, at: Date.now(), note: ta.value.trim(),
             tasks: g.tasks.length, done: g.tasks.length - left, late: g.due < now() });
-          delete signDraft[g.date];
+          delete drafts[key];
           SPARUI.toast("DAP signed off");
         } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't sign off: " + (e.code || e.message), "err"); }
       };
       card.appendChild(E("div", { class: "dap-foot" }, [ta, btn]));
     }
-
-    // Mark tasks as seen
     g.tasks.filter((p) => !p.seenAt).forEach((p) => fs.updateDoc(storeDoc(st.code, p.id), { seenAt: Date.now() }).catch(() => {}));
     return card;
+  }
+
+  function taskRow(st, p, t, locked) {
+    const isDone = p.status === "done";
+    const vs = verifyState(p);
+    // Signed-off DAPs are locked, except a task the department has sent back
+    const lockedTask = (locked && vs !== "back") || vs === "ok";
+    const row = E("div", { class: "task" + (isDone ? " done" : "") });
+    const upd = (data) => fs.updateDoc(storeDoc(st.code, p.id), data);
+
+    // Title line
+    const title = E("div", { class: "t-title" }, [E("span", { text: p.title })]);
+    if (p.priority === "urgent") title.appendChild(E("span", { class: "pill red", text: "Urgent" }));
+    if (p.dept) title.appendChild(E("span", { class: "pill grey", text: p.dept }));
+    if (!isDone && p.dueAt && p.dueAt < t) title.appendChild(E("span", { class: "pill red", text: "Overdue" }));
+    else if (!isDone && p.dueCustom) title.appendChild(E("span", { class: "pill warn", text: "By " + when(p.dueAt) }));
+    if (p.verifyReq) title.appendChild(E("span", { class: "pill brand", text: "To be checked by " + (p.dept || "Head Office") }));
+
+    // Tick box
+    const cb = E("input", { type: "checkbox", "aria-label": "Done: " + p.title });
+    cb.checked = isDone; cb.disabled = lockedTask;
+    row.appendChild(cb);
+    row.appendChild(title);
+    if (p.details) row.appendChild(E("div", { class: "t-body", text: p.details }));
+    const links = (p.links || []).map((l) => ({ ...l, href: safeUrl(l.url) })).filter((l) => l.href);
+    if (links.length) row.appendChild(E("div", { class: "t-links" }, links.map((l) =>
+      E("a", { class: "linkchip", href: l.href, target: "_blank", rel: "noopener", text: "📎 " + (l.label || "Open document") }))));
+
+    // What the store sends back
+    const rt = respType(p);
+    let answerInput = null;
+    if (rt !== "none") {
+      const box = E("div", { class: "resp" }, [E("div", { class: "r-label", text: RESP_TEXT[rt] + (respLabel(p) ? ": " + respLabel(p) : "") })]);
+      if (rt === "number" || rt === "text") {
+        const key = "a-" + p.id;
+        answerInput = E("input", { class: "in", type: rt === "number" ? "number" : "text", inputmode: rt === "number" ? "decimal" : "text", step: "any",
+          placeholder: rt === "number" ? "Enter the number" : "Type your answer", "aria-label": respLabel(p) || "Answer", "data-key": key });
+        answerInput.value = drafts[key] ?? (p.answer ?? "");
+        answerInput.disabled = lockedTask;
+        answerInput.onfocus = () => { busy[key] = true; };
+        answerInput.oninput = () => { drafts[key] = answerInput.value; };
+        answerInput.onblur = async () => {
+          busy[key] = false;
+          const v = answerInput.value.trim();
+          if (v === String(p.answer ?? "")) { delete drafts[key]; return; }
+          try { await upd({ answer: rt === "number" && v !== "" ? Number(v) : v }); delete drafts[key]; SPARUI.toast("Saved"); }
+          catch (e) { SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+        };
+        box.appendChild(answerInput);
+      } else {
+        const thumbs = E("div", { class: "thumbs" });
+        (p.files || []).forEach((f, i) => {
+          const a = E("a", { class: "thumb", href: f.url, target: "_blank", rel: "noopener", title: f.name });
+          if (f.thumb) { const im = E("img", { src: f.thumb, alt: f.name, loading: "lazy", referrerpolicy: "no-referrer" }); im.onerror = () => im.remove(); a.appendChild(im); }
+          a.appendChild(document.createTextNode(/^image\//.test(f.mime) ? "📷 " + f.name : "📄 " + f.name));
+          if (!lockedTask) {
+            const x = E("button", { class: "x", type: "button", text: "✕", "aria-label": "Remove " + f.name });
+            x.onclick = async (ev) => {
+              ev.preventDefault();
+              if (!confirm("Remove " + f.name + "?")) return;
+              const files = (p.files || []).filter((_, j) => j !== i);
+              try { await upd(files.length || !isDone ? { files } : { files, status: "open", ackAt: 0 }); } catch (e) { SPARUI.toast("Couldn't remove: " + (e.code || e.message), "err"); }
+            };
+            a.appendChild(x);
+          }
+          thumbs.appendChild(a);
+        });
+        box.appendChild(thumbs);
+        if (!lockedTask && (p.files || []).length < MAX_FILES) {
+          const fileIn = E("input", { type: "file", hidden: "", multiple: "" });
+          if (rt === "photo") { fileIn.accept = "image/*"; fileIn.setAttribute("capture", "environment"); }
+          const status = E("span", { class: "uploading" });
+          const btn = E("button", { class: "btn secondary small", type: "button", text: rt === "photo" ? "📷 Take or add photo" : "📎 Upload file" });
+          btn.onclick = () => fileIn.click();
+          fileIn.onchange = async () => {
+            const chosen = [...fileIn.files].slice(0, MAX_FILES - (p.files || []).length);
+            if (!chosen.length) return;
+            busy["u-" + p.id] = true; btn.disabled = true;
+            const added = [];
+            try {
+              for (let i = 0; i < chosen.length; i++) {
+                status.textContent = "Uploading " + (i + 1) + " of " + chosen.length + "…";
+                added.push(await uploadOne(st, p, chosen[i]));
+              }
+            } catch (e) { SPARUI.toast(e.message || String(e), "err"); }
+            try { if (added.length) { await upd({ files: (p.files || []).concat(added) }); SPARUI.toast(added.length + " uploaded"); } }
+            catch (e) { SPARUI.toast("Uploaded, but couldn't save: " + (e.code || e.message), "err"); }
+            busy["u-" + p.id] = false; btn.disabled = false; status.textContent = "";
+            renderStore();
+          };
+          box.appendChild(E("div", { class: "row" }, [btn, status, fileIn]));
+        }
+        if (!UPLOAD_URL) box.appendChild(E("p", { class: "note", text: "Uploads aren't switched on yet." }));
+      }
+      row.appendChild(box);
+    }
+
+    // Done by + note
+    if (!lockedTask) {
+      const kb = "b-" + p.id, kn = "n-" + p.id;
+      const by = E("input", { class: "in", placeholder: "Done by (name)", "aria-label": "Done by", "data-key": kb, autocomplete: "name" });
+      by.value = drafts[kb] ?? (p.doneByName || (isDone ? "" : lastName));
+      const note = E("input", { class: "in", placeholder: "Note (optional)", "aria-label": "Note for " + p.title, "data-key": kn });
+      note.value = drafts[kn] ?? (p.note || "");
+      by.onfocus = () => { busy[kb] = true; }; note.onfocus = () => { busy[kn] = true; };
+      by.oninput = () => { drafts[kb] = by.value; };
+      note.oninput = () => { drafts[kn] = note.value; };
+      by.onblur = async () => {
+        busy[kb] = false;
+        const v = by.value.trim();
+        if (v) { try { localStorage.setItem("sparDoneBy", v); } catch (e) {} lastName = v; }
+        if (v !== (p.doneByName || "")) { try { await upd({ doneByName: v }); delete drafts[kb]; } catch (e) { SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); } }
+      };
+      note.onblur = async () => {
+        busy[kn] = false;
+        const v = note.value.trim();
+        if (v !== (p.note || "")) { try { await upd({ note: v }); delete drafts[kn]; SPARUI.toast("Note saved"); } catch (e) { SPARUI.toast("Couldn't save note: " + (e.code || e.message), "err"); } }
+      };
+      row.appendChild(E("div", { class: "row2" }, [by, note]));
+
+      cb.onchange = async () => {
+        if (cb.checked) {
+          const cur = { ...p, answer: answerInput ? answerInput.value.trim() : p.answer };
+          if (!hasResponse(cur)) { cb.checked = false; SPARUI.toast(RESP_TEXT[rt] + " first", "err"); return; }
+          const name = by.value.trim() || "";
+          if (!name) { cb.checked = false; by.focus(); SPARUI.toast("Enter who did it (Done by)", "err"); return; }
+          const data = { status: "done", ackBy: me.email, ackName: me.name, ackAt: Date.now(), doneByName: name };
+          if (answerInput) data.answer = rt === "number" && cur.answer !== "" ? Number(cur.answer) : cur.answer;
+          try { await upd(data); try { localStorage.setItem("sparDoneBy", name); } catch (e) {} }
+          catch (e) { cb.checked = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+        } else {
+          try { await upd({ status: "open", ackBy: "", ackName: "", ackAt: 0 }); }
+          catch (e) { cb.checked = true; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+        }
+      };
+    } else if (p.note) row.appendChild(E("div", { class: "t-body note", text: "Note: " + p.note }));
+
+    if (isDone) row.appendChild(E("div", { class: "t-by", text: "✓ Done by " + (p.doneByName || p.ackName || "") + " · " + SPARUI.fmtDateTime(p.ackAt) }));
+    if (vs === "wait") row.appendChild(E("div", { class: "t-verify wait", text: "⏳ Waiting for " + (p.dept || "Head Office") + " to check" }));
+    if (vs === "ok") row.appendChild(E("div", { class: "t-verify ok", text: "✓ Checked by " + (p.verifyName || "") + " · " + SPARUI.fmtDateTime(p.verifyAt) }));
+    if (vs === "back") row.appendChild(E("div", { class: "t-verify back", text: "↩ Sent back by " + (p.verifyName || "") + ": " + (p.verifyNote || "please redo") }));
+    return row;
   }
 
   watchStore();
@@ -333,14 +565,13 @@ td .note{display:block}
   setInterval(renderStore, 60000); // lets the 3pm DAP appear without a reload
 
   if (me.isHQ) {
-
   // ═════════════════ HEAD OFFICE ═════════════════
   const active = me.allStores.filter((s) => s.active !== false);
   let masters = [], editing = null;
 
   fs.onSnapshot(fs.query(masterCol, fs.orderBy("releaseAt", "desc"), fs.limit(500)), (qs) => {
     masters = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderQueue(); renderDates(); renderDepts();
+    renderQueue(); renderDates(); renderFrom();
   }, (e) => SPARUI.toast("Couldn't load DAP list: " + (e.code || e.message), "err"));
   setInterval(() => { renderQueue(); renderDates(); updateWhen(); }, 60000);
 
@@ -352,14 +583,14 @@ td .note{display:block}
   Object.keys(byRom).sort().forEach((rom) => {
     const all = E("button", { class: "btn secondary small", type: "button", text: "All" });
     box.appendChild(E("div", { class: "romrow" }, [E("b", { text: rom }), all]));
-    const cbs = byRom[rom].map((s) => { const cb = E("input", { type: "checkbox", value: s.code }); box.appendChild(E("label", null, [cb, s.name])); return cb; });
+    const cbs = byRom[rom].map((s) => { const cb = E("input", { type: "checkbox", value: s.code }); box.appendChild(E("label", null, [cb, s.name + " (" + s.code + ")"])); return cb; });
     all.onclick = () => { const on = !cbs.every((c) => c.checked); cbs.forEach((c) => c.checked = on); };
   });
   document.querySelectorAll('input[name="aud"]').forEach((r) => r.onchange = () => { box.hidden = document.querySelector('input[name="aud"]:checked').value !== "pick"; });
 
   function addLinkRow(label = "", url = "") {
     if ($("fLinks").children.length >= 6) return;
-    const l = E("input", { class: "in", placeholder: "Name, e.g. Price card list", value: label });
+    const l = E("input", { class: "in", placeholder: "Name, e.g. Coin Delivery – Day 1&2", value: label });
     const u = E("input", { class: "in lr-url", type: "url", placeholder: "https://sparmalta.sharepoint.com/…", value: url });
     const x = E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove link" });
     const row = E("div", { class: "linkrow" }, [l, u, x]);
@@ -368,25 +599,40 @@ td .note{display:block}
   }
   $("fAddLink").onclick = () => addLinkRow();
 
-  function renderDepts() {
-    const set = new Set(["Store management"]);
+  function renderFrom() {
+    const set = new Set(FROM_LIST);
     masters.forEach((m) => m.dept && set.add(m.dept));
-    $("deptList").innerHTML = "";
-    [...set].sort().forEach((d) => $("deptList").appendChild(E("option", { value: d })));
+    $("fromList").innerHTML = "";
+    [...set].forEach((d) => $("fromList").appendChild(E("option", { value: d })));
   }
+  renderFrom();
+
+  $("fResp").onchange = () => {
+    const t = $("fResp").value;
+    $("fRespLabelWrap").hidden = t === "none";
+    $("fRespLabel").placeholder = { number: "e.g. Safe count in €", text: "e.g. Name of the person trained", photo: "e.g. Photo of the gondola end", file: "e.g. Completed consumables order form" }[t] || "";
+  };
+  $("fCustomDue").onchange = () => {
+    $("fDueWrap").hidden = !$("fCustomDue").checked;
+    if ($("fCustomDue").checked && !$("fDue").value) $("fDue").value = localInput(plannedRelease() + HOURS_TO_ACTION * 3600e3);
+    updateWhen();
+  };
+  $("fDue").onchange = updateWhen;
 
   function plannedRelease() {
     const t = now();
     if ($("fPriority").value === "urgent") return editing && editing.releaseAt <= t ? editing.releaseAt : t;
     return nextRelease(t);
   }
+  function plannedDue(rel) {
+    if ($("fCustomDue").checked && $("fDue").value) return new Date($("fDue").value).getTime();
+    return rel + HOURS_TO_ACTION * 3600e3;
+  }
   function updateWhen() {
     const urgent = $("fPriority").value === "urgent";
-    const rel = plannedRelease();
+    const rel = plannedRelease(), due = plannedDue(rel);
     $("fWhen").className = "when" + (urgent ? " urgent" : "");
-    $("fWhen").textContent = urgent
-      ? "Sends straight away. Stores have until " + when(rel + HOURS_TO_ACTION * 3600e3) + "."
-      : "Goes out with the DAP on " + when(rel) + ". Stores have until " + when(rel + HOURS_TO_ACTION * 3600e3) + ".";
+    $("fWhen").textContent = (urgent ? "Sends straight away." : "Goes out with the DAP on " + when(rel) + ".") + " Deadline: " + when(due) + ".";
     $("fSave").textContent = editing ? "Save changes" : urgent ? "Send now" : "Add to the DAP";
   }
   $("fPriority").onchange = updateWhen;
@@ -394,9 +640,10 @@ td .note{display:block}
 
   function resetForm() {
     editing = null;
-    $("fForm").reset(); $("fDept").value = "Store management";
+    $("fForm").reset(); $("fFrom").value = "Sales Support";
     $("fLinks").innerHTML = ""; box.hidden = true;
     box.querySelectorAll("input").forEach((c) => c.checked = false);
+    $("fRespLabelWrap").hidden = true; $("fDueWrap").hidden = true;
     $("fHead").textContent = "Add a task to the DAP"; $("fCancel").hidden = true;
     updateWhen();
   }
@@ -404,9 +651,12 @@ td .note{display:block}
 
   function startEdit(m) {
     editing = m;
-    $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fDept").value = m.dept || "";
+    $("fTitle").value = m.title || ""; $("fDetails").value = m.details || ""; $("fFrom").value = m.dept || "";
     $("fPriority").value = m.priority === "urgent" ? "urgent" : "normal";
     $("fLinks").innerHTML = ""; (m.links || []).forEach((l) => addLinkRow(l.label, l.url));
+    $("fResp").value = respType(m); $("fRespLabel").value = respLabel(m); $("fResp").onchange();
+    $("fVerify").checked = !!m.verifyReq;
+    $("fCustomDue").checked = !!m.dueCustom; $("fDueWrap").hidden = !m.dueCustom; $("fDue").value = m.dueCustom ? localInput(m.dueAt) : "";
     const all = active.length === (m.stores || []).length;
     document.querySelector(`input[name="aud"][value="${all ? "all" : "pick"}"]`).checked = true;
     box.hidden = all;
@@ -419,35 +669,39 @@ td .note{display:block}
     ev.preventDefault();
     const say = (t, k = "ok") => { $("fMsg").innerHTML = ""; if (t) $("fMsg").appendChild(E("p", { class: "msg " + k, text: t })); };
     const title = $("fTitle").value.trim();
-    if (!title) return say("Enter the task.", "err");
+    if (!title) return say("Enter the action point.", "err");
     const links = [];
     for (const row of $("fLinks").children) {
       const [l, u] = row.querySelectorAll("input");
       if (!u.value.trim() && !l.value.trim()) continue;
       const href = safeUrl(u.value.trim());
-      if (!href) return say("“" + (u.value.trim() || l.value.trim()) + "” isn't a full web link. Copy it from SharePoint with Share → Copy link.", "err");
+      if (!href || /^file:/i.test(u.value.trim())) return say("“" + (u.value.trim() || l.value.trim()) + "” isn't a web link stores can open. Copy it from SharePoint with Share → Copy link.", "err");
       links.push({ label: l.value.trim() || "Open document", url: href });
     }
     const aud = document.querySelector('input[name="aud"]:checked').value;
     const codes = aud === "all" ? active.map((s) => s.code) : [...box.querySelectorAll("input:checked")].map((c) => c.value);
     if (!codes.length) return say("Choose at least one store.", "err");
     const priority = $("fPriority").value;
-    if (editing && editing.releaseAt <= now() && priority !== "urgent") return say("This task has already gone out, so it can't be edited. Remove it from Progress and add a new one if needed.", "err");
+    if (editing && editing.releaseAt <= now()) return say("This task has already gone out, so it can't be edited. Remove it from Progress and add a new one if needed.", "err");
     const releaseAt = plannedRelease();
+    const dueAt = plannedDue(releaseAt);
+    if (!(dueAt > releaseAt)) return say("The deadline must be after the task goes out (" + when(releaseAt) + ").", "err");
+    const rtype = $("fResp").value;
     const task = {
-      title, details: $("fDetails").value.trim(), dept: $("fDept").value.trim(), priority, links,
-      releaseAt, dueAt: releaseAt + HOURS_TO_ACTION * 3600e3, dapDate: dateOf(releaseAt),
+      title, details: $("fDetails").value.trim(), dept: $("fFrom").value.trim() || "Head Office", priority, links,
+      resp: { type: rtype, label: rtype === "none" ? "" : $("fRespLabel").value.trim() },
+      verifyReq: $("fVerify").checked,
+      releaseAt, dueAt, dueCustom: $("fCustomDue").checked, dapDate: dateOf(releaseAt),
       fromName: me.name, fromEmail: me.email, createdAt: editing ? editing.createdAt : Date.now()
     };
     if (priority === "urgent" && !editing && !confirm(`Send “${title}” to ${codes.length} store${codes.length === 1 ? "" : "s"} now?`)) return;
     const id = editing ? editing.id : SPARUI.uid();
     $("fSave").disabled = true;
     try {
-      const b = fs.writeBatch(db);
-      b.set(masterDoc(id), { ...task, stores: codes, emailed: false });
-      codes.forEach((c) => b.set(storeDoc(c, id), { ...task, status: "open" }));
-      if (editing) (editing.stores || []).filter((c) => !codes.includes(c)).forEach((c) => b.delete(storeDoc(c, id)));
-      await b.commit();
+      const ops = [["set", masterDoc(id), { ...task, stores: codes, emailed: false }]];
+      codes.forEach((c) => ops.push(["set", storeDoc(c, id), { ...task, status: "open" }]));
+      if (editing) (editing.stores || []).filter((c) => !codes.includes(c)).forEach((c) => ops.push(["delete", storeDoc(c, id)]));
+      await commitAll(ops);
       say(priority === "urgent" ? `Sent to ${codes.length} store${codes.length === 1 ? "" : "s"}.`
         : `${editing ? "Saved" : "Added"}. Goes out with the DAP on ${when(releaseAt)}.`);
       resetForm();
@@ -458,15 +712,24 @@ td .note{display:block}
   async function deleteTask(m) {
     if (!confirm(`Remove “${m.title}” from ${m.stores.length} store${m.stores.length === 1 ? "" : "s"}?`)) return false;
     try {
-      const b = fs.writeBatch(db);
-      b.delete(masterDoc(m.id));
-      (m.stores || []).forEach((c) => b.delete(storeDoc(c, m.id)));
-      await b.commit();
+      await commitAll([["delete", masterDoc(m.id)]].concat((m.stores || []).map((c) => ["delete", storeDoc(c, m.id)])));
       SPARUI.toast("Task removed"); return true;
     } catch (e) { SPARUI.toast("Couldn't remove: " + (e.code || e.message), "err"); return false; }
   }
 
   // ── Queue ──
+  async function releaseNow(group) {
+    if (!confirm(`Send these ${group.length} task${group.length === 1 ? "" : "s"} to the stores now, as one DAP?`)) return;
+    const t = now(), ops = [];
+    group.forEach((m) => {
+      const upd = { releaseAt: t, dapDate: dateOf(t), dueAt: m.dueCustom && m.dueAt > t ? m.dueAt : t + HOURS_TO_ACTION * 3600e3 };
+      ops.push(["update", masterDoc(m.id), upd]);
+      (m.stores || []).forEach((c) => ops.push(["update", storeDoc(c, m.id), upd]));
+    });
+    try { await commitAll(ops); SPARUI.toast("DAP sent to the stores"); }
+    catch (e) { SPARUI.toast("Couldn't send: " + (e.code || e.message), "err"); }
+  }
+
   function renderQueue() {
     const t = now();
     const q = masters.filter((m) => m.releaseAt > t).sort((a, b) => a.releaseAt - b.releaseAt);
@@ -476,20 +739,26 @@ td .note{display:block}
     const byRel = {};
     q.forEach((m) => { (byRel[m.releaseAt] ||= []).push(m); });
     Object.keys(byRel).forEach((rel) => {
-      const g = E("div", { class: "qgroup" }, [E("h3", { text: "Goes out " + when(+rel) + " · " + byRel[rel].length + " task" + (byRel[rel].length === 1 ? "" : "s") })]);
+      const group = byRel[rel];
+      const head = E("div", { class: "qhead" }, [
+        E("h3", { text: "Goes out " + when(+rel) + " · " + group.length + " task" + (group.length === 1 ? "" : "s") }),
+        E("button", { class: "btn good small", type: "button", text: "Send the DAP now", onclick: () => releaseNow(group) })
+      ]);
+      const g = E("div", { class: "qgroup" }, [head]);
       const tb = E("tbody");
-      byRel[rel].forEach((m) => tb.appendChild(E("tr", null, [
+      group.forEach((m) => tb.appendChild(E("tr", null, [
         E("td", null, [E("b", { text: m.title }), m.details ? E("span", { class: "note", text: m.details.slice(0, 120) + (m.details.length > 120 ? "…" : "") }) : null]),
         E("td", { text: m.dept || "" }),
         E("td", { class: "num", text: (m.stores || []).length === active.length ? "All" : (m.stores || []).length }),
-        E("td", { text: (m.links || []).length ? "📎 " + m.links.length : "" }),
+        E("td", { text: respType(m) === "none" ? "—" : RESP_TEXT[respType(m)].replace("Send back ", "") + (m.verifyReq ? " · verify" : "") }),
+        E("td", { text: m.dueCustom ? when(m.dueAt) : "+23h" }),
         E("td", null, [E("div", { class: "row", style: "justify-content:flex-end" }, [
           E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }),
           E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: () => deleteTask(m) })
         ])])
       ])));
       g.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [
-        E("thead", null, [E("tr", null, [E("th", { text: "Task" }), E("th", { text: "Department" }), E("th", { class: "num", text: "Stores" }), E("th", { text: "Links" }), E("th")])]), tb])]));
+        E("thead", null, [E("tr", null, [E("th", { text: "Action point" }), E("th", { text: "From" }), E("th", { class: "num", text: "Stores" }), E("th", { text: "Send back" }), E("th", { text: "Deadline" }), E("th")])]), tb])]));
       list.appendChild(g);
     });
   }
@@ -501,11 +770,11 @@ td .note{display:block}
     const sel = $("pDate"), keep = sel.value;
     sel.innerHTML = "";
     if (!dates.length) { sel.add(new Option("No DAPs sent yet", "")); return; }
-    dates.forEach((d) => sel.add(new Option(dayName(new Date(d + "T12:00:00").getTime()), d)));
+    dates.forEach((d) => sel.add(new Option(dayOf(d), d)));
     sel.value = dates.includes(keep) ? keep : dates[0];
     if (sel.value !== keep) loadProgress();
   }
-  $("pDate").onchange = loadProgress;
+  $("pDate").onchange = () => { selTask = null; loadProgress(); };
   $("pRefresh").onclick = loadProgress;
 
   function dayTasks(date) {
@@ -518,11 +787,13 @@ td .note{display:block}
     const tasks = dayTasks(date);
     if (!tasks.length) return "";
     const due = Math.max(...tasks.map((m) => m.dueAt));
-    const lines = ["*SPAR DAP · " + dayName(new Date(date + "T12:00:00").getTime()) + "*", "Complete and sign off by " + when(due), ""];
+    const lines = ["*SPAR DAP · " + dayOf(date) + "*", "Complete and sign off by " + when(due), ""];
     tasks.forEach((m, i) => {
       lines.push((i + 1) + ". *" + m.title + "*" + (m.priority === "urgent" ? " (URGENT)" : "") + (m.dept ? " · " + m.dept : "") +
         ((m.stores || []).length < active.length ? " · " + (m.stores || []).length + " stores" : ""));
       if (m.details) lines.push(m.details);
+      if (respType(m) !== "none") lines.push("➡ " + RESP_TEXT[respType(m)] + (respLabel(m) ? ": " + respLabel(m) : ""));
+      if (m.dueCustom) lines.push("⏰ By " + when(m.dueAt));
       (m.links || []).forEach((l) => lines.push("📎 " + l.label + ": " + l.url));
       lines.push("");
     });
@@ -530,59 +801,78 @@ td .note{display:block}
     return lines.join("\n");
   }
   $("pCopy").onclick = async () => {
-    const text = dapText($("pDate").value);
-    try { await navigator.clipboard.writeText(text); SPARUI.toast("Copied. Paste it into WhatsApp or an email"); }
+    try { await navigator.clipboard.writeText(dapText($("pDate").value)); SPARUI.toast("Copied. Paste it into WhatsApp or an email"); }
     catch (e) { SPARUI.toast("Couldn't copy on this device", "err"); }
   };
 
-  let loadSeq = 0;
+  let loadSeq = 0, lastRes = [], selTask = null, lastTasks = [];
   async function loadProgress() {
     const date = $("pDate").value, seq = ++loadSeq;
     const tasks = dayTasks(date);
+    lastTasks = tasks;
     $("pWhatsApp").href = "https://wa.me/?text=" + encodeURIComponent(dapText(date));
-    $("pTasks").innerHTML = ""; $("pRows").innerHTML = "";
+    $("pTasks").innerHTML = ""; $("pRows").innerHTML = ""; $("pResp").hidden = true;
     if (!tasks.length) { $("pMeta").textContent = ""; return; }
     const due = Math.max(...tasks.map((m) => m.dueAt));
     const emailed = tasks.filter((m) => m.emailed).length;
-    $("pMeta").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s") + " · complete by " + when(due) +
+    $("pMeta").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s") + " · last deadline " + when(due) +
       " · email: " + (emailed === tasks.length ? "sent" : emailed ? emailed + " of " + tasks.length + " sent" : "not sent yet");
     const codes = [...new Set(tasks.flatMap((m) => m.stores || []))];
-    $("pRows").appendChild(E("tr", null, [E("td", { colspan: "6", class: "note", text: "Loading " + codes.length + " stores…" })]));
+    $("pRows").appendChild(E("tr", null, [E("td", { colspan: "7", class: "note", text: "Loading " + codes.length + " stores…" })]));
+    const ids = new Set(tasks.map((m) => m.id));
     const res = await Promise.all(codes.map(async (c) => {
       const [qs, sg] = await Promise.all([
         fs.getDocs(fs.query(storeCol(c), fs.where("dapDate", "==", date))).catch(() => null),
         fs.getDoc(signDoc(c, date)).catch(() => null)
       ]);
-      const ids = new Set(tasks.map((m) => m.id));
       const copies = qs ? qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => ids.has(p.id)) : [];
-      return { c, copies, sign: sg && sg.exists() ? sg.data() : null };
+      const st = me.allStores.find((s) => s.code === c) || { code: c, name: c, rom: "" };
+      return { c, st, copies, sign: sg && sg.exists() ? sg.data() : null };
     }));
     if (seq !== loadSeq) return;
-    const t = now();
-    let signed = 0, overdue = 0, unseen = 0;
-    const doneBy = {};
-    const rows = res.map(({ c, copies, sign }) => {
-      const st = me.allStores.find((s) => s.code === c) || { name: c, rom: "" };
+    lastRes = res;
+    renderProgress();
+  }
+
+  function renderProgress() {
+    const res = lastRes, tasks = lastTasks, t = now();
+    const due = Math.max(...tasks.map((m) => m.dueAt));
+    let signed = 0, overdue = 0, toCheck = 0;
+    const doneBy = {}, checkBy = {};
+    res.forEach(({ copies }) => copies.forEach((p) => {
+      if (p.status === "done") doneBy[p.id] = (doneBy[p.id] || 0) + 1;
+      if (verifyState(p) === "wait") { checkBy[p.id] = (checkBy[p.id] || 0) + 1; toCheck++; }
+    }));
+    const rows = res.map(({ st, copies, sign }) => {
       const n = copies.length, k = copies.filter((p) => p.status === "done").length;
-      copies.forEach((p) => { if (p.status === "done") doneBy[p.id] = (doneBy[p.id] || 0) + 1; });
       const seen = copies.some((p) => p.seenAt);
       const isOver = !sign && due < t;
-      if (sign) signed++; if (isOver) overdue++; if (!seen) unseen++;
+      if (sign) signed++; if (isOver) overdue++;
       const status = sign ? (sign.late ? ["Signed off late", "warn"] : ["Signed off", ""]) : isOver ? ["Overdue", "red"] : !seen ? ["Not opened", "grey"] : ["In progress", "warn"];
       const notes = copies.filter((p) => p.note).map((p) => p.title + ": " + p.note);
       if (sign && sign.note) notes.unshift("Sign-off: " + sign.note);
+      if (sign && sign.romNote) notes.push("ROM: " + sign.romNote);
       return { st, n, k, sign, status, notes };
     }).sort((a, b) => (!!a.sign - !!b.sign) || a.st.name.localeCompare(b.st.name));
-    $("pStores").textContent = codes.length; $("pSigned").textContent = signed; $("pOver").textContent = overdue; $("pUnseen").textContent = unseen;
+    $("pStores").textContent = res.length; $("pSigned").textContent = signed; $("pOver").textContent = overdue; $("pToCheck").textContent = toCheck;
+    $("vCount").textContent = toCheck; $("vCount").hidden = !toCheck;
 
     $("pTasks").innerHTML = "";
-    tasks.forEach((m) => $("pTasks").appendChild(E("tr", null, [
-      E("td", null, [E("b", { text: m.title }), (m.links || []).length ? E("span", { class: "note", text: "📎 " + m.links.map((l) => l.label).join(", ") }) : null]),
-      E("td", { text: m.dept || "" }),
-      E("td", null, [E("span", { class: "pill " + (m.priority === "urgent" ? "red" : "grey"), text: m.priority === "urgent" ? "Urgent · " + hhmm(m.releaseAt) : "Normal" })]),
-      E("td", { class: "num", text: (doneBy[m.id] || 0) + " / " + (m.stores || []).length }),
-      E("td", null, [E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: async () => { if (await deleteTask(m)) setTimeout(loadProgress, 300); } })])
-    ])));
+    tasks.forEach((m) => {
+      const tr = E("tr", { class: "taskrow" + (selTask === m.id ? " sel" : ""), tabindex: "0" }, [
+        E("td", null, [E("b", { text: m.title }), (m.links || []).length ? E("span", { class: "note", text: "📎 " + m.links.map((l) => l.label).join(", ") }) : null]),
+        E("td", { text: m.dept || "" }),
+        E("td", { text: respType(m) === "none" ? "—" : RESP_TEXT[respType(m)].replace("Send back ", "") + (m.verifyReq ? " · verify" : "") }),
+        E("td", null, [m.priority === "urgent" ? E("span", { class: "pill red", text: "Urgent " + hhmm(m.releaseAt) }) : null, " " + when(m.dueAt)]),
+        E("td", { class: "num", text: (doneBy[m.id] || 0) + " / " + (m.stores || []).length }),
+        E("td", { class: "num", text: m.verifyReq ? String(checkBy[m.id] || 0) : "—" }),
+        E("td", null, [E("button", { class: "btn danger small", type: "button", text: "Remove", onclick: async (ev) => { ev.stopPropagation(); if (await deleteTask(m)) { selTask = null; setTimeout(loadProgress, 300); } } })])
+      ]);
+      tr.onclick = () => { selTask = selTask === m.id ? null : m.id; renderProgress(); };
+      tr.onkeydown = (e) => { if (e.key === "Enter") tr.onclick(); };
+      $("pTasks").appendChild(tr);
+    });
+    renderResponses();
 
     $("pRows").innerHTML = "";
     rows.forEach(({ st, n, k, sign, status, notes }) => $("pRows").appendChild(E("tr", null, [
@@ -591,8 +881,107 @@ td .note{display:block}
       E("td", null, [E("span", { class: "pill " + status[1], text: status[0] })]),
       E("td", null, [E("div", { class: "bar", title: k + " of " + n }, [E("i", { style: "width:" + (n ? Math.round(100 * k / n) : 0) + "%" })]), E("small", { class: "note", text: k + "/" + n })]),
       E("td", { text: sign ? (sign.name || "") + " · " + SPARUI.fmtDateTime(sign.at) : "" }),
+      E("td", { text: sign && sign.romAt ? (sign.romName || "") + " · " + SPARUI.fmtDateTime(sign.romAt) : "" }),
       E("td", { class: "note", text: notes.join(" · ") })
     ])));
+  }
+
+  function filesCell(p) {
+    const files = p.files || [];
+    if (!files.length) return "";
+    return E("div", { class: "minithumbs" }, files.map((f) => {
+      const a = E("a", { href: f.url, target: "_blank", rel: "noopener", title: f.name });
+      if (f.thumb) { const im = E("img", { src: f.thumb, alt: f.name, loading: "lazy", referrerpolicy: "no-referrer" }); im.onerror = () => { im.remove(); a.textContent = "📷"; }; a.appendChild(im); }
+      else a.textContent = /^image\//.test(f.mime) ? "📷" : "📄";
+      return a;
+    }));
+  }
+
+  function renderResponses() {
+    const box = $("pResp");
+    const m = lastTasks.find((x) => x.id === selTask);
+    box.innerHTML = "";
+    if (!m) { box.hidden = true; return; }
+    box.hidden = false;
+    const xl = E("button", { class: "btn secondary small", type: "button", text: "Download answers (Excel)", onclick: () => downloadAnswers(m) });
+    box.appendChild(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
+      E("h3", { text: "Answers: " + m.title }), xl]));
+    const tb = E("tbody");
+    const order = { wait: 0, back: 1, ok: 2, none: 3 };
+    lastRes.map(({ st, copies }) => ({ st, p: copies.find((x) => x.id === m.id) })).filter((x) => x.p)
+      .sort((a, b) => (a.p.status === "done" ? 0 : 1) - (b.p.status === "done" ? 0 : 1) || order[verifyState(a.p)] - order[verifyState(b.p)] || a.st.name.localeCompare(b.st.name))
+      .forEach(({ st, p }) => {
+      const vs = verifyState(p);
+      const check = E("td");
+      if (m.verifyReq) {
+        if (vs === "ok") check.appendChild(E("span", { class: "pill", text: "✓ " + (p.verifyName || "") }));
+        else if (vs === "back") check.appendChild(E("span", { class: "pill red", text: "Sent back" }));
+        if (p.status === "done" && vs !== "ok") {
+          check.appendChild(E("button", { class: "btn good small", type: "button", text: "✓ OK", style: "margin:2px", onclick: () => verify(st, p, "ok") }));
+        }
+        if (p.status === "done") check.appendChild(E("button", { class: "btn danger small", type: "button", text: "↩ Send back", style: "margin:2px", onclick: () => verify(st, p, "back") }));
+      } else check.textContent = "—";
+      tb.appendChild(E("tr", null, [
+        E("td", null, [E("b", { text: st.name })]),
+        E("td", null, [E("span", { class: "pill " + (p.status === "done" ? "" : p.dueAt < now() ? "red" : "grey"), text: p.status === "done" ? "Done" : p.dueAt < now() ? "Overdue" : "Open" })]),
+        E("td", { text: p.answer ?? "" }),
+        E("td", null, [filesCell(p)]),
+        E("td", { text: p.status === "done" ? (p.doneByName || p.ackName || "") + " · " + SPARUI.fmtDateTime(p.ackAt) : "" }),
+        E("td", { class: "note", text: p.note || "" }),
+        check
+      ]));
+    });
+    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [
+      E("thead", null, [E("tr", null, ["Store", "Status", "Answer", "Photos / files", "Done by", "Note", "Check"].map((h) => E("th", { text: h })))]), tb])]));
+  }
+
+  async function verify(st, p, result) {
+    let note = "";
+    if (result === "back") {
+      note = prompt("Why is it being sent back? The store will see this.", "") ;
+      if (note === null) return;
+    }
+    const data = result === "ok"
+      ? { verify: "ok", verifyBy: me.email, verifyName: me.name, verifyAt: Date.now(), verifyNote: "" }
+      : { verify: "back", verifyBy: me.email, verifyName: me.name, verifyAt: Date.now(), verifyNote: note.trim(), status: "open" };
+    try {
+      await fs.updateDoc(storeDoc(st.code, p.id), data);
+      Object.assign(p, data);
+      renderProgress();
+      SPARUI.toast(result === "ok" ? "Marked as checked" : "Sent back to " + st.name);
+    } catch (e) { SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+  }
+
+  let XLSXlib = null;
+  function loadXLSX() {
+    if (XLSXlib) return Promise.resolve(XLSXlib);
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      s.onload = () => { XLSXlib = window.XLSX; res(XLSXlib); };
+      s.onerror = () => rej(new Error("Couldn't load the Excel writer. Check your connection."));
+      document.head.appendChild(s);
+    });
+  }
+  async function downloadAnswers(m) {
+    try {
+      const X = await loadXLSX();
+      const head = ["Store code", "Store", "ROM", "Status", respLabel(m) || "Answer", "Files", "Done by", "Completed", "Note", "Checked"];
+      const rows = [head];
+      lastRes.forEach(({ st, copies }) => {
+        const p = copies.find((x) => x.id === m.id); if (!p) return;
+        const vs = verifyState(p);
+        rows.push([st.code, st.name, st.rom || "", p.status === "done" ? "Done" : "Open", p.answer ?? "",
+          (p.files || []).map((f) => f.url).join("\n"), p.doneByName || p.ackName || "", p.ackAt ? new Date(p.ackAt).toLocaleString("en-GB") : "",
+          p.note || "", vs === "ok" ? "✓ " + (p.verifyName || "") : vs === "back" ? "Sent back: " + (p.verifyNote || "") : vs === "wait" ? "To check" : ""]);
+      });
+      const ws = X.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [10, 26, 16, 8, 18, 40, 18, 18, 30, 18].map((w) => ({ wch: w }));
+      const wb = X.utils.book_new();
+      X.utils.book_append_sheet(wb, ws, "Answers");
+      const safe = m.title.replace(/[^\w\- ]+/g, "").slice(0, 40).trim() || "task";
+      X.writeFile(wb, "DAP " + m.dapDate + " - " + safe + ".xlsx");
+    } catch (e) { SPARUI.toast(e.message || String(e), "err"); }
   }
   }
 </script>
