@@ -1259,7 +1259,7 @@ th.dcol{text-align:center;font-size:11.5px}
     const dates = [...new Set(masters.filter((m) => m.releaseAt <= t).map((m) => m.dapDate))].sort().reverse();
     const sel = $("pDate"), keep = sel.value;
     sel.innerHTML = "";
-    if (!dates.length) { sel.add(new Option("No DAPs sent yet", "")); return; }
+    if (!dates.length) { sel.add(new Option("No DAPs sent yet", "")); loadProgress(); return; }
     dates.forEach((d) => sel.add(new Option(dayOf(d), d)));
     sel.value = dates.includes(keep) ? keep : dates[0];
     if (sel.value !== keep) loadProgress();
@@ -1302,7 +1302,12 @@ th.dcol{text-align:center;font-size:11.5px}
     lastTasks = tasks;
     $("pWhatsApp").href = "https://wa.me/?text=" + encodeURIComponent(dapText(date));
     $("pTasks").innerHTML = ""; $("pRows").innerHTML = ""; $("pResp").hidden = true;
-    if (!tasks.length) { $("pMeta").textContent = ""; return; }
+    if (!tasks.length) {
+      $("pMeta").textContent = "";
+      ["pStores", "pSigned", "pOver", "pToCheck"].forEach((id) => { $(id).textContent = "0"; });
+      $("vCount").hidden = true;
+      return;
+    }
     const due = Math.max(...tasks.map((m) => m.dueAt));
     const emailed = tasks.filter((m) => m.emailed).length;
     $("pMeta").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s") + " · last deadline " + when(due) +
