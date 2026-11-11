@@ -54,6 +54,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     <label>View<select id="scope"></select></label>
     <label>Week (Sat – Fri)<select id="week"></select></label>
     <label>Filter<select id="filter"></select></label>
+    <label id="grpWrap" hidden>Group<select id="grp"></select></label>
     <div class="stamp" id="stamp"></div>
   </div>
 
@@ -97,8 +98,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       <h2>Item list</h2>
       <p class="note" id="itemInfo" style="margin:-6px 0 12px">Loading…</p>
       <div class="row"><label class="btn secondary" for="itemFile">Upload item list (Excel)</label><input type="file" id="itemFile" accept=".xlsx,.xls" hidden>
-        <button class="btn secondary" id="rebuild" type="button">Rebuild category group copies</button><span class="note" id="itemMsg"></span></div>
-      <p class="note" style="margin:10px 0 0">The item list needs columns Item Code, Description, Department, Category, Group and Case Size (the “Item Mapping” export). Refresh it when new lines are added. After changing category groups in the Sales Tracker, press Rebuild so the F&amp;V, Deli and other teams' copies match.</p>
+        <button class="btn secondary" id="rebuild" type="button">Rebuild copies &amp; totals</button><span class="note" id="itemMsg"></span></div>
+      <p class="note" style="margin:10px 0 0">The item list needs columns Item Code, Description, Department, Category, Group and Case Size (the “Item Mapping” export). Refresh it when new lines are added. Press <b>Rebuild copies &amp; totals</b> once after this update (it makes the quick weekly totals for weeks already uploaded), and again after changing category groups in the Sales Tracker.</p>
     </div>
     <div class="card panel">
       <h2>Missing weeks</h2>
@@ -140,11 +141,25 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const cfgDoc = (id) => fs.doc(db, "modules", "units", "config", id);
   const wkDoc = (c, w) => fs.doc(db, "modules", "units", "stores", c, "weeks", w);
   const metaDoc = (c) => fs.doc(db, "modules", "units", "stores", c, "meta", "weeks");
+  const totDoc = (c, w) => fs.doc(db, "modules", "units", "stores", c, "totals", w);   // small: each item's week total only
   const gwDoc = (g, c, w) => fs.doc(db, "modules", "units", "groups", g, "stores", c, "weeks", w);
   const gMetaDoc = (g, c) => fs.doc(db, "modules", "units", "groups", g, "stores", c, "meta", "weeks");
 
   // Item rows are saved as one compact text field per week: "code:q,q,q,q,q,q,q|code:…" (Sat → Fri)
   const encode = (items) => [...items].map(([c, q]) => c + ":" + q.map((v) => v ? +v.toFixed(3) : "").join(",")).join("|");
+  const encodeTot = (items) => [...items].map(([c, q]) => c + ":" + +sum(q).toFixed(3)).join("|");
+  const decodeTot = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), +p.slice(i + 1)); }); return m; };
+  // gzip + base64 for the item list (about 5x smaller)
+  async function gz(str) {
+    const cs = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
+    const buf = new Uint8Array(await new Response(cs).arrayBuffer()); let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  async function gunz(b64) {
+    const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  }
   const decode = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), p.slice(i + 1).split(",").map((v) => v ? +v : 0)); }); return m; };
 
   // ═════════ STORES, GROUPS, ACCESS ═════════
@@ -180,7 +195,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   function idbGet(k) { return new Promise((res) => { try { const r = indexedDB.open("sparHub", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => { const t = r.result.transaction("kv").objectStore("kv").get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(null); }; r.onerror = () => res(null); } catch (e) { res(null); } }); }
   function idbSet(k, v) { return new Promise((res) => { try { const r = indexedDB.open("sparHub", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); }; r.onerror = () => res(false); } catch (e) { res(false); } }); }
   function setItems(rows, names) {
-    ITEMS = new Map(); rows.forEach((r) => ITEMS.set(r[0], { code: r[0], d: r[1], D: r[2], C: r[3], G: r[4], k: r[5] || 1 }));
+    ITEMS = new Map(); rows.forEach((r) => ITEMS.set(r[0], { code: r[0], d: r[1], l: (r[1] || "").toLowerCase(), D: r[2], C: r[3], G: r[4], k: r[5] || 1 }));
     NAMES = names || {};
   }
   async function loadItems() {
@@ -189,8 +204,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const cached = await idbGet("units-items");
     if (cached && cached.at === itemInfo.at) { setItems(cached.rows, itemInfo.names); return; }
     $("stamp").textContent = "Loading the item list…";
-    const parts = await Promise.all(Array.from({ length: itemInfo.chunks }, (_, i) => fs.getDoc(cfgDoc("items-" + pad(i))).then((d) => d.exists() ? JSON.parse(d.data().data) : [])));
-    const rows = parts.flat();
+    const parts = await Promise.all(Array.from({ length: itemInfo.chunks }, (_, i) => fs.getDoc(cfgDoc("items-" + pad(i))).then((d) => d.exists() ? d.data() : {})));
+    const rows = itemInfo.compressed ? JSON.parse(await gunz(parts.map((p) => p.z || "").join(""))) : parts.flatMap((p) => p.data ? JSON.parse(p.data) : []);
     setItems(rows, itemInfo.names);
     idbSet("units-items", { at: itemInfo.at, rows });
   }
@@ -209,18 +224,41 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       } catch (e) { META[c] = {}; }
     }));
   }
+  // Fetch one saved week, or take it from the browser's copy when it hasn't been re-uploaded since
+  async function cachedDoc(key, ref, c, w) {
+    const at = (META[c] || {})[w];
+    if (typeof at === "number") { const hit = await idbGet(key); if (hit && hit.at === at) return hit; }
+    const d = await fs.getDoc(ref);
+    if (!d.exists()) return null;
+    const v = { at: d.data().at, days: d.data().days, data: d.data().data };
+    idbSet(key, v);
+    return v;
+  }
   async function getWeek(c, w) {
-    const k = (groupMode() ? lens() + "|" : "") + c + "|" + w;
+    const k = "u|" + (groupMode() ? lens() + "|" : "") + c + "|" + w;
     if (!(k in WK)) {
       try {
-        const d = await fs.getDoc(groupMode() ? gwDoc(lens(), c, w) : wkDoc(c, w));
-        WK[k] = d.exists() ? { items: decode(d.data().data), days: d.data().days, at: d.data().at } : null;
+        const v = await cachedDoc(k, groupMode() ? gwDoc(lens(), c, w) : wkDoc(c, w), c, w);
+        WK[k] = v ? { items: decode(v.data), days: v.days, at: v.at } : null;
       } catch (e) { WK[k] = null; }
     }
     return WK[k];
   }
+  // Each item's week total for one store: the small totals file (falls back to the full week)
+  const TOT = {};
+  async function getTotals(c, w) {
+    const k = "t|" + (groupMode() ? lens() + "|" : "") + c + "|" + w;
+    if (!(k in TOT)) {
+      let m = null;
+      if (!groupMode()) { try { const v = await cachedDoc(k, totDoc(c, w), c, w); if (v) m = decodeTot(v.data); } catch (e) {} }
+      if (!m) { const full = await getWeek(c, w); if (full) { m = new Map(); full.items.forEach((q, code) => m.set(code, sum(q))); } }
+      TOT[k] = m;
+    }
+    return TOT[k];
+  }
   // allowed by the lens and the filter
   function allowed(code) {
+    const gsel = $("grp").value; if (gsel && (!ITEMS.get(code) || ITEMS.get(code).G !== gsel)) return false;
     const it = ITEMS.get(code);
     if (it && (it.D === "D000" || /^D99/.test(it.D))) return false;   // BCRS deposits and "DO NOT USE" lines
     if (lens()) { const g = groupOf(lens()); if (!g || !inGroup(g, it)) return false; }
@@ -240,27 +278,38 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     $("week").value = weeks.includes(keep) ? keep : (weeks[0] || "");
   }
   // filter list: departments, categories and groups within the lens
-  function buildFilter() {
-    const keep = $("filter").value, sel = $("filter");
-    sel.innerHTML = ""; sel.add(new Option("All items", ""));
-    const g = lens() ? groupOf(lens()) : null;
-    const D = new Map();
+  const FILTERS = {};   // lens → { depts: Map(D → Map(C → Set(G))) }  (built once)
+  function treeFor(l) {
+    if (FILTERS[l]) return FILTERS[l];
+    const g = l ? groupOf(l) : null, D = new Map();
     ITEMS.forEach((it) => {
       if (g && !inGroup(g, it)) return;
-      if (!it.D || /^D99/.test(it.D)) return;
-      const d = D.get(it.D) || D.set(it.D, new Map()).get(it.D);
-      if (it.C) { const c = d.get(it.C) || d.set(it.C, new Set()).get(it.C); if (it.G) c.add(it.G); }
+      if (!it.D || it.D === "D000" || /^D99/.test(it.D)) return;
+      let d = D.get(it.D); if (!d) D.set(it.D, d = new Map());
+      if (it.C) { let c = d.get(it.C); if (!c) d.set(it.C, c = new Set()); if (it.G) c.add(it.G); }
     });
+    return (FILTERS[l] = D);
+  }
+  function buildFilter() {
+    const keep = $("filter").value, sel = $("filter"), D = treeFor(lens());
+    sel.innerHTML = ""; sel.add(new Option("All items", ""));
     [...D.keys()].sort().forEach((dk) => {
       const og = document.createElement("optgroup"); og.label = nm(dk);
       og.appendChild(new Option("All " + nm(dk), dk));
-      [...D.get(dk).keys()].sort().forEach((ck) => {
-        og.appendChild(new Option("  " + nm(ck), ck));
-        [...D.get(dk).get(ck)].sort().forEach((gk) => og.appendChild(new Option("      " + nm(gk), gk)));
-      });
+      [...D.get(dk).keys()].sort().forEach((ck) => og.appendChild(new Option(nm(ck), ck)));
       sel.appendChild(og);
     });
     if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    buildGroupPick();
+  }
+  function buildGroupPick() {
+    const f = $("filter").value, g = $("grp"), keep = g.value;
+    g.innerHTML = ""; g.add(new Option("All groups", ""));
+    let set = null;
+    if (/^C/.test(f)) treeFor(lens()).forEach((d) => { if (d.has(f)) set = d.get(f); });
+    if (set) [...set].sort().forEach((x) => g.add(new Option(nm(x), x)));
+    $("grpWrap").hidden = !set || set.size < 2;
+    g.value = [...g.options].some((o) => o.value === keep) ? keep : "";
   }
 
   // ═════════ TABS ═════════
@@ -301,13 +350,15 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     for (const it of ITEMS.values()) {
       if (g && !inGroup(g, it)) continue;
       if (it.code.toLowerCase() === q) { out.unshift(it); continue; }
-      const d = (it.d || "").toLowerCase();
+      const d = it.l;
       if (words.every((x) => d.includes(x) || it.code.toLowerCase().startsWith(x))) out.push(it);
       if (out.length > 60) break;
     }
     return out.slice(0, 60);
   }
-  $("q").oninput = () => {
+  let qTimer;
+  $("q").oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(runSearch, 180); };
+  const runSearch = () => {
     const r = search($("q").value), box = $("results"); box.innerHTML = "";
     box.hidden = !r.length;
     r.forEach((it) => box.appendChild(E("button", { type: "button", onclick: () => { picked = it.code; box.hidden = true; $("q").value = it.d; render(); } },
@@ -338,20 +389,23 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Week" }), ...DAYN.map((d) => E("th", { class: "num", text: d })), E("th", { class: "num", text: "Week" })])]), tb])]));
     } else {
       loading("lkOut", "Loading " + codes.length + " stores…");
-      const docs = await Promise.all(codes.map((c) => getWeek(c, w)));
+      const i0 = weeks.indexOf(w), prevW = weeks[i0 + 1];
+      const [cur, prev] = await Promise.all([Promise.all(codes.map((c) => getTotals(c, w))), prevW ? Promise.all(codes.map((c) => getTotals(c, prevW))) : Promise.resolve([])]);
       if (my !== seq) return;
-      const tb = E("tbody"), T = [0, 0, 0, 0, 0, 0, 0];
-      const rows = codes.map((c, i) => ({ c, q: docs[i] ? (docs[i].items.get(picked) || [0, 0, 0, 0, 0, 0, 0]) : null })).sort((a, b) => (b.q ? sum(b.q) : -1) - (a.q ? sum(a.q) : -1));
+      const tb = E("tbody"); let T = 0, TP = 0;
+      const rows = codes.map((c, i) => ({ c, u: cur[i] ? (cur[i].get(picked) || 0) : null, p: prev[i] ? (prev[i].get(picked) || 0) : null })).sort((a, b) => (b.u ?? -1) - (a.u ?? -1));
       rows.forEach((r) => {
-        if (r.q) r.q.forEach((v, i) => { T[i] += v; });
+        T += r.u || 0; TP += r.p || 0;
         tb.appendChild(E("tr", null, [E("td", null, [E("b", { text: (byCode[r.c] || {}).name || r.c }), E("div", { class: "note", text: romOf(r.c) })]),
-          ...(r.q ? r.q.map((v) => E("td", { class: "num" + (v ? "" : " muted"), text: num(v) })) : DAYN.map(() => E("td", { class: "num muted", text: "–" }))),
-          E("td", { class: "num", style: "font-weight:700", text: r.q ? num(sum(r.q)) : "no report" })]));
+          E("td", { class: "num" + (r.u ? "" : " muted"), style: "font-weight:700", text: r.u == null ? "no report" : num(r.u) }),
+          E("td", { class: "num", text: r.u == null ? "–" : num(r.u / 7) }), E("td", { class: "num", text: r.u == null ? "–" : num(r.u / it.k) }),
+          E("td", { class: "num muted", text: r.p == null ? "–" : num(r.p) }),
+          E("td", { class: "num " + (r.u != null && r.p ? (r.u >= r.p ? "up" : "down") : ""), text: r.u != null && r.p ? pct(r.u / r.p - 1) : "–" })]));
       });
-      tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), ...T.map((v) => E("td", { class: "num", text: num(v) })), E("td", { class: "num", text: num(sum(T)) })]));
+      tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { class: "num", text: num(T) }), E("td", { class: "num", text: num(T / 7) }), E("td", { class: "num", text: num(T / it.k) }), E("td", { class: "num", text: num(TP) }), E("td", { class: "num", text: TP ? pct(T / TP - 1) : "–" })]));
       $("lkOut").innerHTML = "";
-      $("lkOut").append(...head, E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Store" }), ...DAYN.map((d, i) => E("th", { class: "num", text: d + " " + short(addDays(w, i)).split(" ")[0] })), E("th", { class: "num", text: "Week" })])]), tb])]),
-        E("p", { class: "note", style: "margin:10px 0 0", text: "Choose one store in View to see this item's last 8 weeks." }));
+      $("lkOut").append(...head, E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Units this week", "A day", "Cases", "Last week", "vs last week"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]),
+        E("p", { class: "note", style: "margin:10px 0 0", text: "Choose one store in View to see this item day by day for its last 8 weeks." }));
     }
   }
   function kpi(label, value, sub) { return E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { text: value }), sub ? E("span", { class: "note", style: "margin-top:6px", text: sub }) : null]); }
@@ -360,12 +414,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   let bestRows = [];
   async function renderBest(my, w, codes) {
     loading("bestOut", "Loading " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…");
-    const docs = (await Promise.all(codes.map((c) => getWeek(c, w)))).filter(Boolean);
+    const docs = (await Promise.all(codes.map((c) => getTotals(c, w)))).filter(Boolean);
     if (my !== seq) return;
     const A = new Map();
-    docs.forEach((d) => d.items.forEach((q, code) => {
-      if (!allowed(code)) return;
-      const t = sum(q); if (!t) return;
+    docs.forEach((d) => d.forEach((t, code) => {
+      if (!t || !allowed(code)) return;
       const o = A.get(code) || A.set(code, { code, u: 0, n: 0 }).get(code); o.u += t; o.n++;
     }));
     bestRows = [...A.values()].sort((a, b) => b.u - a.u);
@@ -578,22 +631,30 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const at = Date.now(), base = { code, week: p.week, days: p.days, at, by: me.email };
     const b = fs.writeBatch(db);
     b.set(wkDoc(code, p.week), { ...base, file: file || "", outlet: p.outlet || "", n: p.items.size, data: encode(p.items) });
-    GROUPS.forEach((g) => { const gi = groupItems(g, p.items); b.set(gwDoc(g.id, code, p.week), { ...base, gid: g.id, n: gi.size, data: encode(gi) }); });
-    await b.commit();
-    await fs.setDoc(metaDoc(code), { weeks: { [p.week]: true }, at }, { merge: true });
-    for (const g of GROUPS) await fs.setDoc(gMetaDoc(g.id, code), { weeks: { [p.week]: true }, at }, { merge: true });
+    b.set(totDoc(code, p.week), { ...base, n: p.items.size, data: encodeTot(p.items) });
+    b.set(metaDoc(code), { weeks: { [p.week]: at }, at }, { merge: true });
+    GROUPS.forEach((g) => {
+      const gi = groupItems(g, p.items);
+      b.set(gwDoc(g.id, code, p.week), { ...base, gid: g.id, n: gi.size, data: encode(gi) });
+      b.set(gMetaDoc(g.id, code), { weeks: { [p.week]: at }, at }, { merge: true });
+    });
+    await b.commit();                     // everything for this file in one trip
   }
   async function savePending() {
     const ok = pending.filter((x) => x.p && !x.done);
     if (ok.some((x) => !x.code)) { SPARUI.toast("Choose the store for each file first", "err"); return; }
     const keys = ok.map((x) => x.code + "_" + x.p.week);
     if (new Set(keys).size !== keys.length) { SPARUI.toast("Two files are for the same store and week. Remove one.", "err"); return; }
-    let n = 0;
-    for (const x of ok) {
-      $("upMsg").textContent = "Saving " + (byCode[x.code] || {}).name + " " + wkLabel(x.p.week) + "…";
-      try { await saveWeek(x.code, x.p, x.name); x.done = true; x.fail = null; n++; delete META[x.code]; Object.keys(WK).forEach((k) => { if (k.includes(x.code + "|" + x.p.week)) delete WK[k]; }); }
-      catch (e) { x.fail = e.code || e.message; }
-    }
+    let n = 0, left = ok.slice();
+    const worker = async () => {
+      while (left.length) {
+        const x = left.shift();
+        $("upMsg").textContent = "Saving " + (ok.length - left.length) + " of " + ok.length + "…";
+        try { await saveWeek(x.code, x.p, x.name); x.done = true; x.fail = null; n++; delete META[x.code]; [WK, TOT].forEach((o) => Object.keys(o).forEach((k) => { if (k.includes(x.code + "|" + x.p.week)) delete o[k]; })); }
+        catch (e) { x.fail = e.code || e.message; }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);   // three files at a time
     showPending(); SPARUI.toast(n + " file" + (n === 1 ? "" : "s") + " saved");
     await refreshWeeks(); renderMissing();
   }
@@ -616,13 +677,18 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         if (r[ci.code] == null || r[ci.code] === "") return;
         out.push([String(r[ci.code]).trim(), String(r[ci.d] || "").trim(), split(r[ci.D]), split(r[ci.C]), ci.G >= 0 ? split(r[ci.G]) : "", ci.k >= 0 ? (+r[ci.k] || 1) : 1]);
       });
-      if (!out.length) throw new Error("No items found.");
-      const CH = 4000, chunks = Math.ceil(out.length / CH), at = Date.now();
-      msg.textContent = "Saving " + out.length.toLocaleString("en-GB") + " items…";
-      for (let i = 0; i < chunks; i++) await fs.setDoc(cfgDoc("items-" + pad(i)), { data: JSON.stringify(out.slice(i * CH, (i + 1) * CH)), at });
-      await fs.setDoc(cfgDoc("items-info"), { chunks, count: out.length, names, at, by: me.email, file: f.name });
-      itemInfo = { chunks, count: out.length, names, at, file: f.name }; setItems(out, names); idbSet("units-items", { at, rows: out });
-      msg.textContent = "✓ " + out.length.toLocaleString("en-GB") + " items saved.";
+      const keepRows = out.filter((r) => !/^D99/.test(r[2]));
+      if (!keepRows.length) throw new Error("No items found.");
+      msg.textContent = "Packing " + keepRows.length.toLocaleString("en-GB") + " items…";
+      const z = await gz(JSON.stringify(keepRows)), PIECE = 900000, chunks = Math.ceil(z.length / PIECE), at = Date.now();
+      msg.textContent = "Saving " + keepRows.length.toLocaleString("en-GB") + " items…";
+      const b = fs.writeBatch(db);
+      for (let i = 0; i < chunks; i++) b.set(cfgDoc("items-" + pad(i)), { z: z.slice(i * PIECE, (i + 1) * PIECE), at });
+      b.set(cfgDoc("items-info"), { chunks, compressed: true, count: keepRows.length, names, at, by: me.email, file: f.name });
+      await b.commit();
+      itemInfo = { chunks, compressed: true, count: keepRows.length, names, at, file: f.name }; setItems(keepRows, names); idbSet("units-items", { at, rows: keepRows });
+      Object.keys(FILTERS).forEach((k) => delete FILTERS[k]);
+      msg.textContent = "✓ " + keepRows.length.toLocaleString("en-GB") + " items saved (lines marked DO NOT USE left out).";
       buildFilter(); renderUpload();
     } catch (e) { msg.textContent = "Couldn't read that file: " + (e.message || e); }
   };
@@ -665,9 +731,10 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
   // ═════════ START ═════════
   $("scope").onchange = async () => { try { localStorage.setItem("sparUnitsScope", $("scope").value); } catch (e) {} await refreshWeeks(); render(); };
-  $("lens").onchange = async () => { try { localStorage.setItem("sparSalesLens", lens()); } catch (e) {} if (groupMode()) { Object.keys(META).forEach((k) => delete META[k]); } buildFilter(); await refreshWeeks(); render(); };
+  $("lens").onchange = async () => { try { localStorage.setItem("sparSalesLens", lens()); } catch (e) {} if (groupMode()) { Object.keys(META).forEach((k) => delete META[k]); } $("filter").value = ""; buildFilter(); await refreshWeeks(); render(); };
   $("week").onchange = render;
-  $("filter").onchange = render;
+  $("filter").onchange = () => { buildGroupPick(); render(); };
+  $("grp").onchange = render;
   await loadItems();
   buildFilter();
   await refreshWeeks();
