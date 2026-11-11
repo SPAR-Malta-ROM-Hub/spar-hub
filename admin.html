@@ -15,6 +15,8 @@
 <style>
 .storeboxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--soft)}
 .storeboxes label{display:flex;gap:7px;align-items:center;font-size:13px;font-weight:400}
+.checkline{display:flex;gap:8px;align-items:center;font-size:13.5px;margin:0 0 6px;cursor:pointer}
+.checkline input{width:16px;height:16px}
 .storeboxes .romhead{grid-column:1/-1;font-weight:800;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:6px}
 td .in{padding:6px 8px;font-size:13px}
 td select.in{width:auto}
@@ -76,6 +78,12 @@ tr.inactive td{color:var(--muted)}
           <div class="f" id="pStoreMany" hidden>
             <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Stores <small class="note" id="pStoreHint"></small></span>
             <div class="storeboxes" id="pStores"></div>
+          </div>
+          <div class="f" id="pSalesWrap">
+            <span style="display:block;font-weight:700;font-size:13px;margin-bottom:5px">Sales Tracker access</span>
+            <label class="checkline" style="font-weight:400"><input type="radio" name="pSales" value="full" checked> Full store figures</label>
+            <label class="checkline" style="font-weight:400"><input type="radio" name="pSales" value="groups"> Only these category groups:</label>
+            <div class="storeboxes" id="pGroups" style="margin-left:26px"></div>
           </div>
           <div class="row" style="margin-top:6px">
             <button class="btn" id="pSave" type="submit">Add person</button>
@@ -189,6 +197,20 @@ tr.inactive td{color:var(--muted)}
   const { fs, db, auth, authMod } = await SPAR.firebase();
   const { initializeApp, getApps } = await import(FB + "firebase-app.js");
 
+  // Sales Tracker category groups (set up in the Sales Tracker → Category groups)
+  let salesGroups = [];
+  try { const qs = await fs.getDocs(fs.collection(db, "modules", "sales", "config", "groups", "list")); salesGroups = qs.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); } catch (e) {}
+  function renderGroupPicker(sel) {
+    const box = $("pGroups"); box.innerHTML = "";
+    document.querySelector('input[name=pSales][value=' + (sel.length ? "groups" : "full") + ']').checked = true;
+    if (!salesGroups.length) { box.appendChild(E("span", { class: "note", text: "No category groups yet: open the Sales Tracker once to create them." })); return; }
+    salesGroups.forEach((g) => {
+      const cb = E("input", { type: "checkbox", value: g.id }); cb.checked = sel.includes(g.id);
+      cb.onchange = () => { if (cb.checked) document.querySelector('input[name=pSales][value=groups]').checked = true; };
+      box.appendChild(E("label", { class: "storebox" }, [cb, " " + g.name]));
+    });
+  }
+
   // ── Tabs ──
   document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => {
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x === t));
@@ -275,6 +297,7 @@ tr.inactive td{color:var(--muted)}
     $("pCancel").hidden = true;
     $("pStoreHint").textContent = "";
     renderStorePickers([]);
+    renderGroupPicker([]);
   }
   $("pCancel").onclick = () => { resetForm(); say("pMsg", ""); };
 
@@ -306,15 +329,18 @@ tr.inactive td{color:var(--muted)}
     if (SINGLE(role) && !st.length) { say("pMsg", "Choose the store this manager runs.", "err"); return; }
     if (MULTI(role) && !st.length) { say("pMsg", "Tick at least one store for this ROM.", "err"); return; }
     const dept = role === "dept" ? $("pDept").value.trim() : "";
+    const salesGroups = document.querySelector('input[name=pSales][value=groups]').checked
+      ? [...$("pGroups").querySelectorAll("input:checked")].map((x) => x.value) : [];
+    if (document.querySelector('input[name=pSales][value=groups]').checked && !salesGroups.length) { say("pMsg", "Tick at least one category group, or choose Full store figures.", "err"); return; }
     if (role === "dept" && !dept) { say("pMsg", "Enter the department, e.g. Maintenance.", "err"); return; }
     if (editing === me.email && role !== "admin") { say("pMsg", "You can't remove your own admin role.", "err"); return; }
     $("pSave").disabled = true;
     try {
       if (editing) {
-        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, updatedAt: Date.now(), updatedBy: me.email });
+        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, updatedAt: Date.now(), updatedBy: me.email });
         say("pMsg", `${name || email} updated.`);
       } else {
-        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, addedBy: me.email, addedAt: Date.now() });
+        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, addedBy: me.email, addedAt: Date.now() });
         const existed = await createLogin(email);
         say("pMsg", existed
           ? `${name || email} added. They already had a login, so they can sign in now.`
@@ -338,6 +364,7 @@ tr.inactive td{color:var(--muted)}
         m.role === "dept" ? "DAP tasks for " + (m.dept || "?")
         : ["admin", "hq", "support"].includes(m.role) ? "All stores"
         : (m.stores || []).length ? m.stores.map(storeName).join(", ") : "⚠ No store assigned" });
+      if ((m.salesGroups || []).length) stTd.appendChild(E("div", { class: "note", text: "Sales: " + m.salesGroups.map((g) => (salesGroups.find((x) => x.id === g) || { name: g }).name).join(", ") + " only" }));
       const acts = E("div", { class: "acts" });
       acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }));
       acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Send password link", onclick: async () => {
@@ -360,6 +387,7 @@ tr.inactive td{color:var(--muted)}
     $("pRole").value = ROLES[m.role] ? m.role : "sm";
     $("pDept").value = m.dept || "";
     renderStorePickers(m.stores || []);
+    renderGroupPicker(m.salesGroups || []);
     $("pFormTitle").textContent = "Edit " + (m.name || m.email);
     $("pSave").textContent = "Save changes";
     $("pCancel").hidden = false;

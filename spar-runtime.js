@@ -136,7 +136,8 @@
       name: ctx.member.name || ctx.user.email,
       role: role,
       roleLabel: role === "dept" && ctx.member.dept ? ctx.member.dept : (ROLE_LABELS[role] || role),
-      dept: ctx.member.dept || "",          // for role "dept": the department they post DAP tasks for
+      dept: ctx.member.dept || "",
+      salesGroups: Array.isArray(ctx.member.salesGroups) ? ctx.member.salesGroups : [],   // Sales Tracker: [] = full figures, else only these category groups          // for role "dept": the department they post DAP tasks for
       isAdmin: role === "admin",
       isHQ: role === "admin" || role === "hq",
       seesAll: ctx.seesAll,

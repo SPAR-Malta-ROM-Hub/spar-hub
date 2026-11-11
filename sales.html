@@ -67,9 +67,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     <button class="tab" data-tab="trends" type="button">Trends</button>
     <button class="tab" data-tab="alerts" type="button">Alerts<span class="count" id="aCount" hidden>0</span></button>
     <button class="tab" data-tab="upload" type="button" hidden>Upload reports</button>
+    <button class="tab" data-tab="groups" type="button" hidden>Category groups &amp; targets</button>
   </div>
 
   <div class="card bar" id="bar">
+    <label id="lensWrap" hidden>Show<select id="lens"></select></label>
     <label>View<select id="scope"></select></label>
     <label>Week<select id="week"></select></label>
     <div class="stamp" id="stamp"></div>
@@ -114,6 +116,34 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     </div>
   </section>
 
+  <!-- ═════════ CATEGORY GROUPS & TARGETS (Head Office) ═════════ -->
+  <section data-pane="groups" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Targets by category group</h2>
+      <p class="note" style="margin:-6px 0 12px">Each group's own monthly sales target for each store (including VAT). The hub spreads each month's target evenly over its days.</p>
+      <div class="row" style="margin-bottom:12px">
+        <label class="note" style="display:flex;gap:6px;align-items:center;font-weight:700">Group <select class="in" id="tgGroup" style="width:auto;padding:7px 9px"></select></label>
+        <label class="note" style="display:flex;gap:6px;align-items:center;font-weight:700">Year <select class="in" id="tgYear" style="width:auto;padding:7px 9px"></select></label>
+        <button class="btn small" id="tgSave" type="button">Save targets</button>
+        <button class="btn secondary small" id="tgDown" type="button">Download as Excel</button>
+        <label class="btn secondary small" for="tgFile">Upload Excel</label><input type="file" id="tgFile" accept=".xlsx,.xls" hidden>
+        <span class="note" id="tgMsg"></span>
+      </div>
+      <div class="tablewrap" id="tgGrid"></div>
+    </div>
+    <div class="card panel">
+      <h2>Category groups</h2>
+      <p class="note" style="margin:-6px 0 12px">Each group is a set of department (D…) or category (C…) codes from the daily report. Give people access to a group in <a href="admin.html">Manage people</a> → Sales Tracker access: they then see only that group's figures. After adding a group or changing its codes, press <b>Rebuild group figures</b> so past weeks are included.</p>
+      <div id="grList"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn secondary small" id="grAdd" type="button">+ Add a group</button>
+        <button class="btn small" id="grSave" type="button">Save groups</button>
+        <button class="btn secondary small" id="grRebuild" type="button">Rebuild group figures</button>
+        <span class="note" id="grMsg"></span>
+      </div>
+    </div>
+  </section>
+
   <!-- ═════════ UPLOAD ═════════ -->
   <section data-pane="upload" hidden>
     <div class="card panel" style="margin-top:0">
@@ -140,7 +170,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   const WEEKS_BACK = 9;            // weeks of history loaded (trends, month to date)
   const WASTE_ALERT = 0.02;        // waste above 2% of sales
   const DOWN_ALERT = -0.10;        // 10% down
-  const canUpload = ["admin", "hq", "support"].includes(me.role);
+  const fullSales = !me.salesGroups.length;              // [] = full store figures
+  const canUpload = ["admin", "hq", "support"].includes(me.role) && fullSales;
+  const isHO = me.isAdmin || me.role === "hq";
   const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DOWFULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -194,17 +226,104 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     tab = name;
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
     document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
-    $("bar").hidden = name === "upload";
+    $("bar").hidden = name === "upload" || name === "groups";
     syncAllOption();
     render();
   }
+  // Which tabs show: whole-store figures have them all; a category group has Overview, Categories and Trends
+  function syncTabs() {
+    const g = !!lens();
+    const vis = { overview: true, depts: true, trends: true, alerts: !g, upload: canUpload && !g, groups: isHO && fullSales };
+    document.querySelectorAll(".tab[data-tab]").forEach((t) => { t.hidden = !vis[t.dataset.tab]; });
+    document.querySelector('.tab[data-tab="depts"]').firstChild.textContent = g ? "Categories" : "Departments";
+    if (!vis[tab]) showTab("overview");
+  }
   document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
-  if (canUpload) document.querySelector('.tab[data-tab="upload"]').hidden = false;
+
+  // ═════════ CATEGORY GROUPS ═════════
+  const GROUP_DEFAULTS = [
+    { id: "fv", name: "F&V", codes: ["C041", "C047", "C046"], order: 1 },
+    { id: "deli", name: "Deli", codes: ["C039", "C039B"], order: 2 },
+    { id: "ftg", name: "Bakery & Food to Go", codes: ["D002", "D016", "D028", "D031"], order: 3 },
+    { id: "butcher", name: "Butcher", codes: ["C105"], order: 4 },
+    { id: "fish", name: "Fish", codes: ["C043"], order: 5 }
+  ];
+  const groupsCol = fs.collection(db, "modules", "sales", "config", "groups", "list");
+  const groupDocRef = (id) => fs.doc(db, "modules", "sales", "config", "groups", "list", id);
+  const gwCol = (g, c) => fs.collection(db, "modules", "sales", "groups", g, "stores", c, "weeks");
+  const gwDoc = (g, c, w) => fs.doc(db, "modules", "sales", "groups", g, "stores", c, "weeks", w);
+  const tgDoc = (g, y) => fs.doc(db, "modules", "sales", "groups", g, "targets", String(y));
+  let GROUPS = [];
+  try { const qs = await fs.getDocs(groupsCol); GROUPS = qs.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {}
+  if (!GROUPS.length && isHO && fullSales) {
+    try { const b = fs.writeBatch(db); GROUP_DEFAULTS.forEach((g) => b.set(groupDocRef(g.id), { name: g.name, codes: g.codes, order: g.order })); await b.commit(); GROUPS = GROUP_DEFAULTS.map((g) => ({ ...g })); } catch (e) {}
+  }
+  GROUPS.sort((a, b) => (a.order || 0) - (b.order || 0));
+  const myGroups = fullSales ? GROUPS : GROUPS.filter((g) => me.salesGroups.includes(g.id));
+  if (!fullSales && !myGroups.length) { $("bar").hidden = true; $("tabs").hidden = true; document.querySelector("[data-pane=overview]").innerHTML = '<p class="msg warn">Your Sales Tracker access hasn\'t been set up yet. Ask a hub admin.</p>'; throw new Error("no groups"); }
+  if (fullSales) $("lens").add(new Option("Whole store", ""));
+  myGroups.forEach((g) => $("lens").add(new Option(g.name, g.id)));
+  $("lensWrap").hidden = $("lens").options.length < 2 && fullSales;
+  if (!fullSales) $("lensWrap").hidden = myGroups.length < 2;
+  try { const k = localStorage.getItem("sparSalesLens"); if ([...$("lens").options].some((o) => o.value === k)) $("lens").value = k; } catch (e) {}
+  const lens = () => $("lens").value;
+  const groupOf = (id) => GROUPS.find((g) => g.id === id);
+
+  // One group's figures from a parsed report (or a saved week): its lines, daily sales, share of the store, waste
+  function groupFigures(g, d) {
+    const G = new Set((g.codes || []).map((x) => String(x).toUpperCase()));
+    const lines = [], sDay = [0, 0, 0, 0, 0, 0, 0]; let ly = 0, w = null;
+    const addTo = (arr, d7) => d7.forEach((v, i) => { arr[i] = Math.round((arr[i] + (v || 0)) * 100) / 100; });
+    (d.depts || []).forEach((x) => {
+      if (!G.has(x.c)) return;
+      lines.push({ c: x.c, n: x.n, d: x.d, ly: x.ly || 0, top: 1 }); addTo(sDay, x.d); ly += x.ly || 0;
+      w = w || [0, 0, 0, 0, 0, 0, 0]; const wd = (d.waste || {})[x.c.toLowerCase()]; if (wd) addTo(w, wd);
+      (d.cats || []).filter((y) => y.p === x.c).forEach((y) => lines.push({ c: y.c, n: y.n, d: y.d, ly: y.ly || 0, p: x.c }));
+    });
+    (d.cats || []).forEach((y) => {
+      if (!G.has(y.c) || G.has(y.p)) return;
+      lines.push({ c: y.c, n: y.n, d: y.d, ly: y.ly || 0, top: 1 }); addTo(sDay, y.d); ly += y.ly || 0;
+    });
+    const storeX = (d.m && d.m.total_inc_vat) || [0, 0, 0, 0, 0, 0, 0];
+    return { gid: g.id, week: d.week, days: d.days, has: d.has, s: sDay, ly: Math.round(ly * 100) / 100,
+      share: sDay.map((v, i) => storeX[i] ? Math.round(v / storeX[i] * 10000) / 10000 : 0), w, lines };
+  }
+
 
   // ═════════ DATA ═════════
   // Weekly summaries per store: { code: { week: summary } }
   let S = {}, loadedFor = "", weeks = [];
+  const GG = {};   // gid → code → week → group figures
+  const GT = {};   // gid → year → { code: { "yyyy-mm": target } }
+  async function loadGroup(gid, force) {
+    const codes = scope().codes;
+    GG[gid] = GG[gid] || {};
+    const need = codes.filter((c) => force || !GG[gid][c]);
+    if (need.length) $("stamp").textContent = "Loading " + need.length + " store" + (need.length === 1 ? "" : "s") + "…";
+    await Promise.all(need.map(async (c) => {
+      try {
+        const qs = await fs.getDocs(fs.query(gwCol(gid, c), fs.orderBy("week", "desc"), fs.limit(WEEKS_BACK)));
+        GG[gid][c] = {}; qs.docs.forEach((d) => { GG[gid][c][d.id] = d.data(); });
+      } catch (e) { GG[gid][c] = GG[gid][c] || {}; }
+    }));
+    const ws = [...new Set(codes.flatMap((c) => Object.keys(GG[gid][c] || {})))];
+    const years = [...new Set(ws.map((w) => w.slice(0, 4)).concat(ws.map((w) => addDays(w, 6).slice(0, 4))))];
+    GT[gid] = GT[gid] || {};
+    await Promise.all(years.filter((y) => force || !(y in GT[gid])).map(async (y) => {
+      try { const d = await fs.getDoc(tgDoc(gid, y)); GT[gid][y] = d.exists() ? (d.data().t || {}) : {}; } catch (e) { GT[gid][y] = {}; }
+    }));
+    return ws;
+  }
   async function loadSummaries(force) {
+    if (lens()) {
+      weeks = (await loadGroup(lens(), force)).sort().reverse();
+      const keep = $("week").value;
+      $("week").innerHTML = "";
+      weeks.forEach((w) => $("week").add(new Option("Week " + isoWeek(w) + " · " + short(w) + " – " + short(addDays(w, 6)), w)));
+      if (!weeks.length) $("week").add(new Option("No figures yet", ""));
+      $("week").value = weeks.includes(keep) ? keep : (weeks[0] || "");
+      return;
+    }
     const codes = scope().codes, key = codes.join(",");
     const need = codes.filter((c) => force || !S[c]);
     if (need.length) {
@@ -266,13 +385,16 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (tab === "upload") return renderUpload();
     if (!curWeek()) {
       $("stamp").textContent = "";
-      const msg = E("div", { class: "card empty", text: canUpload ? "No sales reports yet. Open Upload reports and drop in the daily report files." : "No sales reports have been uploaded yet." });
+      if (tab === "groups") return renderGroupsAdmin();
+      const msg = E("div", { class: "card empty", text: lens() ? "No " + (groupOf(lens()) || {}).name + " figures yet." + (isHO && fullSales ? " Open Category groups & targets and press Rebuild group figures." : "") : canUpload ? "No sales reports yet. Open Upload reports and drop in the daily report files." : "No sales reports have been uploaded yet." });
       ["kpis", "ovMain", "ovMonth", "dpMain", "dpMore", "trMain", "trDow", "alertList"].forEach((id) => { $(id).innerHTML = ""; });
       $("ovMain").appendChild(msg); $("ovMonth").hidden = true;
       return;
     }
+    if (tab === "groups") return renderGroupsAdmin();
     $("ovMonth").hidden = false;
     const w = curWeek(), codes = scope().codes;
+    if (lens()) return renderGroup(w, codes);
     if (w === ALL) {
       $("stamp").textContent = "All weeks of 2026";
       renderAlerts(ALL, codes, -1);
@@ -572,7 +694,6 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   // ── Alerts ──
   // ── Alerts, with the Store Manager's and ROM's comments ──
   let alertCount = 0, aFilter = "unread", alSeq = 0;
-  const isHO = me.isAdmin || me.role === "hq";
   const fullYear = {};                       // code → all 2026 weeks loaded
   const N = {};                              // code → { noteId: note }
   if (isHO) {
@@ -698,6 +819,325 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     else await fs.setDoc(ref, { code: a.store, week: a.week, type: a.type, what: a.what, ...data });
     N[a.store] = N[a.store] || {}; N[a.store][a.id] = Object.assign({}, cur || { code: a.store, week: a.week, type: a.type, what: a.what }, data);
   }
+
+  // ═════════ CATEGORY GROUP VIEWS ═════════
+  const dim = (d) => new Date(+d.slice(0, 4), +d.slice(5, 7), 0).getDate();
+  function tgtDay(gid, c, date) {
+    const t = (((GT[gid] || {})[date.slice(0, 4)] || {})[c] || {})[date.slice(0, 7)];
+    return t ? t / dim(date) : 0;
+  }
+  function hasTargets(gid) { return Object.values(GT[gid] || {}).some((y) => Object.values(y || {}).some((m) => Object.values(m || {}).some((v) => v > 0))); }
+  // figures for one store's group week over chosen days
+  function gAgg(doc, idx, gid, c) {
+    if (!doc) return null;
+    const o = { s: 0, t: 0, st: 0, x: 0, w: 0, n: idx.length, hasW: !!doc.w };   // st = sales on days that have a target
+    idx.forEach((i) => {
+      const v = doc.s[i] || 0, tt = tgtDay(gid, c, doc.days[i]); o.s += v; o.t += tt; if (tt) o.st += v;
+      if (doc.share[i]) o.x += v / doc.share[i];
+      if (doc.w) o.w += doc.w[i] || 0;
+    });
+    return o;
+  }
+  const gAdd = (a, b) => !a ? b : !b ? a : { s: a.s + b.s, t: a.t + b.t, st: a.st + b.st, x: a.x + b.x, w: a.w + b.w, n: a.n + b.n, hasW: a.hasW || b.hasW };
+  function gLatest(gid, w, codes) {
+    let best = -1;
+    codes.forEach((c) => { const d = ((GG[gid] || {})[c] || {})[w]; if (d) d.has.forEach((v, i) => { if (v && i > best) best = i; }); });
+    return best;
+  }
+  function gMtd(gid, c, upto) {
+    const m = upto.slice(0, 7); let o = null;
+    Object.values((GG[gid] || {})[c] || {}).forEach((d) => d.days.forEach((day, i) => {
+      if (day.slice(0, 7) === m && day <= upto && d.has[i]) o = gAdd(o, gAgg(d, [i], gid, c));
+    }));
+    return o;
+  }
+
+  let gPeriod = "wtd", gSort = { k: "vt", dir: 1 };
+  function renderGroup(w, codes) {
+    const gid = lens(), g = groupOf(gid) || { name: gid }, D = GG[gid] || {};
+    const docs = codes.map((c) => (D[c] || {})[w]).filter(Boolean);
+    const ld = gLatest(gid, w, codes);
+    const last = docs.map((u) => u.at).sort().pop();
+    $("stamp").innerHTML = "";
+    $("stamp").append(ld >= 0 ? g.name + " figures up to " + dayLabel(addDays(w, ld)) : "No trading days yet this week", E("br"),
+      (docs.length < codes.length ? docs.length + " of " + codes.length + " stores reported · " : "") + (last ? "updated " + SPARUI.fmtDateTime(last) : ""));
+    if (tab === "overview") renderGroupOverview(gid, g, w, codes, ld);
+    if (tab === "depts") renderGroupCats(gid, g, w, codes);
+    if (tab === "trends") renderGroupTrends(gid, g, w, codes);
+  }
+
+  function renderGroupOverview(gid, g, w, codes, ld) {
+    const D = GG[gid] || {};
+    let tot = null, full = true;
+    codes.forEach((c) => { const d = (D[c] || {})[w]; if (d) { const idx = hasIdx(d); if (idx.length < 7) full = false; tot = gAdd(tot, gAgg(d, idx, gid, c)); } });
+    tot = tot || { s: 0, t: 0, st: 0, x: 0, w: 0, n: 0, hasW: false };
+    let ly = 0; codes.forEach((c) => { const d = (D[c] || {})[w]; if (d) ly += d.ly || 0; });
+    const tg = hasTargets(gid);
+    $("kpis").innerHTML = "";
+    $("kpis").append(
+      kpi(g.name + " sales week to date", eur(tot.s), tg ? subLine("vs target " + eur(tot.t), ch(tot.st, tot.t)) : ["No " + g.name + " targets set yet"], tg && ch(tot.st, tot.t) < 0 ? "bad" : tg ? "good" : ""),
+      kpi("Share of store sales", share(tot.x ? tot.s / tot.x : null), ["Of the store's sales excluding tobacco"]),
+      kpi("vs last year", full && ly ? pct(ch(tot.s, ly)) : "–", [full && ly ? "Last year " + eur(ly) : "Shown once the week is complete (the report gives last year for the whole week)"], full && ly && ch(tot.s, ly) < 0 ? "bad" : ""),
+      kpi("Waste", tot.hasW ? share(tot.s ? tot.w / tot.s : null) : "–", [tot.hasW ? eur(tot.w) + " of sales" : "Not in the daily report: will come from the Waste Tracker"], tot.hasW && tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
+    );
+    const box = $("ovMain"); box.innerHTML = "";
+    if (codes.length === 1) {
+      const c = codes[0], d = (D[c] || {})[w];
+      box.appendChild(E("h2", { text: (byCode[c] || {}).name + " · " + g.name + " day by day" }));
+      if (!d) { box.appendChild(E("p", { class: "empty", text: "No figures for this store this week yet." })); }
+      else {
+        const tb = E("tbody");
+        d.days.forEach((day, i) => {
+          const o = gAgg(d, [i], gid, c), has = d.has[i];
+          tb.appendChild(E("tr", { class: has ? "" : "future" }, [E("td", { text: dayLabel(day) }), E("td", { class: "num", text: has ? eur(o.s) : "–" }),
+            E("td", { class: "num", text: tg ? eur(o.t) : "–" }), E("td", { class: "num " + (has && tg ? cls(ch(o.st, o.t)) : ""), text: has && tg ? pct(ch(o.st, o.t)) : "" }),
+            E("td", { class: "num", text: has ? share(o.x ? o.s / o.x : null) : "–" }), E("td", { class: "num", text: has && o.hasW ? eur(o.w) : "–" })]));
+        });
+        const t = gAgg(d, hasIdx(d), gid, c);
+        tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Week to date (" + t.n + " day" + (t.n === 1 ? "" : "s") + ")" }), E("td", { class: "num", text: eur(t.s) }),
+          E("td", { class: "num", text: tg ? eur(t.t) : "–" }), E("td", { class: "num " + (tg ? cls(ch(t.st, t.t)) : ""), text: tg ? pct(ch(t.st, t.t)) : "" }),
+          E("td", { class: "num", text: share(t.x ? t.s / t.x : null) }), E("td", { class: "num", text: t.hasW ? eur(t.w) : "–" })]));
+        box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null,
+          ["Day", "Sales", "Target", "vs target", "Share of store", "Waste"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+      }
+    } else {
+      const head = E("div", { class: "row", style: "justify-content:space-between;margin-bottom:12px" }, [E("h2", { style: "margin:0", text: g.name + " · store by store" })]);
+      const seg = E("div", { class: "seg" });
+      [["day", ld >= 0 ? dayLabel(addDays(w, ld)) : "Latest day"], ["wtd", "Week to date"], ["mtd", "Month to date"]].forEach(([k, l]) =>
+        seg.appendChild(E("button", { type: "button", class: gPeriod === k ? "on" : "", text: l, onclick: () => { gPeriod = k; render(); } })));
+      head.appendChild(seg); box.appendChild(head);
+      const upto = ld >= 0 ? addDays(w, ld) : w;
+      const rows = codes.map((c) => {
+        const d = (D[c] || {})[w]; let o = null, lyv = null;
+        if (gPeriod === "day") o = d && ld >= 0 && d.has[ld] ? gAgg(d, [ld], gid, c) : null;
+        else if (gPeriod === "wtd") { o = d && hasIdx(d).length ? gAgg(d, hasIdx(d), gid, c) : null; if (d && hasIdx(d).length === 7) lyv = d.ly; }
+        else o = gMtd(gid, c, upto);
+        return { c, name: (byCode[c] || {}).name || c, rom: romOf(c), o, vt: o && tg && o.t ? ch(o.st, o.t) : null, sh: o && o.x ? o.s / o.x : null, vly: o && lyv ? ch(o.s, lyv) : null, ws: o && o.hasW && o.s ? o.w / o.s : null };
+      });
+      const val = (r, k) => k === "name" || k === "rom" ? r[k] : k === "s" ? (r.o ? r.o.s : null) : r[k];
+      rows.sort((a, b) => { const x = val(a, gSort.k), y = val(b, gSort.k); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === "string" ? x.localeCompare(y) : x - y) * gSort.dir; });
+      const cols = [["name", "Store", ""], ["rom", "ROM", ""], ["s", "Sales", "num"], ["vt", "vs target", "num"], ["sh", "Share of store", "num"], ["vly", "vs last year", "num"], ["ws", "Waste %", "num"]];
+      const thr = E("tr", null, cols.map(([k, l, c]) => E("th", { class: c + " sort" + (gSort.k === k ? (gSort.dir > 0 ? " asc" : " desc") : ""), text: l,
+        onclick: () => { gSort = { k, dir: gSort.k === k ? -gSort.dir : (k === "name" || k === "rom" ? 1 : -1) }; render(); } })));
+      const tb = E("tbody"); let T = null;
+      rows.forEach((r) => {
+        T = gAdd(T, r.o);
+        tb.appendChild(E("tr", null, [E("td", null, [E("button", { class: "linkbtn", type: "button", text: r.name, onclick: () => { $("scope").value = "s:" + r.c; changeScope(); } })]),
+          E("td", { class: "note", text: r.rom }), E("td", { class: "num", text: r.o ? eur(r.o.s) : "no report" }),
+          E("td", { class: "num " + cls(r.vt), text: pct(r.vt) }), E("td", { class: "num", text: share(r.sh) }),
+          E("td", { class: "num " + cls(r.vly), text: pct(r.vly) }), E("td", { class: "num " + (r.ws > WASTE_ALERT ? "down" : ""), text: share(r.ws) })]));
+      });
+      if (T) tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td"), E("td", { class: "num", text: eur(T.s) }),
+        E("td", { class: "num " + (tg ? cls(ch(T.st, T.t)) : ""), text: tg ? pct(ch(T.st, T.t)) : "–" }), E("td", { class: "num", text: share(T.x ? T.s / T.x : null) }), E("td"),
+        E("td", { class: "num", text: T.hasW ? share(T.s ? T.w / T.s : null) : "–" })]));
+      box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [thr]), tb])]));
+      box.appendChild(E("p", { class: "note", style: "margin:10px 0 0", text: "Sales include VAT. “vs target” counts only stores with a target set; “vs last year” shows for a complete week only. " + (tg ? "" : "No " + g.name + " targets set yet" + (isHO ? ": add them in Category groups & targets." : ".")) }));
+    }
+    // month to date
+    const mb = $("ovMonth"); mb.innerHTML = "";
+    if (ld < 0) { mb.hidden = true; return; }
+    mb.hidden = false;
+    const upto = addDays(w, ld);
+    let M = null; codes.forEach((c) => { M = gAdd(M, gMtd(gid, c, upto)); });
+    if (!M) { mb.hidden = true; return; }
+    const ym = upto.slice(0, 7), y = upto.slice(0, 4);
+    const monthT = sum(codes.map((c) => ((((GT[gid] || {})[y] || {})[c] || {})[ym]) || 0));
+    const pace = M.t ? M.st / M.t : null;
+    const proj = pace != null ? M.st + (monthT - M.t) * pace : null;
+    mb.appendChild(E("h2", { text: g.name + " · " + monthName(upto) + " to date" }));
+    mb.appendChild(E("div", { class: "kpis" }, [
+      kpi("Sales " + short(upto.slice(0, 8) + "01") + " – " + short(upto), eur(M.s), tg ? subLine("vs target " + eur(M.t), ch(M.st, M.t)) : ["No targets set"]),
+      kpi("Month target", tg ? eur(monthT) : "–", [tg ? share(monthT ? M.st / monthT : null) + " achieved so far" : ""]),
+      kpi("Month-end outlook", tg ? eur(proj) : "–", [tg ? "If the month keeps its pace against target (" + pct(pace != null ? pace - 1 : null) + ")" : ""]),
+      kpi("Share of store sales", share(M.x ? M.s / M.x : null), ["Month to date"])
+    ]));
+  }
+
+  async function renderGroupCats(gid, g, w, codes) {
+    const D = GG[gid] || {};
+    const docs = codes.map((c) => (D[c] || {})[w]).filter(Boolean);
+    $("dpMore").innerHTML = ""; const box = $("dpMain"); box.innerHTML = "";
+    if (!docs.length) { box.appendChild(E("p", { class: "empty", text: "No figures for this week." })); return; }
+    const full = docs.every((d) => hasIdx(d).length === 7);
+    const L = {}, order = [];
+    docs.forEach((d) => { const idx = hasIdx(d); (d.lines || []).forEach((x) => {
+      const k = (x.p || "") + "|" + x.c; if (!L[k]) { L[k] = { ...x, s: 0, ly: 0 }; order.push(k); }
+      L[k].s += sum(idx.map((i) => x.d[i] || 0)); L[k].ly += x.ly || 0;
+    }); });
+    const top = order.map((k) => L[k]).filter((x) => x.top).sort((a, b) => b.s - a.s);
+    const total = sum(top.map((x) => x.s)), totLy = sum(top.map((x) => x.ly));
+    const tb = E("tbody");
+    top.forEach((x) => {
+      const kids = order.map((k) => L[k]).filter((y) => y.p === x.c && (y.s || y.ly)).sort((a, b) => b.s - a.s);
+      const tr = E("tr", { class: kids.length ? "exp" + (openDept.has(x.c) ? " open" : "") : "" }, [E("td", { text: x.n }), E("td", { class: "num", text: eur(x.s) }),
+        E("td", { class: "num", text: share(total ? x.s / total : null) }), E("td", { class: "num", text: eur(x.ly) }), E("td", { class: "num " + (full ? cls(ch(x.s, x.ly)) : ""), text: full ? pct(ch(x.s, x.ly)) : "–" })]);
+      if (kids.length) tr.onclick = () => { openDept.has(x.c) ? openDept.delete(x.c) : openDept.add(x.c); renderGroupCats(gid, g, w, codes); };
+      tb.appendChild(tr);
+      if (openDept.has(x.c)) kids.forEach((y) => tb.appendChild(E("tr", { class: "cat" }, [E("td", { text: y.n }), E("td", { class: "num", text: eur(y.s) }),
+        E("td", { class: "num", text: share(x.s ? y.s / x.s : null) }), E("td", { class: "num", text: eur(y.ly) }), E("td", { class: "num " + (full ? cls(ch(y.s, y.ly)) : ""), text: full ? pct(ch(y.s, y.ly)) : "–" })])));
+    });
+    tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total " + g.name }), E("td", { class: "num", text: eur(total) }), E("td", { class: "num", text: "100%" }),
+      E("td", { class: "num", text: eur(totLy) }), E("td", { class: "num " + (full ? cls(ch(total, totLy)) : ""), text: full ? pct(ch(total, totLy)) : "–" })]));
+    box.append(E("h2", { text: g.name + " categories · " + (codes.length === 1 ? (byCode[codes[0]] || {}).name : scope().label) }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: (full ? "Full week." : "Week to date: “vs last year” appears once the week is complete.") + (top.some((x) => order.some((k) => L[k].p === x.c)) ? " Click a department to see its categories." : "") }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Category", "Sales", "Share of " + g.name, "Last year (week)", "vs LY"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+  }
+
+  function renderGroupTrends(gid, g, w, codes) {
+    const D = GG[gid] || {}, box = $("trMain"); box.innerHTML = ""; $("trDow").innerHTML = "";
+    const tg = hasTargets(gid);
+    const rows = weeks.filter((x) => x <= w).slice(0, 8).reverse().map((wk) => {
+      let o = null, ly = 0, full = true;
+      codes.forEach((c) => { const d = (D[c] || {})[wk]; if (d) { const idx = hasIdx(d); if (idx.length < 7) full = false; o = gAdd(o, gAgg(d, idx, gid, c)); ly += d.ly || 0; } });
+      return { wk, o: o || { s: 0, t: 0, st: 0, x: 0, w: 0, n: 0 }, ly: full ? ly : null };
+    });
+    box.appendChild(E("h2", { text: g.name + " week by week · " + scope().label }));
+    const max = Math.max(1, ...rows.map((r) => Math.max(r.o.s, r.o.t, r.ly || 0)));
+    const Wd = 720, H = 220, Lm = 56, B = 30, bw = Math.min(60, (Wd - Lm - 10) / Math.max(1, rows.length) * 0.55);
+    const x = (i) => Lm + (i + 0.5) * (Wd - Lm - 10) / rows.length, y = (v) => H - B - (v / max) * (H - B - 14);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + H); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", g.name + " weekly sales");
+    const mk = (tag, a, txt) => { const n = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => n.setAttribute(k, v)); if (txt != null) n.textContent = txt; svg.appendChild(n); return n; };
+    [0, 0.5, 1].forEach((f) => { mk("line", { x1: Lm, x2: Wd - 10, y1: y(max * f), y2: y(max * f), stroke: "#E9EBEA" }); mk("text", { x: Lm - 6, y: y(max * f) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, "€" + (max * f >= 10000 ? Math.round(max * f / 1000) + "k" : Math.round(max * f))); });
+    rows.forEach((r, i) => {
+      const ok = !tg || r.o.st >= r.o.t;
+      mk("rect", { x: x(i) - bw / 2, y: y(r.o.s), width: bw, height: Math.max(0, H - B - y(r.o.s)), rx: 4, fill: tg ? (ok ? "#00703C" : "#EC1B24") : "#60727a", "fill-opacity": r.ly != null ? 0.85 : 0.45 });
+      if (tg && r.o.t) mk("line", { x1: x(i) - bw / 2 - 6, x2: x(i) + bw / 2 + 6, y1: y(r.o.t), y2: y(r.o.t), stroke: "#10252b", "stroke-width": 2 });
+      if (r.ly) mk("circle", { cx: x(i), cy: y(r.ly), r: 4, fill: "#fff", stroke: "#60727a", "stroke-width": 2 });
+      mk("text", { x: x(i), y: H - 10, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, "Wk " + isoWeek(r.wk));
+    });
+    box.appendChild(svg);
+    box.appendChild(E("div", { class: "legend" }, [tg ? E("span", null, [E("i", { style: "background:#00703C" }), "At or above target"]) : null, tg ? E("span", null, [E("i", { style: "background:#EC1B24" }), "below target"]) : null,
+      tg ? E("span", null, [E("i", { style: "background:#10252b;height:3px;vertical-align:3px" }), "Target"]) : null, E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), "Last year"]), E("span", { text: "Paler bar = week not complete" })]));
+    const tb = E("tbody");
+    rows.slice().reverse().forEach((r) => tb.appendChild(E("tr", null, [E("td", { text: "Wk " + isoWeek(r.wk) + " · " + short(r.wk) }), E("td", { class: "num", text: eur(r.o.s) }),
+      E("td", { class: "num", text: tg ? eur(r.o.t) : "–" }), E("td", { class: "num " + (tg ? cls(ch(r.o.st, r.o.t)) : ""), text: tg ? pct(ch(r.o.st, r.o.t)) : "–" }),
+      E("td", { class: "num " + cls(ch(r.o.s, r.ly)), text: r.ly ? pct(ch(r.o.s, r.ly)) : "–" }), E("td", { class: "num", text: share(r.o.x ? r.o.s / r.o.x : null) })])));
+    box.appendChild(E("div", { class: "tablewrap", style: "margin-top:14px" }, [E("table", null, [E("thead", null, [E("tr", null,
+      ["Week", "Sales", "Target", "vs target", "vs last year", "Share of store"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+  }
+
+  // ═════════ CATEGORY GROUPS & TARGETS (Head Office) ═════════
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let tgInit = false, tgData = {};
+  async function renderGroupsAdmin() {
+    if (!tgInit) {
+      tgInit = true;
+      GROUPS.forEach((g) => $("tgGroup").add(new Option(g.name, g.id)));
+      const y = new Date().getFullYear(); [y - 1, y, y + 1].forEach((v) => $("tgYear").add(new Option(v, v)));
+      $("tgYear").value = y;
+      if (lens()) $("tgGroup").value = lens();
+      $("tgGroup").onchange = loadTargets; $("tgYear").onchange = loadTargets;
+      renderGroupList();
+    }
+    loadTargets();
+  }
+  const tgStores = () => me.allStores.filter((s) => s.active !== false).sort((a, b) => romOf(a.code).localeCompare(romOf(b.code)) || a.name.localeCompare(b.name));
+  async function loadTargets() {
+    const gid = $("tgGroup").value, y = $("tgYear").value;
+    $("tgGrid").innerHTML = ""; $("tgGrid").appendChild(E("p", { class: "note", style: "padding:12px", text: "Loading…" }));
+    try { const d = await fs.getDoc(tgDoc(gid, y)); tgData = d.exists() ? (d.data().t || {}) : {}; } catch (e) { tgData = {}; }
+    drawTargets();
+  }
+  function drawTargets() {
+    const y = $("tgYear").value;
+    const tb = E("tbody");
+    tgStores().forEach((st) => {
+      const row = E("tr", null, [E("td", null, [E("b", { text: st.name }), E("div", { class: "note", text: romOf(st.code) })])]);
+      MONTHS.forEach((m, i) => {
+        const ym = y + "-" + pad(i + 1), v = (tgData[st.code] || {})[ym];
+        const inp = E("input", { class: "in", type: "number", min: "0", step: "1", inputmode: "numeric", style: "width:92px;padding:6px 7px;text-align:right", "data-code": st.code, "data-ym": ym });
+        inp.value = v ? Math.round(v) : "";
+        inp.oninput = () => { const n = parseFloat(inp.value); (tgData[st.code] = tgData[st.code] || {})[ym] = isFinite(n) && n > 0 ? n : 0; tot.textContent = eur(sum(Object.values(tgData[st.code] || {}))); };
+        row.appendChild(E("td", null, [inp]));
+      });
+      const tot = E("td", { class: "num", text: eur(sum(Object.values(tgData[st.code] || {}))) });
+      row.appendChild(tot); tb.appendChild(row);
+    });
+    $("tgGrid").innerHTML = "";
+    $("tgGrid").appendChild(E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Store" }), ...MONTHS.map((m) => E("th", { text: m })), E("th", { class: "num", text: "Year" })])]), tb]));
+  }
+  $("tgSave").onclick = async () => {
+    const gid = $("tgGroup").value, y = $("tgYear").value, clean = {};
+    Object.keys(tgData).forEach((c) => Object.keys(tgData[c] || {}).forEach((ym) => { if (tgData[c][ym] > 0 && ym.startsWith(y)) (clean[c] = clean[c] || {})[ym] = Math.round(tgData[c][ym] * 100) / 100; }));
+    $("tgSave").disabled = true;
+    try { await fs.setDoc(tgDoc(gid, y), { t: clean, at: Date.now(), by: me.email }); $("tgMsg").textContent = "✓ Saved " + (groupOf(gid) || {}).name + " targets for " + y; delete (GT[gid] || {})[y]; }
+    catch (e) { $("tgMsg").textContent = "Couldn't save: " + (e.code || e.message); }
+    $("tgSave").disabled = false;
+  };
+  $("tgDown").onclick = async () => {
+    const X = await loadXLSX(), y = $("tgYear").value, g = groupOf($("tgGroup").value) || {};
+    const rows = [["Store code", "Store", "ROM", ...MONTHS]];
+    tgStores().forEach((st) => rows.push([st.code, st.name, romOf(st.code), ...MONTHS.map((m, i) => (tgData[st.code] || {})[y + "-" + pad(i + 1)] || "")]));
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), "Targets");
+    X.writeFile(wb, "SPAR " + (g.name || "group") + " targets " + y + ".xlsx");
+  };
+  $("tgFile").onchange = async () => {
+    const f = $("tgFile").files[0]; $("tgFile").value = ""; if (!f) return;
+    try {
+      const X = await loadXLSX(), wb = X.read(await f.arrayBuffer(), { type: "array" });
+      const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+      const h = (rows[0] || []).map((v) => String(v || "").trim().slice(0, 3).toLowerCase());
+      const mi = MONTHS.map((m) => h.indexOf(m.toLowerCase()));
+      const y = $("tgYear").value; let n = 0;
+      rows.slice(1).forEach((r) => {
+        const code = String(r[0] || "").trim().toUpperCase(); if (!byCode[code]) return;
+        mi.forEach((ci, i) => { if (ci < 0) return; const v = nv(r[ci]); (tgData[code] = tgData[code] || {})[y + "-" + pad(i + 1)] = v > 0 ? v : 0; if (v > 0) n++; });
+      });
+      drawTargets(); $("tgMsg").textContent = n + " targets read from the file. Check them, then press Save targets.";
+    } catch (e) { $("tgMsg").textContent = "Couldn't read that file: " + (e.message || e); }
+  };
+
+  let grEdit = [];
+  function renderGroupList() {
+    grEdit = GROUPS.map((g) => ({ id: g.id, name: g.name, codes: (g.codes || []).join(", ") }));
+    drawGroupList();
+  }
+  function drawGroupList() {
+    const box = $("grList"); box.innerHTML = "";
+    const tb = E("tbody");
+    grEdit.forEach((g, i) => {
+      const n = E("input", { class: "in", value: g.name, style: "padding:6px 8px" }); n.oninput = () => { g.name = n.value; };
+      const c = E("input", { class: "in", value: g.codes, placeholder: "e.g. C041, C047, C046", style: "padding:6px 8px" }); c.oninput = () => { g.codes = c.value; };
+      tb.appendChild(E("tr", null, [E("td", { style: "width:30%" }, [n]), E("td", null, [c]),
+        E("td", { style: "width:1%" }, [E("button", { class: "btn secondary small", type: "button", text: "✕", "aria-label": "Remove group", onclick: () => { if (confirm("Remove the group " + (g.name || "") + "? People given only this group will lose their sales access.")) { grEdit.splice(i, 1); drawGroupList(); } } })])]));
+    });
+    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Group" }), E("th", { text: "Report codes (departments D…, categories C…)" }), E("th")])]), tb])]));
+  }
+  $("grAdd").onclick = () => { grEdit.push({ id: "", name: "", codes: "" }); drawGroupList(); };
+  $("grSave").onclick = async () => {
+    const clean = [];
+    for (const g of grEdit) {
+      const name = g.name.trim(), codes = g.codes.split(/[,;\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+      if (!name && !codes.length) continue;
+      if (!name) { $("grMsg").textContent = "Give every group a name."; return; }
+      const bad = codes.find((x) => !/^[CD]\d+\w*$/.test(x)); if (bad) { $("grMsg").textContent = "“" + bad + "” isn't a report code (they look like D002 or C041)."; return; }
+      if (!codes.length) { $("grMsg").textContent = name + " needs at least one code."; return; }
+      clean.push({ id: g.id || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "group", name, codes });
+    }
+    const b = fs.writeBatch(db);
+    clean.forEach((g, i) => b.set(groupDocRef(g.id), { name: g.name, codes: g.codes, order: i + 1 }));
+    GROUPS.filter((g) => !clean.some((x) => x.id === g.id)).forEach((g) => b.delete(groupDocRef(g.id)));
+    try { await b.commit(); $("grMsg").textContent = "✓ Saved. Now press Rebuild group figures so past weeks match."; GROUPS.splice(0, GROUPS.length, ...clean.map((g, i) => ({ ...g, order: i + 1 }))); }
+    catch (e) { $("grMsg").textContent = "Couldn't save: " + (e.code || e.message); }
+  };
+  $("grRebuild").onclick = async () => {
+    if (!confirm("Rebuild every group's figures from all the reports uploaded in 2026? This takes a minute or two.")) return;
+    const btn = $("grRebuild"); btn.disabled = true;
+    const stores = me.allStores.filter((s) => s.active !== false); let weeksDone = 0;
+    try {
+      for (const [i, st] of stores.entries()) {
+        $("grMsg").textContent = "Rebuilding " + st.name + " (" + (i + 1) + " of " + stores.length + ")…";
+        const qs = await fs.getDocs(fs.query(fs.collection(db, "modules", "sales", "stores", st.code, "weeks"), fs.where("week", ">=", START_WEEK)));
+        let ops = [];
+        qs.docs.forEach((d) => { const x = d.data(); GROUPS.forEach((g) => ops.push([gwDoc(g.id, st.code, x.week), { ...groupFigures(g, x), code: st.code, at: x.at || Date.now() }])); weeksDone++; });
+        for (let k = 0; k < ops.length; k += 400) { const b = fs.writeBatch(db); ops.slice(k, k + 400).forEach(([r, v]) => b.set(r, v)); await b.commit(); }
+      }
+      $("grMsg").textContent = "✓ Rebuilt " + weeksDone + " store-weeks for " + GROUPS.length + " groups.";
+      Object.keys(GG).forEach((k) => delete GG[k]);
+    } catch (e) { $("grMsg").textContent = "Stopped: " + (e.code || e.message); }
+    btn.disabled = false;
+  };
 
   // ── Missing weeks ──
   const START_WEEK = "2025-12-29";            // Monday of ISO Week 1, 2026
@@ -898,6 +1338,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         const b = fs.writeBatch(db);
         b.set(wkDoc(x.code, x.p.week), { ...base, v: 2, days: x.p.days, has: x.p.has, depts: x.p.depts, cats: x.p.cats, waste: x.p.waste, m: x.p.m, tob: x.p.tob });
         b.set(sumDoc(x.code, x.p.week), { ...base, ...summaryOf(x.p) });
+        GROUPS.forEach((g) => { const f = groupFigures(g, x.p); b.set(gwDoc(g.id, x.code, x.p.week), { ...f, code: x.code, at }); delete (GG[g.id] || {})[x.code]; });
         await b.commit();
         try { await fs.setDoc(metaDoc(x.code), { weeks: { [x.p.week]: x.p.has.filter(Boolean).length }, at }, { merge: true }); } catch (e) {}
         delete MW[x.code];
@@ -916,7 +1357,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     await loadSummaries(); render();
   }
   $("scope").onchange = changeScope;
+  $("lens").onchange = async () => { try { localStorage.setItem("sparSalesLens", lens()); } catch (e) {} syncTabs(); await loadSummaries(); render(); };
   $("week").onchange = render;
+  syncTabs();
   await loadSummaries();
   render();
 </script>
