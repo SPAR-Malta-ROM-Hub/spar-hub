@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="sales">
+<title>Sales Tracker · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
+.bar label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar select{font:700 14px Arial,sans-serif;padding:8px 28px 8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);min-width:200px;max-width:100%}
+.bar .stamp{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right}
+.kpi .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;font-weight:700}
+.up{color:var(--gd)} .down{color:var(--red)}
+td.up,td.down,span.up,span.down{font-weight:700}
+tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+tr.future td{color:#A4ADB0}
+.seg{display:inline-flex;background:#E9EBEA;border-radius:10px;padding:3px;gap:2px}
+.seg button{appearance:none;border:0;background:transparent;padding:7px 12px;border-radius:8px;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer}
+.seg button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+th.sort{cursor:pointer;user-select:none}
+th.sort:after{content:" ↕";color:#B5BCBE;font-size:11px}
+th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" ↓";color:var(--ink)}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--ink);text-decoration:underline;cursor:pointer;text-align:left}
+.cat td:first-child{padding-left:28px;color:var(--muted)}
+.exp{cursor:pointer}
+.exp td:first-child:before{content:"▸ ";color:var(--muted)}
+.exp.open td:first-child:before{content:"▾ "}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+.drop{border:2px dashed #C9CDCB;border-radius:14px;padding:26px;text-align:center;background:#FBFCFB}
+.drop.drag{border-color:var(--brand);background:var(--brandsoft)}
+.alert{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-left:5px solid var(--amber);border-radius:12px;margin:0 0 10px;background:#fff}
+.alert.red{border-left-color:var(--red)}
+.alert b{display:block}
+.chart{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+</style>
+</head>
+<body>
+<header class="top" data-title="Sales Tracker"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="depts" type="button">Departments</button>
+    <button class="tab" data-tab="trends" type="button">Trends</button>
+    <button class="tab" data-tab="alerts" type="button">Alerts<span class="count" id="aCount" hidden>0</span></button>
+    <button class="tab" data-tab="upload" type="button" hidden>Upload reports</button>
+  </div>
+
+  <div class="card bar" id="bar">
+    <label>View<select id="scope"></select></label>
+    <label>Week<select id="week"></select></label>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <!-- ═════════ OVERVIEW ═════════ -->
+  <section data-pane="overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="card panel" id="ovMain"></div>
+    <div class="card panel" id="ovMonth"></div>
+  </section>
+
+  <!-- ═════════ DEPARTMENTS ═════════ -->
+  <section data-pane="depts" hidden>
+    <div class="card panel" style="margin-top:0" id="dpMain"><p class="note">Loading…</p></div>
+    <div class="grid-2" id="dpMore"></div>
+  </section>
+
+  <!-- ═════════ TRENDS ═════════ -->
+  <section data-pane="trends" hidden>
+    <div class="card panel" style="margin-top:0" id="trMain"></div>
+    <div class="card panel" id="trDow"></div>
+  </section>
+
+  <!-- ═════════ ALERTS ═════════ -->
+  <section data-pane="alerts" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Things to look at</h2>
+      <p class="note" style="margin:-6px 0 14px">Based on the latest week's reports for the stores in this view. A store is listed when it is below target 3 days running, more than 10% down on last year, has waste above 2% of sales, has customers more than 10% down on last week, or is missing the latest day's report.</p>
+      <div id="alertList"></div>
+    </div>
+  </section>
+
+  <!-- ═════════ UPLOAD ═════════ -->
+  <section data-pane="upload" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Upload the daily reports</h2>
+      <p class="note" style="margin:-6px 0 14px">Drop in the report files that arrive by email each morning (report-51.xlsx, report-52.xlsx …), as many stores at once as you like. Each file is matched to its store by its report number, and the store name inside it is checked. Uploading the same week again replaces it with the newer figures.</p>
+      <div class="drop" id="drop">
+        <p style="margin:0 0 10px;font-weight:700">Drag the report files here</p>
+        <label class="btn" for="file">Choose report files</label>
+        <input type="file" id="file" accept=".xlsx,.xls" multiple hidden>
+      </div>
+      <div id="preview" style="margin-top:14px"></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+  const me = await SPAR.ready;
+  const fb = await SPAR.firebase();
+  const { fs, db } = fb;
+
+  // ── Settings ──
+  const WEEKS_BACK = 9;            // weeks of history loaded (trends, month to date)
+  const WASTE_ALERT = 0.02;        // waste above 2% of sales
+  const DOWN_ALERT = -0.10;        // 10% down
+  const canUpload = ["admin", "hq", "support"].includes(me.role);
+  const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const DOWFULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  // ── Formatting ──
+  const eur = (v) => v == null || isNaN(v) ? "–" : "€" + Math.round(v).toLocaleString("en-GB");
+  const eur2 = (v) => v == null || isNaN(v) ? "–" : "€" + v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const int = (v) => v == null || isNaN(v) || !v ? "–" : Math.round(v).toLocaleString("en-GB");
+  const pct = (v, d = 1) => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toFixed(d) + "%";
+  const share = (v) => v == null || !isFinite(v) ? "–" : (v * 100).toFixed(1) + "%";
+  const ch = (a, b) => a && b ? a / b - 1 : null;
+  const cls = (v, good = 1) => v == null ? "" : v * good > 0.0005 ? "up" : v * good < -0.0005 ? "down" : "";
+  const pad = (n) => (n < 10 ? "0" : "") + n;
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
+  const dayLabel = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const short = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const monthName = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const isoWeek = (s) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const y = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y) / 864e5 - 3 + ((y.getDay() + 6) % 7)) / 7); };
+  const sum = (a) => a.reduce((p, v) => p + (v || 0), 0);
+
+  // ── Paths ──
+  const sumCol = (c) => fs.collection(db, "modules", "sales", "stores", c, "sum");
+  const sumDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "sum", w);
+  const wkDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "weeks", w);
+
+  // ── Who sees what ──
+  const stores = me.stores.slice();                       // what this person may see
+  const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
+  const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
+  const scopes = [];
+  if (me.seesAll && stores.length > 1) {
+    scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+    [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) =>
+      scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
+  } else if (stores.length > 1) {
+    scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+  }
+  stores.forEach((s) => scopes.push({ id: "s:" + s.code, label: s.name, codes: [s.code] }));
+  if (!scopes.length) { $("bar").hidden = true; $("tabs").hidden = true; document.querySelector("[data-pane=overview]").innerHTML = '<p class="msg warn">You haven\'t been given a store yet. Ask a hub admin.</p>'; throw new Error("no stores"); }
+  scopes.forEach((s) => $("scope").add(new Option(s.label, s.id)));
+  try { const k = localStorage.getItem("sparSalesScope"); if (scopes.some((s) => s.id === k)) $("scope").value = k; } catch (e) {}
+  const scope = () => scopes.find((s) => s.id === $("scope").value) || scopes[0];
+
+  // ── Tabs ──
+  let tab = "overview";
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+    $("bar").hidden = name === "upload";
+    render();
+  }
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
+  if (canUpload) document.querySelector('.tab[data-tab="upload"]').hidden = false;
+
+  // ═════════ DATA ═════════
+  // Weekly summaries per store: { code: { week: summary } }
+  let S = {}, loadedFor = "", weeks = [];
+  async function loadSummaries(force) {
+    const codes = scope().codes, key = codes.join(",");
+    const need = codes.filter((c) => force || !S[c]);
+    if (need.length) {
+      $("stamp").textContent = "Loading " + need.length + " store" + (need.length === 1 ? "" : "s") + "…";
+      await Promise.all(need.map(async (c) => {
+        try {
+          const qs = await fs.getDocs(fs.query(sumCol(c), fs.orderBy("week", "desc"), fs.limit(WEEKS_BACK)));
+          S[c] = {}; qs.docs.forEach((d) => { S[c][d.id] = d.data(); });
+        } catch (e) { S[c] = S[c] || {}; }
+      }));
+    }
+    loadedFor = key;
+    weeks = [...new Set(codes.flatMap((c) => Object.keys(S[c] || {})))].sort().reverse();
+    const keep = $("week").value;
+    $("week").innerHTML = "";
+    weeks.forEach((w) => $("week").add(new Option("Week " + isoWeek(w) + " · " + short(w) + " – " + short(addDays(w, 6)), w)));
+    if (!weeks.length) $("week").add(new Option("No reports yet", ""));
+    $("week").value = weeks.includes(keep) ? keep : (weeks[0] || "");
+  }
+  const curWeek = () => $("week").value;
+  const daysOf = (w) => Array.from({ length: 7 }, (_, i) => addDays(w, i));
+
+  // Figures for one store, one week, over chosen day indexes
+  function agg(sm, idx) {
+    if (!sm) return null;
+    const pick = (k) => sum(idx.map((i) => (sm[k] || [])[i] || 0));
+    const o = { s: pick("s"), t: pick("t"), lw: pick("lw"), ly: pick("ly"), c: pick("c"), clw: pick("clw"), w: pick("w"), tob: pick("tob"), n: idx.length };
+    return o;
+  }
+  const hasIdx = (sm) => sm ? sm.has.map((v, i) => v ? i : -1).filter((i) => i >= 0) : [];
+  const add = (a, b) => { if (!a) return b; if (!b) return a; const o = {}; for (const k in a) o[k] = (a[k] || 0) + (b[k] || 0); return o; };
+
+  // latest trading day with data in the chosen week, across the view
+  function latestDay(w, codes) {
+    let best = -1;
+    codes.forEach((c) => { const sm = S[c] && S[c][w]; if (sm) sm.has.forEach((v, i) => { if (v && i > best) best = i; }); });
+    return best;
+  }
+
+  // Month to date for one store: month of the given date, every day with data up to it
+  function mtd(c, upto) {
+    const m = upto.slice(0, 7); let o = null, days = 0;
+    Object.values(S[c] || {}).forEach((sm) => sm.days.forEach((d, i) => {
+      if (d.slice(0, 7) === m && d <= upto && sm.has[i]) { o = add(o, agg(sm, [i])); days++; }
+    }));
+    return o && Object.assign(o, { days });
+  }
+
+  // ═════════ RENDER ═════════
+  function render() {
+    if (tab === "upload") return renderUpload();
+    if (!curWeek()) {
+      $("stamp").textContent = "";
+      const msg = E("div", { class: "card empty", text: canUpload ? "No sales reports yet. Open Upload reports and drop in the daily report files." : "No sales reports have been uploaded yet." });
+      ["kpis", "ovMain", "ovMonth", "dpMain", "dpMore", "trMain", "trDow", "alertList"].forEach((id) => { $(id).innerHTML = ""; });
+      $("ovMain").appendChild(msg); $("ovMonth").hidden = true;
+      return;
+    }
+    $("ovMonth").hidden = false;
+    const w = curWeek(), codes = scope().codes;
+    const ups = codes.map((c) => S[c] && S[c][w]).filter(Boolean);
+    const ld = latestDay(w, codes);
+    const last = ups.map((u) => u.at).sort().pop();
+    $("stamp").innerHTML = "";
+    $("stamp").append(ld >= 0 ? "Figures up to " + dayLabel(addDays(w, ld)) : "No trading days yet this week",
+      E("br"), (ups.length < codes.length ? ups.length + " of " + codes.length + " stores reported · " : "") + (last ? "updated " + SPARUI.fmtDateTime(last) : ""));
+    if (tab === "overview") renderOverview(w, codes, ld);
+    if (tab === "depts") renderDepts(w, codes);
+    if (tab === "trends") renderTrends(w, codes);
+    renderAlerts(w, codes, ld);
+  }
+
+  function kpi(label, value, sub, klass) {
+    return E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: klass || "", text: value }), sub ? E("span", { class: "sub" }, sub) : null]);
+  }
+  const subLine = (txt, v, good = 1) => [E("span", { class: cls(v, good), text: pct(v) }), " " + txt];
+
+  // ── Overview ──
+  function renderOverview(w, codes, ld) {
+    const idxW = (sm) => hasIdx(sm);
+    let tot = null;
+    codes.forEach((c) => { tot = add(tot, agg(S[c] && S[c][w], idxW(S[c] && S[c][w]))); });
+    tot = tot || { s: 0, t: 0, lw: 0, ly: 0, c: 0, clw: 0, w: 0 };
+    $("kpis").innerHTML = "";
+    $("kpis").append(
+      kpi("Sales week to date", eur(tot.s), subLine("vs target " + eur(tot.t), ch(tot.s, tot.t)), ch(tot.s, tot.t) < 0 ? "bad" : "good"),
+      kpi("vs last year", pct(ch(tot.s, tot.ly)), ["Last year " + eur(tot.ly) + " · vs last week ", E("span", { class: cls(ch(tot.s, tot.lw)), text: pct(ch(tot.s, tot.lw)) })], cls(ch(tot.s, tot.ly)) === "down" ? "bad" : "good"),
+      kpi("Customers", int(tot.c), ["Basket " + eur2(tot.c ? tot.s / tot.c : null) + " · ", ...subLine("vs last week", ch(tot.c, tot.clw))]),
+      kpi("Waste", share(tot.s ? tot.w / tot.s : null), [eur(tot.w) + " of sales"], tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
+    );
+    const box = $("ovMain"); box.innerHTML = "";
+    if (codes.length === 1) renderDayTable(box, codes[0], w);
+    else renderLeague(box, w, codes, ld);
+    renderMonth(w, codes, ld);
+  }
+
+  function renderDayTable(box, c, w) {
+    const sm = S[c] && S[c][w];
+    box.appendChild(E("h2", { text: (byCode[c] || {}).name + " · day by day" }));
+    if (!sm) { box.appendChild(E("p", { class: "empty", text: "No report for this store this week yet." })); return; }
+    const tb = E("tbody");
+    sm.days.forEach((d, i) => {
+      const o = agg(sm, [i]), has = sm.has[i];
+      tb.appendChild(E("tr", { class: has ? "" : "future" }, [
+        E("td", { text: dayLabel(d) }),
+        E("td", { class: "num", text: has ? eur(o.s) : "–" }),
+        E("td", { class: "num", text: eur(o.t) }),
+        E("td", { class: "num " + (has ? cls(ch(o.s, o.t)) : ""), text: has ? pct(ch(o.s, o.t)) : "" }),
+        E("td", { class: "num", text: eur(o.lw) }),
+        E("td", { class: "num " + (has ? cls(ch(o.s, o.lw)) : ""), text: has ? pct(ch(o.s, o.lw)) : "" }),
+        E("td", { class: "num", text: eur(o.ly) }),
+        E("td", { class: "num " + (has ? cls(ch(o.s, o.ly)) : ""), text: has ? pct(ch(o.s, o.ly)) : "" }),
+        E("td", { class: "num", text: has ? int(o.c) : "–" }),
+        E("td", { class: "num", text: has && o.c ? eur2(o.s / o.c) : "–" }),
+        E("td", { class: "num", text: has ? eur(o.w) : "–" })
+      ]));
+    });
+    const t = agg(sm, hasIdx(sm));
+    tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Week to date (" + t.n + " day" + (t.n === 1 ? "" : "s") + ")" }),
+      E("td", { class: "num", text: eur(t.s) }), E("td", { class: "num", text: eur(t.t) }), E("td", { class: "num " + cls(ch(t.s, t.t)), text: pct(ch(t.s, t.t)) }),
+      E("td", { class: "num", text: eur(t.lw) }), E("td", { class: "num " + cls(ch(t.s, t.lw)), text: pct(ch(t.s, t.lw)) }),
+      E("td", { class: "num", text: eur(t.ly) }), E("td", { class: "num " + cls(ch(t.s, t.ly)), text: pct(ch(t.s, t.ly)) }),
+      E("td", { class: "num", text: int(t.c) }), E("td", { class: "num", text: t.c ? eur2(t.s / t.c) : "–" }), E("td", { class: "num", text: eur(t.w) })]));
+    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null,
+      ["Day", "Sales", "Target", "vs target", "Last week", "vs LW", "Last year", "vs LY", "Customers", "Basket", "Waste"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+    box.appendChild(E("p", { class: "note", style: "margin:10px 0 0", text: "Sales are Total inc VAT inc D030 (including tobacco). Last week and last year include tobacco too. Note: the report's own target % is worked out without tobacco, so “vs target” here reads a little higher than the report." }));
+  }
+
+  // League table across stores
+  let lgPeriod = "wtd", lgSort = { k: "vt", dir: 1 };
+  function renderLeague(box, w, codes, ld) {
+    const head = E("div", { class: "row", style: "justify-content:space-between;margin-bottom:12px" }, [E("h2", { style: "margin:0", text: "Store by store" })]);
+    const seg = E("div", { class: "seg" });
+    [["day", ld >= 0 ? dayLabel(addDays(w, ld)) : "Latest day"], ["wtd", "Week to date"], ["mtd", "Month to date"]].forEach(([k, l]) => {
+      seg.appendChild(E("button", { type: "button", class: lgPeriod === k ? "on" : "", text: l, onclick: () => { lgPeriod = k; render(); } }));
+    });
+    head.appendChild(seg); box.appendChild(head);
+    const upto = ld >= 0 ? addDays(w, ld) : w;
+    const rows = codes.map((c) => {
+      const sm = S[c] && S[c][w];
+      let o = null;
+      if (lgPeriod === "day") o = sm && ld >= 0 && sm.has[ld] ? agg(sm, [ld]) : null;
+      else if (lgPeriod === "wtd") o = sm && hasIdx(sm).length ? agg(sm, hasIdx(sm)) : null;
+      else o = mtd(c, upto);
+      return { c, name: (byCode[c] || {}).name || c, rom: romOf(c), o,
+        vt: o ? ch(o.s, o.t) : null, vlw: o ? ch(o.s, o.lw) : null, vly: o ? ch(o.s, o.ly) : null, ws: o && o.s ? o.w / o.s : null };
+    });
+    const val = (r, k) => k === "name" || k === "rom" ? r[k] : k === "s" ? (r.o ? r.o.s : null) : k === "c" ? (r.o ? r.o.c : null) : k === "b" ? (r.o && r.o.c ? r.o.s / r.o.c : null) : r[k];
+    rows.sort((a, b) => {
+      const x = val(a, lgSort.k), y = val(b, lgSort.k);
+      if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y) : x - y) * lgSort.dir;
+    });
+    let tot = null; rows.forEach((r) => { tot = add(tot, r.o); });
+    const cols = [["name", "Store", ""], ["rom", "ROM", ""], ["s", "Sales", "num"], ["vt", "vs target", "num"], ["vlw", "vs last week", "num"], ["vly", "vs last year", "num"], ["c", "Customers", "num"], ["b", "Basket", "num"], ["ws", "Waste %", "num"]];
+    const thr = E("tr", null, cols.map(([k, l, c]) => E("th", { class: c + " sort" + (lgSort.k === k ? (lgSort.dir > 0 ? " asc" : " desc") : ""), text: l,
+      onclick: () => { lgSort = { k, dir: lgSort.k === k ? -lgSort.dir : (k === "name" || k === "rom" ? 1 : -1) }; render(); } })));
+    const tb = E("tbody");
+    rows.forEach((r) => {
+      const o = r.o;
+      tb.appendChild(E("tr", null, [
+        E("td", null, [E("button", { class: "linkbtn", type: "button", text: r.name, onclick: () => { $("scope").value = "s:" + r.c; changeScope(); } })]),
+        E("td", { class: "note", text: r.rom }),
+        E("td", { class: "num", text: o ? eur(o.s) : "no report" }),
+        E("td", { class: "num " + cls(r.vt), text: pct(r.vt) }),
+        E("td", { class: "num " + cls(r.vlw), text: pct(r.vlw) }),
+        E("td", { class: "num " + cls(r.vly), text: pct(r.vly) }),
+        E("td", { class: "num", text: o ? int(o.c) : "–" }),
+        E("td", { class: "num", text: o && o.c ? eur2(o.s / o.c) : "–" }),
+        E("td", { class: "num " + (r.ws > WASTE_ALERT ? "down" : ""), text: share(r.ws) })
+      ]));
+    });
+    if (tot) tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td"), E("td", { class: "num", text: eur(tot.s) }),
+      E("td", { class: "num " + cls(ch(tot.s, tot.t)), text: pct(ch(tot.s, tot.t)) }), E("td", { class: "num " + cls(ch(tot.s, tot.lw)), text: pct(ch(tot.s, tot.lw)) }),
+      E("td", { class: "num " + cls(ch(tot.s, tot.ly)), text: pct(ch(tot.s, tot.ly)) }), E("td", { class: "num", text: int(tot.c) }),
+      E("td", { class: "num", text: tot.c ? eur2(tot.s / tot.c) : "–" }), E("td", { class: "num", text: share(tot.s ? tot.w / tot.s : null) })]));
+    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [thr]), tb])]));
+    box.appendChild(E("p", { class: "note", style: "margin:10px 0 0", text: "Click a column to sort, or a store to open it. Sales are Total inc VAT inc D030 (including tobacco)." }));
+  }
+
+  function renderMonth(w, codes, ld) {
+    const box = $("ovMonth"); box.innerHTML = "";
+    if (ld < 0) { box.hidden = true; return; }
+    box.hidden = false;
+    const upto = addDays(w, ld);
+    let o = null; codes.forEach((c) => { o = add(o, mtd(c, upto)); });
+    if (!o) { box.hidden = true; return; }
+    const first = upto.slice(0, 8) + "01";
+    const dim = new Date(+upto.slice(0, 4), +upto.slice(5, 7), 0).getDate();
+    const elapsed = +upto.slice(8);
+    const pace = o.t ? o.s / o.t : null;
+    const tPerDay = elapsed ? o.t / elapsed : 0;
+    const monthTarget = o.t + tPerDay * (dim - elapsed);
+    const proj = pace != null ? o.s + tPerDay * (dim - elapsed) * pace : null;
+    box.appendChild(E("h2", { text: monthName(upto) + " to date" }));
+    const missing = codes.length > 1 ? "" : (o.days < elapsed ? " Only " + o.days + " of the " + elapsed + " days so far have a report uploaded." : "");
+    box.appendChild(E("div", { class: "kpis" }, [
+      kpi("Sales " + short(first) + " – " + short(upto), eur(o.s), subLine("vs target " + eur(o.t), ch(o.s, o.t))),
+      kpi("vs last year", pct(ch(o.s, o.ly)), ["Last year " + eur(o.ly)], cls(ch(o.s, o.ly)) === "down" ? "bad" : "good"),
+      kpi("Month-end outlook", eur(proj), ["Month target about " + eur(monthTarget)]),
+      kpi("Customers", int(o.c), ["Basket " + eur2(o.c ? o.s / o.c : null)])
+    ]));
+    box.appendChild(E("p", { class: "note", style: "margin:12px 0 0", text: "The outlook assumes the rest of the month runs at the same pace against target as the month so far (" + pct(pace != null ? pace - 1 : null) + "). Targets for days not yet reported are estimated from this month's average daily target." + missing }));
+  }
+
+  // ── Departments ──
+  const W = {};   // week detail cache: code_week → doc
+  async function getDetail(c, w) {
+    const k = c + "_" + w;
+    if (!(k in W)) { try { const s = await fs.getDoc(wkDoc(c, w)); W[k] = s.exists() ? s.data() : null; } catch (e) { W[k] = null; } }
+    return W[k];
+  }
+  let dpSeq = 0;
+  const openDept = new Set();
+  async function renderDepts(w, codes) {
+    const seq = ++dpSeq;
+    $("dpMain").innerHTML = ""; $("dpMain").appendChild(E("p", { class: "note", text: "Loading " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…" }));
+    $("dpMore").innerHTML = "";
+    const docs = (await Promise.all(codes.map((c) => getDetail(c, w)))).filter(Boolean);
+    if (seq !== dpSeq) return;
+    $("dpMain").innerHTML = "";
+    if (!docs.length) { $("dpMain").appendChild(E("p", { class: "empty", text: "No report for this week." })); return; }
+    const idxs = docs.map((d) => d.has.map((v, i) => v ? i : -1).filter((i) => i >= 0));
+    const nDays = Math.max(...idxs.map((x) => x.length));
+    const full = idxs.every((x) => x.length === 7);
+    const S2 = (arr, i) => arr ? sum(idxs[i].map((j) => arr[j] || 0)) : 0;
+    const M = (k) => sum(docs.map((d, i) => S2(d.m[k], i)));
+    // departments (sum across stores)
+    const dep = {}, cat = {};
+    docs.forEach((d, i) => {
+      d.depts.forEach((x) => { const o = dep[x.c] || (dep[x.c] = { c: x.c, n: x.n, s: 0, ly: 0 }); o.s += S2(x.d, i); o.ly += x.ly || 0; });
+      d.cats.forEach((x) => { const o = cat[x.p + "|" + x.c] || (cat[x.p + "|" + x.c] = { c: x.c, n: x.n, p: x.p, s: 0, ly: 0 }); o.s += S2(x.d, i); o.ly += x.ly || 0; });
+    });
+    // Tobacco & Related Products (D030) from its own blocks
+    const TK = "tobacco_related_products_incl_vat", TKY = "tobacco_related_products_prev_year_incl_vat";
+    const allDays = (arr) => sum(arr || []);
+    if (docs.some((d) => d.m[TK])) {
+      const o = dep.D030 || (dep.D030 = { c: "D030", n: "Tobacco & Related Products", s: 0, ly: 0 });
+      docs.forEach((d, i) => {
+        o.s += S2(d.m[TK], i); o.ly += allDays(d.m[TKY]);
+        const lyCats = Object.fromEntries(((d.tob || {})[TKY] || []).map((y) => [y.c, allDays(y.d)]));
+        ((d.tob || {})[TK] || []).forEach((y) => { const c = cat["D030|" + y.c] || (cat["D030|" + y.c] = { c: y.c, n: y.n, p: "D030", s: 0, ly: 0 }); c.s += S2(y.d, i); c.ly += lyCats[y.c] || 0; });
+      });
+    }
+    const total = sum(Object.values(dep).map((x) => x.s));
+    const list = Object.values(dep).filter((x) => x.s || x.ly).sort((a, b) => b.s - a.s);
+    const tb = E("tbody");
+    list.forEach((x) => {
+      const cats = Object.values(cat).filter((y) => y.p === x.c && (y.s || y.ly)).sort((a, b) => b.s - a.s);
+      const tr = E("tr", { class: cats.length ? "exp" + (openDept.has(x.c) ? " open" : "") : "" }, [
+        E("td", { text: x.n }), E("td", { class: "num", text: eur(x.s) }), E("td", { class: "num", text: share(total ? x.s / total : null) }),
+        E("td", { class: "num", text: eur(x.ly) }), E("td", { class: "num " + (full ? cls(ch(x.s, x.ly)) : ""), text: full ? pct(ch(x.s, x.ly)) : "–" })]);
+      if (cats.length) tr.onclick = () => { openDept.has(x.c) ? openDept.delete(x.c) : openDept.add(x.c); renderDepts(w, codes); };
+      tb.appendChild(tr);
+      if (openDept.has(x.c)) cats.forEach((y) => tb.appendChild(E("tr", { class: "cat" }, [E("td", { text: y.n }), E("td", { class: "num", text: eur(y.s) }),
+        E("td", { class: "num", text: share(x.s ? y.s / x.s : null) }), E("td", { class: "num", text: eur(y.ly) }),
+        E("td", { class: "num " + (full ? cls(ch(y.s, y.ly)) : ""), text: full ? pct(ch(y.s, y.ly)) : "–" })])));
+    });
+    tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total (inc VAT inc D030)" }), E("td", { class: "num", text: eur(total) }), E("td", { class: "num", text: "100%" }),
+      E("td", { class: "num", text: eur(sum(list.map((x) => x.ly))) }), E("td", { class: "num " + (full ? cls(ch(total, sum(list.map((x) => x.ly)))) : ""), text: full ? pct(ch(total, sum(list.map((x) => x.ly)))) : "–" })]));
+    const scopeName = codes.length === 1 ? (byCode[codes[0]] || {}).name : scope().label;
+    $("dpMain").append(E("h2", { text: "Departments · " + scopeName }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: (full ? "Full week." : nDays + " day" + (nDays === 1 ? "" : "s") + " so far: the report only gives last year for the whole week, so “vs last year” appears once the week is complete.") + " Click a department to see its categories." + (docs.length < codes.length ? " " + (codes.length - docs.length) + " store(s) have no report this week." : "") }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Department", "Sales", "Share", "Last year (week)", "vs LY"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+
+    // waste, tobacco, payments, night trade
+    const wd = {}; docs.forEach((d, i) => Object.keys(d.waste || {}).forEach((k) => { wd[k] = (wd[k] || 0) + S2(d.waste[k], i); }));
+    const wName = Object.fromEntries(list.map((x) => [x.c.toLowerCase(), x]));
+    const wRows = Object.keys(wd).filter((k) => wd[k]).sort((a, b) => wd[b] - wd[a]);
+    const wTot = M("total_waste");
+    const card = (title, rows, headers, note) => E("div", { class: "card panel" }, [E("h3", { text: title }),
+      rows.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, headers.map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), E("tbody", null, rows)])]) : E("p", { class: "note", text: "Nothing this week." }),
+      note ? E("p", { class: "note", style: "margin:8px 0 0", text: note }) : null]);
+    $("dpMore").appendChild(card("Waste by department", wRows.map((k) => {
+      const d = wName[k]; return E("tr", null, [E("td", { text: d ? d.n : k.toUpperCase() }), E("td", { class: "num", text: eur2(wd[k]) }),
+        E("td", { class: "num " + (d && d.s && wd[k] / d.s > WASTE_ALERT ? "down" : ""), text: share(d && d.s ? wd[k] / d.s : null) })]);
+    }).concat(wRows.length ? [E("tr", { class: "tot" }, [E("td", { text: "Total waste" }), E("td", { class: "num", text: eur2(wTot) }), E("td", { class: "num", text: share(total ? wTot / total : null) })])] : []),
+      ["Department", "Waste", "% of its sales"], "Stock adjustments this week: " + eur2(M("stock_adjustments")) + "."));
+
+    const tob = M("tobacco_related_products_incl_vat"), tobLW = M("tobacco_related_products_prev_week_incl_vat"), tobLY = M("tobacco_related_products_prev_year_incl_vat");
+    const pays = {}; docs.forEach((d, i) => Object.keys(d.m).filter((k) => k.indexOf("pay_") === 0).forEach((k) => { pays[k] = (pays[k] || 0) + S2(d.m[k], i); }));
+    const payTot = sum(Object.values(pays));
+    const n22 = M("sales_between_22_00_23_59_inc_vat"), n22lw = M("sales_between_22_00_23_59_last_week_inc_vat"), n22ly = M("sales_between_22_00_23_59_last_year_inc_vat");
+    const n00 = M("sales_between_00_00_06_00_inc_vat"), n00lw = M("sales_between_00_00_06_00_last_week_inc_vat"), n00ly = M("sales_between_00_00_06_00_last_year_inc_vat");
+    const c22 = M("nr_of_chits_between_22_00_23_59"), c00 = M("nr_of_chits_between_00_00_06_00");
+    const onl = M("online_sales_inc_vat"), cred = M("credit_sales_inc_vat");
+    const tr3 = (a, b, c, d) => E("tr", null, [E("td", { text: a }), E("td", { class: "num", text: b }), E("td", { class: "num " + (c ? c[1] : ""), text: c ? c[0] : "" }), E("td", { class: "num " + (d ? d[1] : ""), text: d ? d[0] : "" })]);
+    const vs = (a, b) => [pct(ch(a, b)), cls(ch(a, b))];
+    $("dpMore").appendChild(card("Tobacco, online and credit", [
+      tr3("Tobacco & related", eur(tob), vs(tob, tobLW), vs(tob, tobLY)),
+      tr3("Online sales", eur(onl), null, null),
+      tr3("Credit sales", eur(cred), null, null)], ["", "Sales", "vs last week", "vs last year"], "Tobacco is included in the sales totals and in the Departments table."));
+    $("dpMore").appendChild(card("Payments", Object.keys(pays).filter((k) => pays[k]).sort((a, b) => pays[b] - pays[a]).map((k) =>
+      E("tr", null, [E("td", { text: ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " ")) }), E("td", { class: "num", text: eur(pays[k]) }), E("td", { class: "num", text: share(payTot ? pays[k] / payTot : null) })])),
+      ["Method", "Amount", "Share"], "Payment totals include tobacco."));
+    $("dpMore").appendChild(card("Night trade", [
+      tr3("22:00 – 23:59", eur2(n22) + " · " + int(c22) + " chits", vs(n22, n22lw), vs(n22, n22ly)),
+      tr3("00:00 – 06:00", eur2(n00) + " · " + int(c00) + " chits", vs(n00, n00lw), vs(n00, n00ly))], ["", "Sales", "vs last week", "vs last year"]));
+  }
+
+  // ── Trends ──
+  function renderTrends(w, codes) {
+    const box = $("trMain"); box.innerHTML = "";
+    const wks = weeks.filter((x) => x <= w).slice(0, 8).reverse();
+    const rows = wks.map((wk) => {
+      let o = null; codes.forEach((c) => { const sm = S[c] && S[c][wk]; o = add(o, agg(sm, hasIdx(sm))); });
+      return { wk, o: o || { s: 0, t: 0, lw: 0, ly: 0, c: 0, clw: 0, w: 0, n: 0 } };
+    });
+    box.appendChild(E("h2", { text: "Week by week · " + scope().label }));
+    // chart: sales bars, target tick, last-year dot
+    const max = Math.max(1, ...rows.map((r) => Math.max(r.o.s, r.o.t, r.o.ly)));
+    const Wd = 720, H = 220, L = 56, B = 30, bw = Math.min(60, (Wd - L - 10) / rows.length * 0.55);
+    const x = (i) => L + (i + 0.5) * (Wd - L - 10) / rows.length, y = (v) => H - B - (v / max) * (H - B - 14);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 " + Wd + " " + H); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Weekly sales against target and last year");
+    const mk = (tag, a, txt) => { const n = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => n.setAttribute(k, v)); if (txt != null) n.textContent = txt; svg.appendChild(n); return n; };
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => { mk("line", { x1: L, x2: Wd - 10, y1: y(max * f), y2: y(max * f), stroke: "#E9EBEA" }); mk("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, "€" + Math.round(max * f / 1000) + "k"); });
+    rows.forEach((r, i) => {
+      const full = r.o.n >= 7 * codes.length || r.o.n === 0 ? 1 : 0;
+      mk("rect", { x: x(i) - bw / 2, y: y(r.o.s), width: bw, height: Math.max(0, H - B - y(r.o.s)), rx: 4, fill: r.o.s >= r.o.t ? "#00703C" : "#EC1B24", "fill-opacity": full ? 0.85 : 0.45 });
+      if (r.o.t) mk("line", { x1: x(i) - bw / 2 - 6, x2: x(i) + bw / 2 + 6, y1: y(r.o.t), y2: y(r.o.t), stroke: "#10252b", "stroke-width": 2 });
+      if (r.o.ly) mk("circle", { cx: x(i), cy: y(r.o.ly), r: 4, fill: "#fff", stroke: "#60727a", "stroke-width": 2 });
+      mk("text", { x: x(i), y: H - 10, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, "Wk " + isoWeek(r.wk));
+    });
+    box.appendChild(svg);
+    box.appendChild(E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#00703C" }), "Sales at or above target"]), E("span", null, [E("i", { style: "background:#EC1B24" }), "below target"]),
+      E("span", null, [E("i", { style: "background:#10252b;height:3px;vertical-align:3px" }), "Target"]), E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), "Last year"]), E("span", { text: "Paler bar = week not complete" })]));
+    const tb = E("tbody");
+    rows.slice().reverse().forEach((r) => tb.appendChild(E("tr", null, [E("td", { text: "Wk " + isoWeek(r.wk) + " · " + short(r.wk) }),
+      E("td", { class: "num", text: eur(r.o.s) }), E("td", { class: "num", text: eur(r.o.t) }), E("td", { class: "num " + cls(ch(r.o.s, r.o.t)), text: pct(ch(r.o.s, r.o.t)) }),
+      E("td", { class: "num " + cls(ch(r.o.s, r.o.ly)), text: pct(ch(r.o.s, r.o.ly)) }), E("td", { class: "num", text: int(r.o.c) }),
+      E("td", { class: "num", text: r.o.c ? eur2(r.o.s / r.o.c) : "–" }), E("td", { class: "num", text: share(r.o.s ? r.o.w / r.o.s : null) })])));
+    box.appendChild(E("div", { class: "tablewrap", style: "margin-top:14px" }, [E("table", null, [E("thead", null, [E("tr", null,
+      ["Week", "Sales", "Target", "vs target", "vs last year", "Customers", "Basket", "Waste %"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
+
+    // day-of-week pattern over the weeks loaded
+    const dbox = $("trDow"); dbox.innerHTML = "";
+    const per = DOW.map(() => ({ s: 0, t: 0, n: 0 }));
+    wks.forEach((wk) => codes.forEach((c) => { const sm = S[c] && S[c][wk]; if (sm) sm.has.forEach((h, i) => { if (h) { per[i].s += sm.s[i] || 0; per[i].t += sm.t[i] || 0; per[i].n++; } }); }));
+    const avg = per.map((p) => p.n ? p.s / p.n * codes.length : 0);
+    const best = Math.max(...avg);
+    dbox.append(E("h2", { text: "Day-of-week pattern" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Average sales per day over the last " + wks.length + " week" + (wks.length === 1 ? "" : "s") + ", and how each weekday does against its target." }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Day", "Average sales", "", "vs target"].map((h, i) => E("th", { class: i === 1 || i === 3 ? "num" : "", text: h })))]),
+        E("tbody", null, per.map((p, i) => E("tr", null, [E("td", { text: DOWFULL[i] }), E("td", { class: "num", text: p.n ? eur(avg[i]) : "–" }),
+          E("td", { style: "width:40%" }, [E("div", { style: "height:10px;border-radius:5px;background:" + (avg[i] === best ? "#EC1B24" : "#C9CDCB") + ";width:" + (best ? Math.round(avg[i] / best * 100) : 0) + "%" })]),
+          E("td", { class: "num " + cls(ch(p.s, p.t)), text: pct(ch(p.s, p.t)) })])))])]));
+  }
+
+  // ── Alerts ──
+  function renderAlerts(w, codes, ld) {
+    const out = [];
+    codes.forEach((c) => {
+      const sm = S[c] && S[c][w], name = (byCode[c] || {}).name || c;
+      const everReported = Object.keys(S[c] || {}).length > 0;   // stores not yet on the tracker aren't flagged
+      if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported) out.push({ red: true, store: c, name, what: "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), why: "Other stores in this view have reported that day." }); return; }
+      const idx = hasIdx(sm); const t = agg(sm, idx);
+      let run = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.s[j] || 0) < (sm.t[j] || 0)) run++; else break; }
+      if (run >= 3) out.push({ red: true, store: c, name, what: "Below target " + run + " days running", why: "Week to date " + pct(ch(t.s, t.t)) + " against target." });
+      if (ch(t.s, t.ly) != null && ch(t.s, t.ly) <= DOWN_ALERT) out.push({ store: c, name, what: "Sales " + pct(ch(t.s, t.ly)) + " on last year", why: eur(t.s) + " against " + eur(t.ly) + " week to date." });
+      if (t.s && t.w / t.s > WASTE_ALERT) out.push({ store: c, name, what: "Waste at " + share(t.w / t.s) + " of sales", why: eur(t.w) + " week to date (alert above " + share(WASTE_ALERT) + ")." });
+      if (ch(t.c, t.clw) != null && ch(t.c, t.clw) <= DOWN_ALERT) out.push({ store: c, name, what: "Customers " + pct(ch(t.c, t.clw)) + " on last week", why: int(t.c) + " against " + int(t.clw) + "." });
+    });
+    $("aCount").textContent = out.length; $("aCount").hidden = !out.length;
+    if (tab !== "alerts") return;
+    const box = $("alertList"); box.innerHTML = "";
+    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to flag for the stores in this view this week." })); return; }
+    out.sort((a, b) => b.red - a.red || a.name.localeCompare(b.name)).forEach((a) => box.appendChild(E("div", { class: "alert" + (a.red ? " red" : "") }, [
+      E("div", null, [E("b", null, [codes.length > 1 ? E("button", { class: "linkbtn", type: "button", text: a.name, onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : a.name, " · " + a.what]),
+        E("span", { class: "note", text: a.why })])])));
+  }
+
+  // ═════════ UPLOAD ═════════
+  let pending = [];
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("Couldn't load the Excel reader. Check your connection.")); document.head.appendChild(s); });
+  }
+  const keyOf = (l) => String(l).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
+  const nv = (v) => { if (v == null || v === "") return 0; const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[,€\s]/g, "")); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+  function toISO(v, X) {
+    if (v == null || v === "") return null;
+    if (typeof v === "number" && X) { const p = X.SSF.parse_date_code(v); return p ? p.y + "-" + pad(p.m) + "-" + pad(p.d) : null; }
+    if (v instanceof Date) return iso(v);
+    const s = String(v).trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+    m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/); if (m) return m[3] + "-" + pad(+m[2]) + "-" + pad(+m[1]);
+    return null;
+  }
+  // Reads the weekly department report (the same layout for every store). Based on Keith's reader.
+  function parseReport(rows, X) {
+    const h = rows[0] || [], cols = [], dates = [];
+    for (let c = 0; c < h.length; c++) { const v = h[c]; if (typeof v === "string" && DOWFULL.includes(v.trim())) { cols.push(c); dates.push(toISO(h[c + 1], X)); } }
+    if (cols.length !== 7 || dates.some((d) => !d)) throw new Error("This doesn't look like the daily department report: the Monday to Sunday columns weren't found.");
+    if (new Date(dates[0] + "T12:00:00").getDay() !== 1) throw new Error("The first day in this report isn't a Monday.");
+    const lyCol = h.findIndex((v) => typeof v === "string" && /totals\s*ly/i.test(v));
+    const out = { title: String(h[0] || "").trim(), days: dates, depts: [], cats: [], waste: {}, m: {} };
+    let sec = "sales", cur = null, blk = null;
+    out.tob = {};
+    for (let i = 2; i < rows.length; i++) {
+      const r = rows[i] || []; const code = r[0] == null ? "" : String(r[0]).trim(), label = r[1] == null ? "" : String(r[1]).trim();
+      if (!label) continue;
+      const d = cols.map((c) => nv(r[c]));
+      if (label === "Waste") { sec = "waste"; continue; }
+      if (sec === "sales") {
+        const ly = lyCol >= 0 ? nv(r[lyCol]) : 0;
+        if (/^D\d+\w*$/.test(code)) { cur = code; if (d.some((x) => x) || ly) out.depts.push({ c: code, n: label, d, ly }); continue; }
+        if (/^C\d+\w*$/.test(code)) { if (d.some((x) => x) || ly) out.cats.push({ c: code, n: label, p: cur, d, ly }); continue; }
+        sec = "misc";
+      }
+      if (sec === "waste" && /^D\d+\w*$/.test(code)) { if (d.some((x) => x)) out.waste[code.toLowerCase()] = d; continue; }
+      if (label.startsWith("%")) continue;
+      // Tobacco comes in its own blocks (this week, previous week, previous year…), each a D030 row with its categories
+      if (sec === "misc" && /^D\d+\w*$/.test(code)) blk = keyOf(label);
+      else if (sec === "misc" && /^C\d+\w*$/.test(code) && blk) { (out.tob[blk] = out.tob[blk] || []).push({ c: code, n: label, d }); continue; }
+      else blk = null;
+      let k = keyOf(label); if (/^\d+$/.test(code)) k = "pay_" + k;
+      if (k && !out.m[k]) out.m[k] = d;
+    }
+    if (!out.m.total_inc_vat) throw new Error("The sales totals weren't found in this file.");
+    out.has = out.m.total_inc_vat.map((v, i) => v > 0 || (out.m.total_inc_vat_inc_d030 || [])[i] > 0);
+    out.week = dates[0];
+    return out;
+  }
+  const norm = (s) => String(s || "").toLowerCase().replace(/interspar|eurospar|spar|express|gourmet/g, "").replace(/[^a-z0-9]+/g, "");
+  function matchStore(fname, title) {
+    const m = String(fname).match(/report[-_ ]?(\d+)/i);
+    const byRep = m ? me.allStores.find((s) => String(s.report || "").toLowerCase().replace(/\s/g, "") === "report-" + m[1]) : null;
+    const t = norm(title);
+    const byName = t ? me.allStores.find((s) => norm(s.name) === t) || me.allStores.find((s) => norm(s.name).includes(t) || t.includes(norm(s.name))) : null;
+    return { code: (byRep || byName || {}).code || "", check: byRep && byName && byRep.code !== byName.code ? byName : null };
+  }
+  function summaryOf(p) {
+    const g = (k) => (p.m[k] || [0, 0, 0, 0, 0, 0, 0]).map((v) => v || 0);
+    const tob = g("tobacco_related_products_incl_vat"), tobLW = g("tobacco_related_products_prev_week_incl_vat"), tobLY = g("tobacco_related_products_prev_year_incl_vat");
+    const sx = g("total_inc_vat"), inc = p.m.total_inc_vat_inc_d030 ? g("total_inc_vat_inc_d030") : sx.map((v, i) => v + tob[i]);
+    const plus = (a, b) => a.map((v, i) => Math.round((v + b[i]) * 100) / 100);
+    // Sales = "Total inc VAT inc D030". The report's last week / last year exclude tobacco, so tobacco's own last week / last year are added back.
+    return { v: 2, week: p.week, days: p.days, has: p.has, s: inc, sx, t: g("target_sales"), lw: plus(g("total_prev_week_inc_vat"), tobLW), ly: plus(g("total_prev_year_inc_vat"), tobLY),
+      tobLW, tobLY,
+      c: g("customer_no_current_wk"), clw: g("customer_no_previous_wk"), w: g("total_waste"), tob, n22: g("sales_between_22_00_23_59_inc_vat"), n00: g("sales_between_00_00_06_00_inc_vat"),
+      online: g("online_sales_inc_vat") };
+  }
+
+  function renderUpload() {}
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
+  drop.addEventListener("drop", (e) => { const f = [...((e.dataTransfer && e.dataTransfer.files) || [])]; if (f.length) readFiles(f); });
+  $("file").onchange = () => { const f = [...$("file").files]; $("file").value = ""; readFiles(f); };
+
+  async function readFiles(files) {
+    const pv = $("preview"); pv.innerHTML = ""; pv.appendChild(E("p", { class: "note", text: "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…" }));
+    let X; try { X = await loadXLSX(); } catch (e) { pv.innerHTML = ""; pv.appendChild(E("p", { class: "msg err", text: e.message })); return; }
+    pending = [];
+    for (const f of files) {
+      try {
+        const wb = X.read(await f.arrayBuffer(), { type: "array" });
+        const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+        const p = parseReport(rows, X); const mt = matchStore(f.name, p.title);
+        let prev = null; if (mt.code) { try { const s = await fs.getDoc(sumDoc(mt.code, p.week)); prev = s.exists() ? s.data() : null; } catch (e) {} }
+        pending.push({ name: f.name, p, code: mt.code, check: mt.check, prev });
+      } catch (e) { pending.push({ name: f.name, err: e.message || "Couldn't read this file." }); }
+    }
+    showPending();
+  }
+  function showPending() {
+    const pv = $("preview"); pv.innerHTML = "";
+    if (!pending.length) return;
+    const tb = E("tbody");
+    pending.forEach((x) => {
+      if (x.err) { tb.appendChild(E("tr", null, [E("td", { text: x.name }), E("td", { colspan: "6" }, [E("span", { class: "down", text: x.err })])])); return; }
+      const sel = E("select", { class: "in", style: "padding:6px 8px;min-width:180px" });
+      sel.add(new Option(x.code ? "" : "Choose the store…", ""));
+      me.allStores.filter((s) => s.active !== false).forEach((s) => sel.add(new Option(s.name + " (" + (s.report || s.code) + ")", s.code)));
+      sel.value = x.code; sel.onchange = () => { x.code = sel.value; x.check = null; x.done = false; };
+      const sm = summaryOf(x.p), idx = sm.has.map((v, i) => v ? i : -1).filter((i) => i >= 0);
+      const s = sum(idx.map((i) => sm.s[i])), t = sum(idx.map((i) => sm.t[i]));
+      const prevDays = x.prev ? x.prev.has.filter(Boolean).length : 0;
+      tb.appendChild(E("tr", null, [
+        E("td", null, [E("b", { text: x.p.title || x.name }), E("br"), E("span", { class: "note", text: x.name })]),
+        E("td", null, [sel, x.check ? E("div", { class: "note down", text: "The file says " + x.p.title + ": check this is right" }) : null]),
+        E("td", { text: "Wk " + isoWeek(x.p.week) + " · " + short(x.p.week) + " – " + short(addDays(x.p.week, 6)) }),
+        E("td", { class: "num", text: idx.length ? idx.map((i) => DOW[i]).join(", ") : "none yet" }),
+        E("td", { class: "num", text: eur(s) }), E("td", { class: "num " + cls(ch(s, t)), text: pct(ch(s, t)) }),
+        E("td", { class: x.done ? "up" : "", text: x.done ? "✓ Saved" : x.fail ? "Not saved: " + x.fail : x.prev ? "Replaces " + prevDays + " day" + (prevDays === 1 ? "" : "s") : "New" })
+      ]));
+    });
+    const ok = pending.filter((x) => x.p && !x.done);
+    const go = E("button", { class: "btn", type: "button", text: "Save " + ok.length + " report" + (ok.length === 1 ? "" : "s"), onclick: savePending });
+    go.disabled = !ok.length;
+    pv.append(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["File", "Store", "Week", "Days in file", "Sales to date", "vs target", ""].map((h, i) => E("th", { class: i >= 3 && i <= 5 ? "num" : "", text: h })))]), tb])]),
+      E("div", { class: "row", style: "margin-top:12px" }, [go, E("button", { class: "btn secondary", type: "button", text: "Clear", onclick: () => { pending = []; showPending(); } }), E("span", { class: "note", id: "upMsg" })]));
+  }
+  async function savePending() {
+    const ok = pending.filter((x) => x.p && !x.done);
+    if (ok.some((x) => !x.code)) { SPARUI.toast("Choose the store for each file first", "err"); return; }
+    const keys = ok.map((x) => x.code + "_" + x.p.week);
+    if (new Set(keys).size !== keys.length) { SPARUI.toast("Two files are for the same store and week. Remove one.", "err"); return; }
+    let n = 0;
+    for (const x of ok) {
+      $("upMsg").textContent = "Saving " + (byCode[x.code] || {}).name + "…";
+      try {
+        const at = Date.now(), base = { code: x.code, week: x.p.week, file: x.name, title: x.p.title, at, by: me.email };
+        const b = fs.writeBatch(db);
+        b.set(wkDoc(x.code, x.p.week), { ...base, v: 2, days: x.p.days, has: x.p.has, depts: x.p.depts, cats: x.p.cats, waste: x.p.waste, m: x.p.m, tob: x.p.tob });
+        b.set(sumDoc(x.code, x.p.week), { ...base, ...summaryOf(x.p) });
+        await b.commit();
+        x.done = true; x.fail = null; n++;
+        delete S[x.code]; delete W[x.code + "_" + x.p.week];
+      } catch (e) { x.fail = e.code || e.message; }
+    }
+    showPending();
+    SPARUI.toast(n + " report" + (n === 1 ? "" : "s") + " saved");
+    await loadSummaries();
+  }
+
+  // ═════════ START ═════════
+  async function changeScope() {
+    try { localStorage.setItem("sparSalesScope", $("scope").value); } catch (e) {}
+    await loadSummaries(); render();
+  }
+  $("scope").onchange = changeScope;
+  $("week").onchange = render;
+  await loadSummaries();
+  render();
+</script>
+</body>
+</html>

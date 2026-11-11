@@ -108,7 +108,7 @@
     // The modules list, used by the hub. "page" set = built; otherwise "coming soon".
     // who: which roles see the tile.
     MODULES: [
-      { group: "Sales & stock", id: "sales", icon: "📈", name: "Sales Tracker", desc: "Daily sales by store against target and last year.", who: "all" },
+      { group: "Sales & stock", id: "sales", icon: "📈", name: "Sales Tracker", desc: "Daily sales by store against target and last year.", who: "all", page: "sales.html" },
       { group: "Sales & stock", id: "waste", icon: "🗑️", name: "Waste Tracker", desc: "Log waste by department and reason; spot the trends.", who: "all" },
       { group: "Sales & stock", id: "gaps", icon: "🔍", name: "Gap Check Tracker", desc: "Daily gap checks — out of stock, stock on system, suppliers.", who: "all" },
       { group: "Cash", id: "cash", icon: "💶", name: "Cash Sheet Analyser", desc: "Weekly cash sheets, cashier unders and overs, unders check.", who: "all" },
