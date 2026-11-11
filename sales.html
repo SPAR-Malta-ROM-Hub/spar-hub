@@ -89,6 +89,14 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       <p class="note" style="margin:-6px 0 14px">Based on the latest week's reports for the stores in this view. A store is listed when it is below target 3 days running, more than 10% down on last year, has waste above 2% of sales, has customers more than 10% down on last week, or is missing the latest day's report.</p>
       <div id="alertList"></div>
     </div>
+    <div class="card panel">
+      <div class="row" style="justify-content:space-between;margin-bottom:4px">
+        <h2 style="margin:0">Missing weeks</h2>
+        <button class="btn secondary small" id="mwRefresh" type="button">Check again</button>
+      </div>
+      <p class="note" style="margin:0 0 14px">Every week from Week 1 of 2026 to last week should have a full report (Monday to Sunday) for each store in this view. The full week arrives in the sales email on the Monday after it, so that's the email to look for.</p>
+      <div id="missList"><p class="note">Checking…</p></div>
+    </div>
   </section>
 
   <!-- ═════════ UPLOAD ═════════ -->
@@ -142,6 +150,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   const sumCol = (c) => fs.collection(db, "modules", "sales", "stores", c, "sum");
   const sumDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "sum", w);
   const wkDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "weeks", w);
+  // One small document per store listing which weeks are in and how many days each has (so the missing-weeks check is cheap)
+  const metaDoc = (c) => fs.doc(db, "modules", "sales", "stores", c, "meta", "weeks");
 
   // ── Who sees what ──
   const stores = me.stores.slice();                       // what this person may see
@@ -247,7 +257,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (tab === "depts") renderDepts(w, codes);
     if (tab === "trends") renderTrends(w, codes);
     renderAlerts(w, codes, ld);
+    if (tab === "alerts" || lastMissScope !== scope().id) { lastMissScope = scope().id; renderMissing(); }
   }
+  let lastMissScope = null;
 
   function kpi(label, value, sub, klass) {
     return E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: klass || "", text: value }), sub ? E("span", { class: "sub" }, sub) : null]);
@@ -526,6 +538,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
 
   // ── Alerts ──
+  let alertCount = 0;
   function renderAlerts(w, codes, ld) {
     const out = [];
     codes.forEach((c) => {
@@ -539,7 +552,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       if (t.s && t.w / t.s > WASTE_ALERT) out.push({ store: c, name, what: "Waste at " + share(t.w / t.s) + " of sales", why: eur(t.w) + " week to date (alert above " + share(WASTE_ALERT) + ")." });
       if (ch(t.c, t.clw) != null && ch(t.c, t.clw) <= DOWN_ALERT) out.push({ store: c, name, what: "Customers " + pct(ch(t.c, t.clw)) + " on last week", why: int(t.c) + " against " + int(t.clw) + "." });
     });
-    $("aCount").textContent = out.length; $("aCount").hidden = !out.length;
+    alertCount = out.length; updateBadge();
     if (tab !== "alerts") return;
     const box = $("alertList"); box.innerHTML = "";
     if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to flag for the stores in this view this week." })); return; }
@@ -547,6 +560,71 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       E("div", null, [E("b", null, [codes.length > 1 ? E("button", { class: "linkbtn", type: "button", text: a.name, onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : a.name, " · " + a.what]),
         E("span", { class: "note", text: a.why })])])));
   }
+
+  // ── Missing weeks ──
+  const START_WEEK = "2025-12-29";            // Monday of ISO Week 1, 2026
+  const MW = {};                               // code → { week: days } (cached for this visit)
+  let mwSeq = 0, missCount = 0;
+  const longDay = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  async function weeksOf(c) {
+    if (MW[c]) return MW[c];
+    let map = null;
+    try { const d = await fs.getDoc(metaDoc(c)); if (d.exists()) map = d.data().weeks || {}; } catch (e) {}
+    if (!map) {
+      // No list yet (reports uploaded before this check existed): build it once from the reports themselves
+      map = {};
+      try {
+        const qs = await fs.getDocs(fs.query(sumCol(c), fs.where("week", ">=", START_WEEK)));
+        qs.docs.forEach((d) => { const x = d.data(); map[x.week] = (x.has || []).filter(Boolean).length; });
+        if (canUpload && qs.docs.length) await fs.setDoc(metaDoc(c), { weeks: map, at: Date.now() }, { merge: true });
+      } catch (e) {}
+    }
+    return (MW[c] = map);
+  }
+  async function renderMissing(force) {
+    const seq = ++mwSeq, codes = scope().codes;
+    if (force) codes.forEach((c) => delete MW[c]);
+    const box = $("missList");
+    if (tab === "alerts") { box.innerHTML = ""; box.appendChild(E("p", { class: "note", text: "Checking " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…" })); }
+    const maps = await Promise.all(codes.map(weeksOf));
+    if (seq !== mwSeq) return;
+    // the last week whose full report should have arrived: its following Monday is today or earlier
+    const today = iso(new Date());
+    const thisMon = addDays(today, -((new Date(today + "T12:00:00").getDay() + 6) % 7));
+    const lastFull = addDays(thisMon, -7);
+    const out = [];
+    codes.forEach((c, i) => {
+      const map = maps[i], have = Object.keys(map).sort();
+      if (!have.length) return;                 // store not on the tracker yet
+      let start = START_WEEK;
+      if (have[0] > addDays(START_WEEK, 28)) start = have[0];   // a store that started later is checked from its first report
+      for (let w = start; w <= lastFull; w = addDays(w, 7)) {
+        const n = map[w];
+        if (n === 7) continue;
+        out.push({ c, w, n: n || 0 });
+      }
+    });
+    missCount = out.length;
+    updateBadge();
+    if (tab !== "alerts") return;
+    box.innerHTML = "";
+    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "All weeks are in, up to Week " + isoWeek(lastFull) + " (" + short(lastFull) + " – " + short(addDays(lastFull, 6)) + ")." })); return; }
+    const tb = E("tbody");
+    out.sort((a, b) => a.w.localeCompare(b.w) || ((byCode[a.c] || {}).name || "").localeCompare((byCode[b.c] || {}).name || "")).forEach((x) => {
+      tb.appendChild(E("tr", null, [
+        E("td", null, [E("b", { text: c3(x.c) }), " ", E("span", { class: "note", text: (byCode[x.c] || {}).name || "" })]),
+        E("td", { text: "Week " + isoWeek(x.w) + " · " + short(x.w) + " – " + short(addDays(x.w, 6)) }),
+        E("td", null, [E("span", { class: "pill " + (x.n ? "warn" : "red"), text: x.n ? "Only " + x.n + " of 7 days" : "Missing" })]),
+        E("td", null, ["Check the sales email of ", E("b", { text: longDay(addDays(x.w, 7)) })])
+      ]));
+    });
+    box.append(E("p", { style: "margin:0 0 10px;font-weight:700", text: out.length + " week" + (out.length === 1 ? "" : "s") + " to upload" }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Week", "", "What to do"].map((h) => E("th", { text: h })))]), tb])]),
+      E("p", { class: "note", style: "margin:10px 0 0", text: "“Only N of 7 days” means a mid-week report was uploaded but not the full week: upload the Monday email's report for that store and it replaces it. A store that was closed for a day will also show here." }));
+  }
+  const c3 = (c) => c;
+  function updateBadge() { const n = alertCount + missCount; $("aCount").textContent = n; $("aCount").hidden = !n; }
+  $("mwRefresh").onclick = () => renderMissing(true);
 
   // ═════════ UPLOAD ═════════
   let pending = [];
@@ -683,6 +761,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         b.set(wkDoc(x.code, x.p.week), { ...base, v: 2, days: x.p.days, has: x.p.has, depts: x.p.depts, cats: x.p.cats, waste: x.p.waste, m: x.p.m, tob: x.p.tob });
         b.set(sumDoc(x.code, x.p.week), { ...base, ...summaryOf(x.p) });
         await b.commit();
+        try { await fs.setDoc(metaDoc(x.code), { weeks: { [x.p.week]: x.p.has.filter(Boolean).length }, at }, { merge: true }); } catch (e) {}
+        delete MW[x.code];
         x.done = true; x.fail = null; n++;
         delete S[x.code]; delete W[x.code + "_" + x.p.week];
       } catch (e) { x.fail = e.code || e.message; }
