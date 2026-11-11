@@ -1135,6 +1135,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       }
       $("grMsg").textContent = "✓ Rebuilt " + weeksDone + " store-weeks for " + GROUPS.length + " groups.";
       Object.keys(GG).forEach((k) => delete GG[k]);
+      await loadSummaries(true);          // show the rebuilt figures straight away
     } catch (e) { $("grMsg").textContent = "Stopped: " + (e.code || e.message); }
     btn.disabled = false;
   };
