@@ -40,6 +40,18 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .alert{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-left:5px solid var(--amber);border-radius:12px;margin:0 0 10px;background:#fff}
 .alert.red{border-left-color:var(--red)}
 .alert b{display:block}
+.alert{flex-direction:column;gap:8px}
+.alert.read{opacity:.75;border-left-color:#C9CDCB}
+.anotes{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+@media(max-width:700px){.anotes{grid-template-columns:1fr}}
+.anote{background:#F7F8F8;border:1px solid #E9EBEA;border-radius:10px;padding:9px 11px;font-size:13.5px}
+.anote>span{display:block;font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+.anote p{margin:0;white-space:pre-wrap}
+.anote textarea{width:100%;min-height:58px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13.5px;resize:vertical}
+.anote .row{margin-top:6px}
+.aread{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.aread input{width:18px;height:18px;accent-color:var(--gd)}
+.weekhead{margin:18px 0 8px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .chart{width:100%;height:auto;display:block}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
@@ -85,8 +97,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   <!-- ═════════ ALERTS ═════════ -->
   <section data-pane="alerts" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Things to look at</h2>
-      <p class="note" style="margin:-6px 0 14px">Based on the latest week's reports for the stores in this view. A store is listed when it is below target 3 days running, more than 10% down on last year, has waste above 2% of sales, has customers more than 10% down on last week, or is missing the latest day's report.</p>
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">Things to look at</h2>
+        <div class="seg" id="aFilter" hidden><button type="button" data-f="unread" class="on">Not read yet</button><button type="button" data-f="all">All</button></div>
+      </div>
+      <p class="note" style="margin:-6px 0 14px">Based on the latest week's reports for the stores in this view. A store is listed when it is below target 3 days running, more than 10% down on last year, has waste above 2% of sales, has customers more than 10% down on last week, or is missing the latest day's report. The Store Manager and the ROM add a comment to each alert; Head Office ticks it once read. Choose “All weeks” above to see every week of 2026.</p>
       <div id="alertList"></div>
     </div>
     <div class="card panel">
@@ -151,6 +166,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   const sumDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "sum", w);
   const wkDoc = (c, w) => fs.doc(db, "modules", "sales", "stores", c, "weeks", w);
   // One small document per store listing which weeks are in and how many days each has (so the missing-weeks check is cheap)
+  const noteCol = (c) => fs.collection(db, "modules", "sales", "stores", c, "notes");
+  const noteDoc = (c, id) => fs.doc(db, "modules", "sales", "stores", c, "notes", id);
   const metaDoc = (c) => fs.doc(db, "modules", "sales", "stores", c, "meta", "weeks");
 
   // ── Who sees what ──
@@ -178,6 +195,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
     document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
     $("bar").hidden = name === "upload";
+    syncAllOption();
     render();
   }
   document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
@@ -205,8 +223,16 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     weeks.forEach((w) => $("week").add(new Option("Week " + isoWeek(w) + " · " + short(w) + " – " + short(addDays(w, 6)), w)));
     if (!weeks.length) $("week").add(new Option("No reports yet", ""));
     $("week").value = weeks.includes(keep) ? keep : (weeks[0] || "");
+    syncAllOption();
+    if (keep === ALL && tab === "alerts") $("week").value = ALL;
   }
   const curWeek = () => $("week").value;
+  const ALL = "__all__";
+  function syncAllOption() {
+    const sel = $("week"), opt = sel.querySelector('option[value="' + ALL + '"]');
+    if (tab === "alerts" && weeks.length && !opt) sel.insertBefore(new Option("All weeks (2026)", ALL), sel.firstChild);
+    if (tab !== "alerts" && opt) { const was = sel.value === ALL; opt.remove(); if (was) sel.value = weeks[0] || ""; }
+  }
   const daysOf = (w) => Array.from({ length: 7 }, (_, i) => addDays(w, i));
 
   // Figures for one store, one week, over chosen day indexes
@@ -247,6 +273,12 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     }
     $("ovMonth").hidden = false;
     const w = curWeek(), codes = scope().codes;
+    if (w === ALL) {
+      $("stamp").textContent = "All weeks of 2026";
+      renderAlerts(ALL, codes, -1);
+      renderMissing();
+      return;
+    }
     const ups = codes.map((c) => S[c] && S[c][w]).filter(Boolean);
     const ld = latestDay(w, codes);
     const last = ups.map((u) => u.at).sort().pop();
@@ -538,27 +570,133 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
 
   // ── Alerts ──
-  let alertCount = 0;
-  function renderAlerts(w, codes, ld) {
+  // ── Alerts, with the Store Manager's and ROM's comments ──
+  let alertCount = 0, aFilter = "unread", alSeq = 0;
+  const isHO = me.isAdmin || me.role === "hq";
+  const fullYear = {};                       // code → all 2026 weeks loaded
+  const N = {};                              // code → { noteId: note }
+  if (isHO) {
+    $("aFilter").hidden = false;
+    $("aFilter").querySelectorAll("button").forEach((b) => b.onclick = () => {
+      aFilter = b.dataset.f; $("aFilter").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); render();
+    });
+  }
+  function weekAlerts(w, codes, ld, latest) {
     const out = [];
     codes.forEach((c) => {
       const sm = S[c] && S[c][w], name = (byCode[c] || {}).name || c;
       const everReported = Object.keys(S[c] || {}).length > 0;   // stores not yet on the tracker aren't flagged
-      if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported) out.push({ red: true, store: c, name, what: "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), why: "Other stores in this view have reported that day." }); return; }
+      const A = (type, red, what, why) => out.push({ id: w + "_" + type, type, week: w, red, store: c, name, what, why });
+      if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported && latest) A("nodata", true, "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), "Other stores in this view have reported that day."); return; }
       const idx = hasIdx(sm); const t = agg(sm, idx);
       let run = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.s[j] || 0) < (sm.t[j] || 0)) run++; else break; }
-      if (run >= 3) out.push({ red: true, store: c, name, what: "Below target " + run + " days running", why: "Week to date " + pct(ch(t.s, t.t)) + " against target." });
-      if (ch(t.s, t.ly) != null && ch(t.s, t.ly) <= DOWN_ALERT) out.push({ store: c, name, what: "Sales " + pct(ch(t.s, t.ly)) + " on last year", why: eur(t.s) + " against " + eur(t.ly) + " week to date." });
-      if (t.s && t.w / t.s > WASTE_ALERT) out.push({ store: c, name, what: "Waste at " + share(t.w / t.s) + " of sales", why: eur(t.w) + " week to date (alert above " + share(WASTE_ALERT) + ")." });
-      if (ch(t.c, t.clw) != null && ch(t.c, t.clw) <= DOWN_ALERT) out.push({ store: c, name, what: "Customers " + pct(ch(t.c, t.clw)) + " on last week", why: int(t.c) + " against " + int(t.clw) + "." });
+      if (run >= 3) A("target", true, "Below target " + run + " days running", (idx.length === 7 ? "Week " : "Week to date ") + pct(ch(t.s, t.t)) + " against target.");
+      if (ch(t.s, t.ly) != null && ch(t.s, t.ly) <= DOWN_ALERT) A("ly", false, "Sales " + pct(ch(t.s, t.ly)) + " on last year", eur(t.s) + " against " + eur(t.ly) + (idx.length === 7 ? " for the week." : " week to date."));
+      if (t.s && t.w / t.s > WASTE_ALERT) A("waste", false, "Waste at " + share(t.w / t.s) + " of sales", eur(t.w) + (idx.length === 7 ? " for the week" : " week to date") + " (alert above " + share(WASTE_ALERT) + ").");
+      if (ch(t.c, t.clw) != null && ch(t.c, t.clw) <= DOWN_ALERT) A("cust", false, "Customers " + pct(ch(t.c, t.clw)) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
     });
-    alertCount = out.length; updateBadge();
+    return out;
+  }
+  async function loadYear(codes) {
+    const need = codes.filter((c) => !fullYear[c]);
+    await Promise.all(need.map(async (c) => {
+      try {
+        const qs = await fs.getDocs(fs.query(sumCol(c), fs.where("week", ">=", START_WEEK)));
+        S[c] = S[c] || {}; qs.docs.forEach((d) => { S[c][d.id] = d.data(); }); fullYear[c] = true;
+      } catch (e) {}
+    }));
+  }
+  async function loadNotes(codes, fromWeek) {
+    await Promise.all(codes.map(async (c) => {
+      const key = c + "|" + fromWeek;
+      if (N[c] && N[c]._from && N[c]._from <= fromWeek) return;
+      try {
+        const qs = await fs.getDocs(fs.query(noteCol(c), fs.where("week", ">=", fromWeek)));
+        N[c] = Object.assign(N[c] || {}, { _from: fromWeek }); qs.docs.forEach((d) => { N[c][d.id] = d.data(); });
+      } catch (e) { N[c] = N[c] || {}; }
+    }));
+  }
+  const noteOf = (a) => (N[a.store] || {})[a.id] || {};
+  const isRead = (n) => n.readAt && n.readAt >= Math.max(n.smAt || 0, n.romAt || 0);
+
+  async function renderAlerts(w, codes, ld) {
+    const seq = ++alSeq;
+    let list;
+    if (w === ALL) {
+      if (tab === "alerts") { $("alertList").innerHTML = ""; $("alertList").appendChild(E("p", { class: "note", text: "Loading every week of 2026…" })); }
+      await loadYear(codes);
+      if (seq !== alSeq) return;
+      weeks = [...new Set(codes.flatMap((c) => Object.keys(S[c] || {})))].sort().reverse();
+      list = weeks.flatMap((wk, i) => weekAlerts(wk, codes, latestDay(wk, codes), i === 0));
+      await loadNotes(codes, START_WEEK);
+    } else {
+      list = weekAlerts(w, codes, ld, w === weeks[0]);
+      await loadNotes(codes, w);
+    }
+    if (seq !== alSeq) return;
+    const shown = isHO && aFilter === "unread" ? list.filter((a) => !isRead(noteOf(a))) : list;
+    alertCount = isHO ? list.filter((a) => !isRead(noteOf(a))).length : list.length;
+    if (w !== ALL || tab === "alerts") updateBadge();
     if (tab !== "alerts") return;
     const box = $("alertList"); box.innerHTML = "";
-    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to flag for the stores in this view this week." })); return; }
-    out.sort((a, b) => b.red - a.red || a.name.localeCompare(b.name)).forEach((a) => box.appendChild(E("div", { class: "alert" + (a.red ? " red" : "") }, [
-      E("div", null, [E("b", null, [codes.length > 1 ? E("button", { class: "linkbtn", type: "button", text: a.name, onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : a.name, " · " + a.what]),
-        E("span", { class: "note", text: a.why })])])));
+    if (!list.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to flag for the stores in this view " + (w === ALL ? "in 2026." : "this week.") })); return; }
+    if (!shown.length) { box.appendChild(E("p", { class: "msg ok", text: (list.length === 1 ? "The alert has" : "All " + list.length + " alerts have") + " been read. Choose “All” to see " + (list.length === 1 ? "it." : "them.") })); return; }
+    let lastWeek = null;
+    shown.sort((a, b) => b.week.localeCompare(a.week) || b.red - a.red || a.name.localeCompare(b.name)).forEach((a) => {
+      if (w === ALL && a.week !== lastWeek) { lastWeek = a.week; box.appendChild(E("h3", { class: "weekhead", text: "Week " + isoWeek(a.week) + " · " + short(a.week) + " – " + short(addDays(a.week, 6)) })); }
+      box.appendChild(alertCard(a, codes));
+    });
+  }
+
+  function alertCard(a, codes) {
+    const n = noteOf(a), read = isRead(n);
+    const card = E("div", { class: "alert" + (a.red ? " red" : "") + (read ? " read" : "") });
+    card.appendChild(E("div", null, [E("b", null, [codes.length > 1 ? E("button", { class: "linkbtn", type: "button", text: a.name, onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : a.name, " · " + a.what]),
+      E("span", { class: "note", text: a.why })]));
+    const box = E("div", { class: "anotes" });
+    box.appendChild(noteBox(a, n, "sm", "Store Manager comment", me.role === "sm"));
+    box.appendChild(noteBox(a, n, "rom", "ROM comment", me.role === "rom"));
+    card.appendChild(box);
+    if (isHO) {
+      const cb = E("input", { type: "checkbox" }); cb.checked = read;
+      const changedAfter = n.readAt && !read;
+      cb.onchange = async () => {
+        cb.disabled = true;
+        const data = cb.checked ? { readBy: me.email, readName: me.name, readAt: Date.now() } : { readAt: 0 };
+        try { await saveNote(a, data); SPARUI.toast(cb.checked ? "Marked as read" : "Marked as not read"); render(); }
+        catch (e) { cb.checked = !cb.checked; cb.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      card.appendChild(E("label", { class: "aread" }, [cb, "I've read these comments",
+        E("span", { class: "note", style: "font-weight:400", text: read ? "· read by " + (n.readName || "") + " " + SPARUI.fmtDateTime(n.readAt) : changedAfter ? "· a comment changed after it was read" : "" })]));
+    }
+    return card;
+  }
+
+  function noteBox(a, n, who, label, mine) {
+    const text = n[who + "Note"] || "", by = n[who + "Name"], at = n[who + "At"];
+    const box = E("div", { class: "anote" }, [E("span", { text: label + (by ? " · " + by + " " + SPARUI.fmtDateTime(at) : "") })]);
+    if (!mine) { box.appendChild(E("p", { class: text ? "" : "note", text: text || "No comment yet." })); return box; }
+    const ta = E("textarea", { placeholder: who === "sm" ? "What happened, and what you're doing about it…" : "Your view, and any action agreed with the store…" });
+    ta.value = text;
+    const btn = E("button", { class: "btn small", type: "button", text: text ? "Update comment" : "Save comment" });
+    btn.onclick = async () => {
+      const v = ta.value.trim();
+      if (!v) { SPARUI.toast("Write a comment first", "err"); return; }
+      btn.disabled = true;
+      try {
+        await saveNote(a, { [who + "Note"]: v, [who + "By"]: me.email, [who + "Name"]: me.name, [who + "At"]: Date.now() });
+        SPARUI.toast("Comment saved"); render();
+      } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+    };
+    box.append(ta, E("div", { class: "row" }, [btn]));
+    return box;
+  }
+
+  async function saveNote(a, data) {
+    const ref = noteDoc(a.store, a.id), cur = (N[a.store] || {})[a.id];
+    if (cur) await fs.updateDoc(ref, data);
+    else await fs.setDoc(ref, { code: a.store, week: a.week, type: a.type, what: a.what, ...data });
+    N[a.store] = N[a.store] || {}; N[a.store][a.id] = Object.assign({}, cur || { code: a.store, week: a.week, type: a.type, what: a.what }, data);
   }
 
   // ── Missing weeks ──
