@@ -362,8 +362,15 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (!sm) return null;
     const pick = (k) => sum(idx.map((i) => (sm[k] || [])[i] || 0));
     const o = { s: pick("s"), t: pick("t"), lw: pick("lw"), ly: pick("ly"), c: pick("c"), clw: pick("clw"), w: pick("w"), tob: pick("tob"), n: idx.length };
+    // like for like: this year's sales only where there is something to compare with
+    const when = (k) => sum(idx.map((i) => ((sm[k] || [])[i] || 0) > 0 ? ((sm.s || [])[i] || 0) : 0));
+    const whenC = sum(idx.map((i) => ((sm.clw || [])[i] || 0) > 0 ? ((sm.c || [])[i] || 0) : 0));
+    o.sT = when("t"); o.sLW = when("lw"); o.sLY = when("ly"); o.cLW = whenC;
     return o;
   }
+  const vT = (o) => o ? ch(o.sT, o.t) : null, vLW = (o) => o ? ch(o.sLW, o.lw) : null, vLY = (o) => o ? ch(o.sLY, o.ly) : null;
+  const vC = (o) => o ? ch(o.cLW, o.clw) : null;
+  const vB = (o) => o && o.cLW && o.clw ? ch(o.sLW / o.cLW, o.lw / o.clw) : null;
   const hasIdx = (sm) => sm ? sm.has.map((v, i) => v ? i : -1).filter((i) => i >= 0) : [];
   const add = (a, b) => { if (!a) return b; if (!b) return a; const o = {}; for (const k in a) o[k] = (a[k] || 0) + (b[k] || 0); return o; };
 
@@ -424,18 +431,32 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   const subLine = (txt, v, good = 1) => [E("span", { class: cls(v, good), text: pct(v) }), " " + txt];
 
   // ── Overview ──
+  // the period the headline tiles and the store table show: latest day, week to date or month to date
+  function periodSeg(ld, w) {
+    const seg = E("div", { class: "seg" });
+    [["day", ld >= 0 ? dayLabel(addDays(w, ld)) : "Latest day"], ["wtd", "Week to date"], ["mtd", "Month to date"]].forEach(([k, l]) =>
+      seg.appendChild(E("button", { type: "button", class: lgPeriod === k ? "on" : "", text: l, onclick: () => { lgPeriod = k; render(); } })));
+    return seg;
+  }
+  function periodOf(c, w, ld) {
+    const sm = S[c] && S[c][w];
+    if (lgPeriod === "day") return sm && ld >= 0 && sm.has[ld] ? agg(sm, [ld]) : null;
+    if (lgPeriod === "mtd") return ld >= 0 ? mtd(c, addDays(w, ld)) : null;
+    return sm && hasIdx(sm).length ? agg(sm, hasIdx(sm)) : null;
+  }
   function renderOverview(w, codes, ld) {
-    const idxW = (sm) => hasIdx(sm);
     let tot = null;
-    codes.forEach((c) => { tot = add(tot, agg(S[c] && S[c][w], idxW(S[c] && S[c][w]))); });
-    tot = tot || { s: 0, t: 0, lw: 0, ly: 0, c: 0, clw: 0, w: 0 };
+    codes.forEach((c) => { tot = add(tot, periodOf(c, w, ld)); });
+    tot = tot || { s: 0, t: 0, lw: 0, ly: 0, c: 0, clw: 0, w: 0, sT: 0, sLW: 0, sLY: 0, cLW: 0 };
+    const pl = lgPeriod === "day" ? (ld >= 0 ? dayLabel(addDays(w, ld)) : "latest day") : lgPeriod === "mtd" ? "month to date" : "week to date";
+    const partial = (a, b) => a < b - 0.5;   // some sales have nothing to compare with
     $("kpis").innerHTML = ""; $("kpis").classList.add("five");
     $("kpis").append(
-      kpi("Sales week to date", eur(tot.s), subLine("vs target " + eur(tot.t), ch(tot.s, tot.t)), ch(tot.s, tot.t) < 0 ? "bad" : "good"),
-      kpi("vs last year", pct(ch(tot.s, tot.ly)), ["Last year " + eur(tot.ly) + " · vs last week ", E("span", { class: cls(ch(tot.s, tot.lw)), text: pct(ch(tot.s, tot.lw)) })], cls(ch(tot.s, tot.ly)) === "down" ? "bad" : "good"),
-      kpi("Customers", int(tot.c), [...subLine("vs last week", ch(tot.c, tot.clw)), " (" + int(tot.clw) + ")"]),
+      kpi("Sales " + pl, eur(tot.s), [...subLine("vs target " + eur(tot.t), vT(tot)), partial(tot.sT, tot.s) ? " · stores with a target" : ""], vT(tot) < 0 ? "bad" : "good"),
+      kpi("vs last year", pct(vLY(tot)), ["Last year " + eur(tot.ly) + (partial(tot.sLY, tot.s) ? " (like for like)" : "") + " · vs last week ", E("span", { class: cls(vLW(tot)), text: pct(vLW(tot)) })], cls(vLY(tot)) === "down" ? "bad" : "good"),
+      kpi("Customers", int(tot.c), [...subLine("vs last week", vC(tot)), " (" + int(tot.clw) + ")"]),
       // average basket = sales ÷ customers; last week's from last week's sales and customers
-      kpi("Average basket", eur2(tot.c ? tot.s / tot.c : null), [...subLine("vs last week", tot.c && tot.clw ? ch(tot.s / tot.c, tot.lw / tot.clw) : null), " (" + eur2(tot.clw ? tot.lw / tot.clw : null) + ")"]),
+      kpi("Average basket", eur2(tot.c ? tot.s / tot.c : null), [...subLine("vs last week", vB(tot)), " (" + eur2(tot.clw ? tot.lw / tot.clw : null) + ")"]),
       kpi("Waste", share(tot.s ? tot.w / tot.s : null), [eur(tot.w) + " of sales"], tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
     );
     const box = $("ovMain"); box.innerHTML = "";
@@ -446,7 +467,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
   function renderDayTable(box, c, w) {
     const sm = S[c] && S[c][w];
-    box.appendChild(E("h2", { text: (byCode[c] || {}).name + " · day by day" }));
+    box.appendChild(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:12px" }, [E("h2", { style: "margin:0", text: (byCode[c] || {}).name + " · day by day" }),
+      E("div", null, [E("span", { class: "note", style: "margin-right:8px", text: "Headline figures:" }), periodSeg(latestDay(w, [c]), w)])]));
     if (!sm) { box.appendChild(E("p", { class: "empty", text: "No report for this store this week yet." })); return; }
     const tb = E("tbody");
     sm.days.forEach((d, i) => {
@@ -455,11 +477,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         E("td", { text: dayLabel(d) }),
         E("td", { class: "num", text: has ? eur(o.s) : "–" }),
         E("td", { class: "num", text: eur(o.t) }),
-        E("td", { class: "num " + (has ? cls(ch(o.s, o.t)) : ""), text: has ? pct(ch(o.s, o.t)) : "" }),
+        E("td", { class: "num " + (has ? cls(vT(o)) : ""), text: has ? pct(vT(o)) : "" }),
         E("td", { class: "num", text: eur(o.lw) }),
-        E("td", { class: "num " + (has ? cls(ch(o.s, o.lw)) : ""), text: has ? pct(ch(o.s, o.lw)) : "" }),
+        E("td", { class: "num " + (has ? cls(vLW(o)) : ""), text: has ? pct(vLW(o)) : "" }),
         E("td", { class: "num", text: eur(o.ly) }),
-        E("td", { class: "num " + (has ? cls(ch(o.s, o.ly)) : ""), text: has ? pct(ch(o.s, o.ly)) : "" }),
+        E("td", { class: "num " + (has ? cls(vLY(o)) : ""), text: has ? pct(vLY(o)) : "" }),
         E("td", { class: "num", text: has ? int(o.c) : "–" }),
         E("td", { class: "num", text: has && o.c ? eur2(o.s / o.c) : "–" }),
         E("td", { class: "num", text: has ? eur(o.w) : "–" })
@@ -467,9 +489,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     });
     const t = agg(sm, hasIdx(sm));
     tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Week to date (" + t.n + " day" + (t.n === 1 ? "" : "s") + ")" }),
-      E("td", { class: "num", text: eur(t.s) }), E("td", { class: "num", text: eur(t.t) }), E("td", { class: "num " + cls(ch(t.s, t.t)), text: pct(ch(t.s, t.t)) }),
-      E("td", { class: "num", text: eur(t.lw) }), E("td", { class: "num " + cls(ch(t.s, t.lw)), text: pct(ch(t.s, t.lw)) }),
-      E("td", { class: "num", text: eur(t.ly) }), E("td", { class: "num " + cls(ch(t.s, t.ly)), text: pct(ch(t.s, t.ly)) }),
+      E("td", { class: "num", text: eur(t.s) }), E("td", { class: "num", text: eur(t.t) }), E("td", { class: "num " + cls(vT(t)), text: pct(vT(t)) }),
+      E("td", { class: "num", text: eur(t.lw) }), E("td", { class: "num " + cls(vLW(t)), text: pct(vLW(t)) }),
+      E("td", { class: "num", text: eur(t.ly) }), E("td", { class: "num " + cls(vLY(t)), text: pct(vLY(t)) }),
       E("td", { class: "num", text: int(t.c) }), E("td", { class: "num", text: t.c ? eur2(t.s / t.c) : "–" }), E("td", { class: "num", text: eur(t.w) })]));
     box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null,
       ["Day", "Sales", "Target", "vs target", "Last week", "vs LW", "Last year", "vs LY", "Customers", "Basket", "Waste"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
@@ -480,20 +502,12 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   let lgPeriod = "wtd", lgSort = { k: "vt", dir: 1 };
   function renderLeague(box, w, codes, ld) {
     const head = E("div", { class: "row", style: "justify-content:space-between;margin-bottom:12px" }, [E("h2", { style: "margin:0", text: "Store by store" })]);
-    const seg = E("div", { class: "seg" });
-    [["day", ld >= 0 ? dayLabel(addDays(w, ld)) : "Latest day"], ["wtd", "Week to date"], ["mtd", "Month to date"]].forEach(([k, l]) => {
-      seg.appendChild(E("button", { type: "button", class: lgPeriod === k ? "on" : "", text: l, onclick: () => { lgPeriod = k; render(); } }));
-    });
-    head.appendChild(seg); box.appendChild(head);
+    head.appendChild(periodSeg(ld, w)); box.appendChild(head);
     const upto = ld >= 0 ? addDays(w, ld) : w;
     const rows = codes.map((c) => {
-      const sm = S[c] && S[c][w];
-      let o = null;
-      if (lgPeriod === "day") o = sm && ld >= 0 && sm.has[ld] ? agg(sm, [ld]) : null;
-      else if (lgPeriod === "wtd") o = sm && hasIdx(sm).length ? agg(sm, hasIdx(sm)) : null;
-      else o = mtd(c, upto);
+      const o = periodOf(c, w, ld);
       return { c, name: (byCode[c] || {}).name || c, rom: romOf(c), o,
-        vt: o ? ch(o.s, o.t) : null, vlw: o ? ch(o.s, o.lw) : null, vly: o ? ch(o.s, o.ly) : null, ws: o && o.s ? o.w / o.s : null };
+        vt: o ? vT(o) : null, vlw: o ? vLW(o) : null, vly: o ? vLY(o) : null, ws: o && o.s ? o.w / o.s : null };
     });
     const val = (r, k) => k === "name" || k === "rom" ? r[k] : k === "s" ? (r.o ? r.o.s : null) : k === "c" ? (r.o ? r.o.c : null) : k === "b" ? (r.o && r.o.c ? r.o.s / r.o.c : null) : r[k];
     rows.sort((a, b) => {
@@ -521,8 +535,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       ]));
     });
     if (tot) tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td"), E("td", { class: "num", text: eur(tot.s) }),
-      E("td", { class: "num " + cls(ch(tot.s, tot.t)), text: pct(ch(tot.s, tot.t)) }), E("td", { class: "num " + cls(ch(tot.s, tot.lw)), text: pct(ch(tot.s, tot.lw)) }),
-      E("td", { class: "num " + cls(ch(tot.s, tot.ly)), text: pct(ch(tot.s, tot.ly)) }), E("td", { class: "num", text: int(tot.c) }),
+      E("td", { class: "num " + cls(vT(tot)), text: pct(vT(tot)) }), E("td", { class: "num " + cls(vLW(tot)), text: pct(vLW(tot)) }),
+      E("td", { class: "num " + cls(vLY(tot)), text: pct(vLY(tot)) }), E("td", { class: "num", text: int(tot.c) }),
       E("td", { class: "num", text: tot.c ? eur2(tot.s / tot.c) : "–" }), E("td", { class: "num", text: share(tot.s ? tot.w / tot.s : null) })]));
     box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [thr]), tb])]));
     box.appendChild(E("p", { class: "note", style: "margin:10px 0 0", text: "Click a column to sort, or a store to open it. Sales are Total inc VAT inc D030 (including tobacco)." }));
@@ -545,8 +559,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     box.appendChild(E("h2", { text: monthName(upto) + " to date" }));
     const missing = codes.length > 1 ? "" : (o.days < elapsed ? " Only " + o.days + " of the " + elapsed + " days so far have a report uploaded." : "");
     box.appendChild(E("div", { class: "kpis" }, [
-      kpi("Sales " + short(first) + " – " + short(upto), eur(o.s), subLine("vs target " + eur(o.t), ch(o.s, o.t))),
-      kpi("vs last year", pct(ch(o.s, o.ly)), ["Last year " + eur(o.ly)], cls(ch(o.s, o.ly)) === "down" ? "bad" : "good"),
+      kpi("Sales " + short(first) + " – " + short(upto), eur(o.s), subLine("vs target " + eur(o.t), vT(o))),
+      kpi("vs last year", pct(vLY(o)), ["Last year " + eur(o.ly)], cls(vLY(o)) === "down" ? "bad" : "good"),
       kpi("Month-end outlook", eur(proj), ["Month target about " + eur(monthTarget)]),
       kpi("Customers", int(o.c), ["Basket " + eur2(o.c ? o.s / o.c : null)])
     ]));
@@ -677,8 +691,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       E("span", null, [E("i", { style: "background:#10252b;height:3px;vertical-align:3px" }), "Target"]), E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), "Last year"]), E("span", { text: "Paler bar = week not complete" })]));
     const tb = E("tbody");
     rows.slice().reverse().forEach((r) => tb.appendChild(E("tr", null, [E("td", { text: "Wk " + isoWeek(r.wk) + " · " + short(r.wk) }),
-      E("td", { class: "num", text: eur(r.o.s) }), E("td", { class: "num", text: eur(r.o.t) }), E("td", { class: "num " + cls(ch(r.o.s, r.o.t)), text: pct(ch(r.o.s, r.o.t)) }),
-      E("td", { class: "num " + cls(ch(r.o.s, r.o.ly)), text: pct(ch(r.o.s, r.o.ly)) }), E("td", { class: "num", text: int(r.o.c) }),
+      E("td", { class: "num", text: eur(r.o.s) }), E("td", { class: "num", text: eur(r.o.t) }), E("td", { class: "num " + cls(vT(r.o)), text: pct(vT(r.o)) }),
+      E("td", { class: "num " + cls(vLY(r.o)), text: pct(vLY(r.o)) }), E("td", { class: "num", text: int(r.o.c) }),
       E("td", { class: "num", text: r.o.c ? eur2(r.o.s / r.o.c) : "–" }), E("td", { class: "num", text: share(r.o.s ? r.o.w / r.o.s : null) })])));
     box.appendChild(E("div", { class: "tablewrap", style: "margin-top:14px" }, [E("table", null, [E("thead", null, [E("tr", null,
       ["Week", "Sales", "Target", "vs target", "vs last year", "Customers", "Basket", "Waste %"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
@@ -716,10 +730,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported && latest) A("nodata", true, "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), "Other stores in this view have reported that day."); return; }
       const idx = hasIdx(sm); const t = agg(sm, idx);
       let run = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.s[j] || 0) < (sm.t[j] || 0)) run++; else break; }
-      if (run >= 3) A("target", true, "Below target " + run + " days running", (idx.length === 7 ? "Week " : "Week to date ") + pct(ch(t.s, t.t)) + " against target.");
-      if (ch(t.s, t.ly) != null && ch(t.s, t.ly) <= DOWN_ALERT) A("ly", false, "Sales " + pct(ch(t.s, t.ly)) + " on last year", eur(t.s) + " against " + eur(t.ly) + (idx.length === 7 ? " for the week." : " week to date."));
+      if (run >= 3) A("target", true, "Below target " + run + " days running", (idx.length === 7 ? "Week " : "Week to date ") + pct(vT(t)) + " against target.");
+      if (vLY(t) != null && vLY(t) <= DOWN_ALERT) A("ly", false, "Sales " + pct(vLY(t)) + " on last year", eur(t.s) + " against " + eur(t.ly) + (idx.length === 7 ? " for the week." : " week to date."));
       if (t.s && t.w / t.s > WASTE_ALERT) A("waste", false, "Waste at " + share(t.w / t.s) + " of sales", eur(t.w) + (idx.length === 7 ? " for the week" : " week to date") + " (alert above " + share(WASTE_ALERT) + ").");
-      if (ch(t.c, t.clw) != null && ch(t.c, t.clw) <= DOWN_ALERT) A("cust", false, "Customers " + pct(ch(t.c, t.clw)) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
+      if (vC(t) != null && vC(t) <= DOWN_ALERT) A("cust", false, "Customers " + pct(vC(t)) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
     });
     return out;
   }
