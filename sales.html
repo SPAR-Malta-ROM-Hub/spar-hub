@@ -44,6 +44,13 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .alert b{display:block}
 .alert{flex-direction:column;gap:8px}
 .alert.read{opacity:.75;border-left-color:#C9CDCB}
+.alert.watch{border-left-color:#E0A21B;padding:10px 14px}
+.alert.good{border-left-color:#00A651;padding:10px 14px}
+.alert .lvl{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:8px;vertical-align:1px}
+.lvl.act{background:#FBE0E1;color:#C5121A}.lvl.watch{background:#FFF0D2;color:#9A6200}.lvl.good{background:#DDF1E4;color:#00703C}
+.alert .astore{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.seg .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:#E9EBEA;font-size:11.5px;line-height:18px;text-align:center}
+.seg .on .cnt{background:#F3F4F4}
 .anotes{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
 @media(max-width:700px){.anotes{grid-template-columns:1fr}}
 .anote{background:#F7F8F8;border:1px solid #E9EBEA;border-radius:10px;padding:9px 11px;font-size:13.5px}
@@ -202,7 +209,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         <h2 style="margin:0">Things to look at</h2>
         <div class="seg" id="aFilter" hidden><button type="button" data-f="unread" class="on">Not read yet</button><button type="button" data-f="all">All</button></div>
       </div>
-      <p class="note" style="margin:-6px 0 14px">Based on the latest week's reports for the stores in this view. A store is listed when it is below target 3 days running, more than 10% down on last year, has waste above 2% of sales, has customers more than 10% down on last week, or is missing the latest day's report. The Store Manager and the ROM add a comment to each alert; Head Office ticks it once read. Choose “All weeks” above to see every week of 2026.</p>
+      <p class="note" style="margin:-6px 0 12px">Sorted by priority. <b style="color:var(--red)">Act now</b>: needs action this week; the Store Manager and the ROM add a comment and Head Office ticks it once read. <b style="color:#9A6200">Watch</b>: an early warning, no comment needed. <b style="color:#00703C">Good news</b>: what's going well. Choose “All weeks” above to see every week of 2026.</p>
+      <div class="seg" id="aLevel" style="flex-wrap:wrap;margin-bottom:8px"></div>
+      <div class="seg" id="aStores" style="flex-wrap:wrap;margin-bottom:12px" hidden></div>
       <div id="alertList"></div>
     </div>
     <div class="card panel">
@@ -877,7 +886,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
   // ── Alerts ──
   // ── Alerts, with the Store Manager's and ROM's comments ──
-  let alertCount = 0, aFilter = "unread", alSeq = 0;
+  let alertCount = 0, aFilter = "unread", alSeq = 0, aLevel = "all", aStore = "";
   const fullYear = {};                       // code → all 2026 weeks loaded
   const N = {};                              // code → { noteId: note }
   if (isHO) {
@@ -886,20 +895,54 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       aFilter = b.dataset.f; $("aFilter").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); render();
     });
   }
+  // Priority: "act" = needs action (comments + read tick), "watch" = early warning, "good" = good news.
+  // Act-now ids keep their old names so comments already written stay attached.
+  const LVL = { act: 0, watch: 1, good: 2 };
   function weekAlerts(w, codes, ld, latest) {
-    const out = [];
+    const out = [], best = [];
     codes.forEach((c) => {
       const sm = S[c] && S[c][w], name = (byCode[c] || {}).name || c;
       const everReported = Object.keys(S[c] || {}).length > 0;   // stores not yet on the tracker aren't flagged
-      const A = (type, red, what, why) => out.push({ id: w + "_" + type, type, week: w, red, store: c, name, what, why });
-      if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported && latest) A("nodata", true, "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), "Other stores in this view have reported that day."); return; }
-      const idx = hasIdx(sm); const t = agg(sm, idx);
-      let run = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.s[j] || 0) < (sm.t[j] || 0)) run++; else break; }
-      if (run >= 3) A("target", true, "Below target " + run + " days running", (idx.length === 7 ? "Week " : "Week to date ") + pct(vT(t)) + " against target.");
-      if (vLY(t) != null && vLY(t) <= DOWN_ALERT) A("ly", false, "Sales " + pct(vLY(t)) + " on last year", eur(t.s) + " against " + eur(t.ly) + (idx.length === 7 ? " for the week." : " week to date."));
-      if (t.s && t.w / t.s > WASTE_ALERT) A("waste", false, "Waste at " + share(t.w / t.s) + " of sales", eur(t.w) + (idx.length === 7 ? " for the week" : " week to date") + " (alert above " + share(WASTE_ALERT) + ").");
-      if (vC(t) != null && vC(t) <= DOWN_ALERT) A("cust", false, "Customers " + pct(vC(t)) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
+      const A = (lvl, type, what, why) => out.push({ id: w + "_" + type, type, week: w, lvl, red: lvl === "act", store: c, name, what, why });
+      if (!sm || (ld >= 0 && !sm.has[ld])) { if (everReported && latest) A("act", "nodata", "No report for " + (ld >= 0 ? dayLabel(addDays(w, ld)) : "this week"), "Other stores in this view have reported that day. Upload it, or check the daily email."); return; }
+      const idx = hasIdx(sm); const t = agg(sm, idx), so = idx.length === 7 ? "for the week" : "week to date";
+      // earlier weeks for this store (up to 8) for "rising / falling" checks
+      const prev = Object.keys(S[c] || {}).filter((x) => x < w).sort().slice(-8).map((x) => S[c][x]).filter(Boolean).map((p) => agg(p, hasIdx(p))).filter((p) => p && p.s);
+      const P = prev.reduce((a, b) => add(a, b), null);
+      // target
+      let run = 0, short = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.s[j] || 0) < (sm.t[j] || 0)) { run++; short += (sm.t[j] || 0) - (sm.s[j] || 0); } else break; }
+      let up = 0; for (let i = idx.length - 1; i >= 0; i--) { const j = idx[i]; if ((sm.t[j] || 0) && (sm.s[j] || 0) >= sm.t[j]) up++; else break; }
+      const vt = vT(t);
+      if (run >= 5 || (run >= 3 && vt != null && vt <= -0.05)) A("act", "target", run + " days in a row below target", "Short by " + eur(short) + " over those days; " + pct(vt) + " against target " + so + ".");
+      else if (run >= 2) A("watch", "target_w", run + " days in a row below target", "Short by " + eur(short) + " over those days; " + pct(vt) + " against target " + so + ".");
+      else if (vt != null && vt < 0 && idx.length >= 3) A("watch", "behind_w", "Behind target " + so, pct(vt) + " against target (" + signEur(t.sT - t.t) + ")" + (idx.length < 7 ? ", " + (7 - idx.length) + " days left this week." : "."));
+      if (vt != null && t.t) { best.push({ c, name, vt }); if (vt >= 0.05 && idx.length >= 3) A("good", "good_tgt", pct(vt) + " ahead of target " + so, eur(t.s) + " against " + eur(t.t) + (up >= 3 ? "; on or above target " + up + " days in a row." : ".")); else if (up >= 4) A("good", "good_run", "On or above target " + up + " days in a row", pct(vt) + " against target " + so + "."); }
+      // last year
+      const vly = vLY(t);
+      if (vly != null && vly <= DOWN_ALERT) A("act", "ly", "Sales " + pct(vly) + " on last year", eur(t.s) + " against " + eur(t.ly) + " " + so + ".");
+      else if (vly != null && vly <= -0.05) A("watch", "ly_w", "Sales " + pct(vly) + " on last year", eur(t.s) + " against " + eur(t.ly) + " " + so + ". Early warning: the act-now level is " + pct(DOWN_ALERT) + ".");
+      else if (vly != null && vly >= 0.05) A("good", "good_ly", "Sales " + pct(vly) + " on last year", eur(t.s) + " against " + eur(t.ly) + " " + so + ".");
+      // waste
+      const wp = t.s ? t.w / t.s : null, pw = P && P.s ? P.w / P.s : null;
+      if (wp != null && wp > WASTE_ALERT) A("act", "waste", "Waste at " + share(wp) + " of sales", eur(t.w) + " " + so + " (limit " + share(WASTE_ALERT) + "). Check ordering and markdowns.");
+      else if (wp != null && pw != null && t.w > 0 && wp - pw >= 0.003) A("watch", "waste_w", "Waste is rising", share(wp) + " of sales this week against " + share(pw) + " over the previous " + prev.length + " weeks.");
+      else if (wp != null && wp > WASTE_ALERT * 0.75) A("watch", "waste_w", "Waste close to the limit", share(wp) + " of sales (limit " + share(WASTE_ALERT) + ").");
+      else if (wp != null && pw != null && pw - wp >= 0.003 && idx.length >= 3) A("good", "good_waste", "Waste is down", share(wp) + " of sales this week against " + share(pw) + " over the previous " + prev.length + " weeks.");
+      // customers
+      const vc = vC(t);
+      if (vc != null && vc <= DOWN_ALERT) A("act", "cust", "Customers " + pct(vc) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
+      else if (vc != null && vc <= -0.05) A("watch", "cust_w", "Customers " + pct(vc) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
+      else if (vc != null && vc >= 0.05) A("good", "good_cust", "Customers " + pct(vc) + " on last week", int(t.c) + " against " + int(t.clw) + ".");
+      // basket against the previous weeks
+      const b = t.c ? t.s / t.c : null, pb = P && P.c ? P.s / P.c : null;
+      if (b && pb && idx.length >= 3) {
+        const d = b / pb - 1;
+        if (d <= -0.03) A("watch", "bask_w", "Basket spend is falling", eur2(b) + " this week against " + eur2(pb) + " over the previous " + prev.length + " weeks (" + pct(d) + "). Look at promotions and upselling at the till.");
+        else if (d >= 0.03) A("good", "good_bask", "Basket spend is up", eur2(b) + " this week against " + eur2(pb) + " over the previous " + prev.length + " weeks (" + pct(d) + ").");
+      }
     });
+    // the best store in the view
+    if (best.length > 2) { const top = best.sort((a, b) => b.vt - a.vt)[0]; if (top.vt > 0) out.push({ id: w + "_good_best", type: "good_best", week: w, lvl: "good", red: false, store: top.c, name: top.name, what: "Best against target in this view", why: pct(top.vt) + " against target " + (latest ? "this week so far." : "that week.") }); }
     return out;
   }
   async function loadYear(codes) {
@@ -939,24 +982,39 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       await loadNotes(codes, w);
     }
     if (seq !== alSeq) return;
-    const shown = isHO && aFilter === "unread" ? list.filter((a) => !isRead(noteOf(a))) : list;
-    alertCount = isHO ? list.filter((a) => !isRead(noteOf(a))).length : list.length;
+    const acts = list.filter((a) => a.lvl === "act");
+    alertCount = isHO ? acts.filter((a) => !isRead(noteOf(a))).length : acts.length;
+    // filters: priority, then store; Head Office's "Not read yet" applies to Act now
+    const base = list.filter((a) => a.lvl !== "act" || !(isHO && aFilter === "unread") || !isRead(noteOf(a)));
+    const inStores = [...new Set(list.map((a) => a.store))];
+    if (aStore && !inStores.includes(aStore)) aStore = "";
+    const byStore = base.filter((a) => !aStore || a.store === aStore);
+    const cnt = (l) => byStore.filter((a) => l === "all" || a.lvl === l).length;
+    const lv = $("aLevel"); lv.innerHTML = "";
+    [["all", "All"], ["act", "Act now"], ["watch", "Watch"], ["good", "Good news"]].forEach(([k, l]) => lv.appendChild(E("button", { type: "button", class: aLevel === k ? "on" : "", onclick: () => { aLevel = k; render(); } }, [l, E("span", { class: "cnt", text: String(cnt(k)) })])));
+    const sb = $("aStores"); sb.innerHTML = ""; sb.hidden = !(codes.length > 1 && inStores.length > 1 && inStores.length <= 14);
+    if (!sb.hidden) [["", "All stores"], ...inStores.sort((x, y) => ((byCode[x] || {}).name || x).localeCompare((byCode[y] || {}).name || y)).map((c) => [c, shortStore((byCode[c] || {}).name || c)])].forEach(([k, l]) =>
+      sb.appendChild(E("button", { type: "button", class: aStore === k ? "on" : "", text: l, onclick: () => { aStore = k; render(); } })));
+    const shown = byStore.filter((a) => aLevel === "all" || a.lvl === aLevel);
     if (w !== ALL || tab === "alerts") updateBadge();
     if (tab !== "alerts") return;
     const box = $("alertList"); box.innerHTML = "";
     if (!list.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to flag for the stores in this view " + (w === ALL ? "in 2026." : "this week.") })); return; }
-    if (!shown.length) { box.appendChild(E("p", { class: "msg ok", text: (list.length === 1 ? "The alert has" : "All " + list.length + " alerts have") + " been read. Choose “All” to see " + (list.length === 1 ? "it." : "them.") })); return; }
+    if (!shown.length) { box.appendChild(E("p", { class: "msg ok", text: aLevel === "act" && acts.length && isHO && aFilter === "unread" ? "Every Act now alert has been read. Choose “All” at the top right to see them." : aLevel === "act" ? "Nothing needs action " + (w === ALL ? "in 2026." : "this week.") : aLevel === "watch" ? "No early warnings." : aLevel === "good" ? "No good news to show yet." : "Nothing to show for this filter." })); return; }
     let lastWeek = null;
-    shown.sort((a, b) => b.week.localeCompare(a.week) || b.red - a.red || a.name.localeCompare(b.name)).forEach((a) => {
+    shown.sort((a, b) => b.week.localeCompare(a.week) || LVL[a.lvl] - LVL[b.lvl] || a.name.localeCompare(b.name)).forEach((a) => {
       if (w === ALL && a.week !== lastWeek) { lastWeek = a.week; box.appendChild(E("h3", { class: "weekhead", text: "Week " + isoWeek(a.week) + " · " + short(a.week) + " – " + short(addDays(a.week, 6)) })); }
       box.appendChild(alertCard(a, codes));
     });
   }
 
   function alertCard(a, codes) {
+    const nameEl = codes.length > 1 ? E("button", { class: "linkbtn astore", type: "button", text: shortStore(a.name), onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : null;
+    const tag = E("span", { class: "lvl " + a.lvl, text: a.lvl === "act" ? "Act now" : a.lvl === "watch" ? "Watch" : "Good news" });
+    if (a.lvl !== "act") return E("div", { class: "alert " + a.lvl }, [E("div", null, [E("b", null, [tag, nameEl, a.what]), E("span", { class: "note", text: a.why })])]);
     const n = noteOf(a), read = isRead(n);
     const card = E("div", { class: "alert" + (a.red ? " red" : "") + (read ? " read" : "") });
-    card.appendChild(E("div", null, [E("b", null, [codes.length > 1 ? E("button", { class: "linkbtn", type: "button", text: a.name, onclick: () => { $("scope").value = "s:" + a.store; changeScope(); showTab("overview"); } }) : a.name, " · " + a.what]),
+    card.appendChild(E("div", null, [E("b", null, [tag, nameEl, a.what]),
       E("span", { class: "note", text: a.why })]));
     const box = E("div", { class: "anotes" });
     box.appendChild(noteBox(a, n, "sm", "Store Manager comment", me.role === "sm"));
