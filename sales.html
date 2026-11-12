@@ -60,6 +60,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .mv{display:grid;grid-template-columns:minmax(120px,1.2fr) 2fr 128px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid #F0F1F1}
 .mv-n{min-width:0}.mv-n b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv-n span{display:block;font-size:12px;color:var(--muted)}
 .mv-bar{height:10px;border-radius:5px;background:#EEF0EF;overflow:hidden}.mv-bar i{display:block;height:100%;border-radius:5px}
+.hb{display:grid;grid-template-columns:minmax(110px,1fr) 1.4fr 215px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid #F0F1F1}
+.hb-v{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
+@media(max-width:700px){.hb{grid-template-columns:1fr 1fr}.hb .mv-bar{grid-column:1/-1;grid-row:2}}
 .mv-v{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
@@ -680,18 +683,36 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const n00 = M("sales_between_00_00_06_00_inc_vat"), n00lw = M("sales_between_00_00_06_00_last_week_inc_vat"), n00ly = M("sales_between_00_00_06_00_last_year_inc_vat");
     const c22 = M("nr_of_chits_between_22_00_23_59"), c00 = M("nr_of_chits_between_00_00_06_00");
     const onl = M("online_sales_inc_vat"), cred = M("credit_sales_inc_vat");
-    const tr3 = (a, b, c, d) => E("tr", null, [E("td", { text: a }), E("td", { class: "num", text: b }), E("td", { class: "num " + (c ? c[1] : ""), text: c ? c[0] : "" }), E("td", { class: "num " + (d ? d[1] : ""), text: d ? d[0] : "" })]);
-    const vs = (a, b) => [pct(ch(a, b)), cls(ch(a, b))];
-    $("dpMore").appendChild(card("Tobacco, online and credit", [
-      tr3("Tobacco & related", eur(tob), vs(tob, tobLW), vs(tob, tobLY)),
-      tr3("Online sales", eur(onl), null, null),
-      tr3("Credit sales", eur(cred), null, null)], ["", "Sales", "vs last week", "vs last year"], "Tobacco is included in the sales totals and in the Departments table."));
-    $("dpMore").appendChild(card("Payments", Object.keys(pays).filter((k) => pays[k]).sort((a, b) => pays[b] - pays[a]).map((k) =>
-      E("tr", null, [E("td", { text: ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " ")) }), E("td", { class: "num", text: eur(pays[k]) }), E("td", { class: "num", text: share(payTot ? pays[k] / payTot : null) })])),
-      ["Method", "Amount", "Share"], "Payment totals include tobacco."));
-    $("dpMore").appendChild(card("Night trade", [
-      tr3("22:00 – 23:59", eur2(n22) + " · " + int(c22) + " chits", vs(n22, n22lw), vs(n22, n22ly)),
-      tr3("00:00 – 06:00", eur2(n00) + " · " + int(c00) + " chits", vs(n00, n00lw), vs(n00, n00ly))], ["", "Sales", "vs last week", "vs last year"]));
+    // Bar charts in the same style as Keith's: label (+ small line), a bar sized against the biggest, the figures on the right
+    const vsSpan = (label, a, b) => a && b ? [" · ", E("span", { class: cls(ch(a, b)), text: pct(ch(a, b)) }), " " + label] : [];
+    const bars = (title, note, rows, color) => {
+      const max = Math.max(1, ...rows.map((r) => Math.abs(r.v || 0)));
+      return E("div", { class: "card panel" }, [E("h3", { text: title }), note ? E("p", { class: "note", style: "margin:-4px 0 10px", text: note }) : null,
+        ...(rows.length ? rows.map((r) => E("div", { class: "hb" }, [
+          E("div", { class: "mv-n" }, [E("b", { text: r.label, title: r.label }), r.sub ? E("span", { text: r.sub }) : null]),
+          E("div", { class: "mv-bar" }, [E("i", { style: "width:" + (r.v > 0 ? Math.max(2, Math.round(r.v / max * 100)) : 0) + "%;background:" + (r.color || color) })]),
+          E("div", { class: "hb-v" }, r.val)])) : [E("p", { class: "note", text: "Nothing this week." })])]);
+    };
+    // Waste by department (the report gives waste by department only)
+    const wRows = Object.keys(wd).filter((k) => wd[k]).sort((a, b) => wd[b] - wd[a]).map((k) => {
+      const d = dep[k.toUpperCase()]; const r = d && d.s ? wd[k] / d.s : null;
+      return { label: d ? d.n : k.toUpperCase(), v: wd[k], val: [eur2(wd[k]) + " · ", E("span", { class: r > WASTE_ALERT ? "down" : "", text: share(r) })] };
+    });
+    $("dpMore").appendChild(bars("Waste by department", "Waste € and as % of that department's sales. Red above " + share(WASTE_ALERT) + ".", wRows, "#E8A33D"));
+    // Tobacco, online and credit
+    $("dpMore").appendChild(bars("Tobacco, online and credit", "Tobacco is included in the sales totals and in the Departments table.", [
+      { label: "Tobacco & related", v: tob, val: [eur(tob), ...vsSpan("LW", tob, tobLW), ...vsSpan("LY", tob, tobLY)] },
+      { label: "Online sales", v: onl, val: [eur(onl)] },
+      { label: "Credit sales", v: cred, val: [eur(cred)] }], "#60727a"));
+    // Payments
+    const payName = (k) => ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " "));
+    $("dpMore").appendChild(bars("Payments", "Share of all takings (payment totals include tobacco).",
+      Object.keys(pays).filter((k) => Math.abs(pays[k]) >= 0.5).sort((a, b) => pays[b] - pays[a]).map((k) => ({ label: payName(k), v: pays[k],
+        val: [(pays[k] < 0 ? "−" : "") + eur(Math.abs(pays[k])) + " · " + share(payTot ? pays[k] / payTot : null)] })), "#1F6FB2"));
+    // Night trade
+    $("dpMore").appendChild(bars("Night trade", "Late-night and overnight sales, with the number of chits (transactions).", [
+      { label: "22:00 – 23:59", sub: int(c22) + " chits", v: n22, val: [eur2(n22), ...vsSpan("LW", n22, n22lw), ...vsSpan("LY", n22, n22ly)] },
+      { label: "00:00 – 06:00", sub: int(c00) + " chits", v: n00, val: [eur2(n00), ...vsSpan("LW", n00, n00lw), ...vsSpan("LY", n00, n00ly)] }], "#5B3E96"));
   }
 
   // ── Trends ──
