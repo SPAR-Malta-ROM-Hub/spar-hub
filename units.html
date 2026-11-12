@@ -35,6 +35,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 .daybox{display:inline-flex;gap:4px;flex-wrap:wrap}
 .daybox label{display:inline-flex;gap:5px;align-items:center;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:700;font-size:13px;cursor:pointer}
 .daybox input{accent-color:var(--brand)}
+.chart{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 </style>
 </head>
 <body>
@@ -46,13 +49,14 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     <button class="tab" data-tab="best" type="button">Best &amp; worst sellers</button>
     <button class="tab" data-tab="gaps" type="button">Zero-sales gaps</button>
     <button class="tab" data-tab="order" type="button">Ordering suggestions</button>
+    <button class="tab" data-tab="hours" type="button">By hour</button>
     <button class="tab" data-tab="upload" type="button" hidden>Upload</button>
   </div>
 
   <div class="card bar" id="bar">
     <label id="lensWrap" hidden>Show<select id="lens"></select></label>
     <label>View<select id="scope"></select></label>
-    <label>Week (Sat – Fri)<select id="week"></select></label>
+    <label>Week (Mon – Sun)<select id="week"></select></label>
     <label>Filter<select id="filter"></select></label>
     <label id="grpWrap" hidden>Group<select id="grp"></select></label>
     <div class="stamp" id="stamp"></div>
@@ -87,22 +91,27 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     </div>
   </section>
 
+  <section data-pane="hours" hidden>
+    <div class="card panel" style="margin-top:0" id="hrOut"></div>
+    <div class="card panel" id="soOut"></div>
+  </section>
+
   <section data-pane="upload" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Upload weekly unit sales</h2>
-      <p class="note" style="margin:-6px 0 12px">Drop in the weekly unit files (e.g. SLM39.xlsx), as many stores as you like. Each file is matched to its store by the outlet number inside it (52 = report-52). Uploading the same store and week again replaces it.</p>
-      <div class="drop" id="drop"><p style="margin:0 0 10px;font-weight:700">Drag the unit files here</p><label class="btn" for="file">Choose unit files</label><input type="file" id="file" accept=".xlsx,.xls" multiple hidden></div>
+      <h2>Upload hourly item sales</h2>
+      <p class="note" style="margin:-6px 0 12px">Drop in the daily hourly item sales files (report-hourly_itemsales-51.xlsx …): any number of stores and days at once. Each file is matched to its store by the outlet number inside it (51 = report-51). Uploading the same store and day again replaces it. Weeks run Monday to Sunday, like the Sales Tracker.</p>
+      <div class="drop" id="drop"><p style="margin:0 0 10px;font-weight:700">Drag the hourly files here</p><label class="btn" for="file">Choose hourly files</label><input type="file" id="file" accept=".xlsx,.xls" multiple hidden></div>
       <div id="preview" style="margin-top:14px"></div>
     </div>
     <div class="card panel">
       <h2>Item list</h2>
       <p class="note" id="itemInfo" style="margin:-6px 0 12px">Loading…</p>
       <div class="row"><label class="btn secondary" for="itemFile">Upload item list (Excel)</label><input type="file" id="itemFile" accept=".xlsx,.xls" hidden>
-        <button class="btn secondary" id="rebuild" type="button">Rebuild copies &amp; totals</button><span class="note" id="itemMsg"></span></div>
-      <p class="note" style="margin:10px 0 0">The item list needs columns Item Code, Description, Department, Category, Group and Case Size (the “Item Mapping” export). Refresh it when new lines are added. Press <b>Rebuild copies &amp; totals</b> once after this update (it makes the quick weekly totals for weeks already uploaded), and again after changing category groups in the Sales Tracker.</p>
+        <button class="btn secondary" id="rebuild" type="button">Rebuild weeks &amp; group copies</button><span class="note" id="itemMsg"></span></div>
+      <p class="note" style="margin:10px 0 0">The item list needs columns Item Code, Description, Department, Category, Group and Case Size (the “Item Mapping” export). Refresh it when new lines are added. After changing category groups in the Sales Tracker, press <b>Rebuild weeks &amp; group copies</b> so the F&amp;V, Deli and other teams' copies match.</p>
     </div>
     <div class="card panel">
-      <h2>Missing weeks</h2>
+      <h2>Missing days</h2>
       <div id="missOut"><p class="note">Checking…</p></div>
     </div>
   </section>
@@ -120,7 +129,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const GAP_RUN_DAILY = 2;         // …and at least this many a day to flag 2+ zero days in a row
   const ORDER_WEEKS = 4;           // weeks of history used for ordering suggestions and gaps
   const TOP_N = 50;
-  const DAYN = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+  const DAYN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const SOLD_OUT_MIN = 3;          // "sold out early?": units it usually still sells after its last sale today
   const DAYFULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const fullSales = !me.salesGroups.length;
   const canUpload = ["admin", "hq", "support"].includes(me.role) && fullSales;
@@ -132,18 +142,21 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const short = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   const dayLabel = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const isoWeek = (s) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const y = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y) / 864e5 - 3 + ((y.getDay() + 6) % 7)) / 7); };
-  const wkLabel = (sat) => "Wk " + isoWeek(addDays(sat, 2)) + " · Sat " + short(sat) + " – Fri " + short(addDays(sat, 6));
+  const wkLabel = (mon) => "Wk " + isoWeek(mon) + " · " + short(mon) + " – " + short(addDays(mon, 6));
+  const mondayOf = (d) => addDays(d, -((new Date(d + "T12:00:00").getDay() + 6) % 7));
+  const hh = (h) => pad(h) + ":00";
   const num = (v) => v == null || !isFinite(v) ? "–" : Math.abs(v - Math.round(v)) < 0.005 ? Math.round(v).toLocaleString("en-GB") : v.toLocaleString("en-GB", { maximumFractionDigits: 2 });
   const sum = (a) => a.reduce((p, v) => p + (v || 0), 0);
   const pct = (v) => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toFixed(0) + "%";
 
   // ── Paths ──
   const cfgDoc = (id) => fs.doc(db, "modules", "units", "config", id);
-  const wkDoc = (c, w) => fs.doc(db, "modules", "units", "stores", c, "weeks", w);
-  const metaDoc = (c) => fs.doc(db, "modules", "units", "stores", c, "meta", "weeks");
-  const totDoc = (c, w) => fs.doc(db, "modules", "units", "stores", c, "totals", w);   // small: each item's week total only
-  const gwDoc = (g, c, w) => fs.doc(db, "modules", "units", "groups", g, "stores", c, "weeks", w);
-  const gMetaDoc = (g, c) => fs.doc(db, "modules", "units", "groups", g, "stores", c, "meta", "weeks");
+  // Saved per store: each day's hourly file (days/), each Monday–Sunday week (wk/: units per item per day),
+  // the week's item totals (wtot/: small), units per hour per day (hours/: tiny) and the list of days uploaded (meta/days)
+  const SP = (c, ...x) => fs.doc(db, "modules", "units", "stores", c, ...x);
+  const GP = (g, c, ...x) => fs.doc(db, "modules", "units", "groups", g, "stores", c, ...x);
+  const wkDoc = (c, w) => SP(c, "wk", w), totDoc = (c, w) => SP(c, "wtot", w), dayDoc = (c, d) => SP(c, "days", d), hrDoc = (c, w) => SP(c, "hours", w), metaDoc = (c) => SP(c, "meta", "days");
+  const gwDoc = (g, c, w) => GP(g, c, "wk", w), gDayDoc = (g, c, d) => GP(g, c, "days", d), gHrDoc = (g, c, w) => GP(g, c, "hours", w), gMetaDoc = (g, c) => GP(g, c, "meta", "days");
 
   // Item rows are saved as one compact text field per week: "code:q,q,q,q,q,q,q|code:…" (Sat → Fri)
   const encode = (items) => [...items].map(([c, q]) => c + ":" + q.map((v) => v ? +v.toFixed(3) : "").join(",")).join("|");
@@ -160,6 +173,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
     return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
   }
+  // a day's hourly rows: "code:6=2,13=1|code:…" (hour=units)
+  const encodeDay = (items) => [...items].map(([c, h]) => c + ":" + Object.keys(h).map((k) => k + "=" + +h[k].toFixed(3)).join(",")).join("|");
+  const decodeDay = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); const h = {}; p.slice(i + 1).split(",").forEach((x) => { const [k, v] = x.split("="); if (k) h[+k] = +v; }); m.set(p.slice(0, i), h); }); return m; };
   const decode = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), p.slice(i + 1).split(",").map((v) => v ? +v : 0)); }); return m; };
 
   // ═════════ STORES, GROUPS, ACCESS ═════════
@@ -213,24 +229,26 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const nm = (c) => c ? (NAMES[c] || c) : "";
 
   // ═════════ WEEKLY DATA ═════════
-  const META = {};          // code → { sat: true }
+  const META = {};          // code → { "yyyy-mm-dd": uploadedAt }
   const WK = {};            // key → Map(item → [7]) | null
   const groupMode = () => !fullSales;   // people limited to groups read their group copies
   async function loadMeta(codes) {
     await Promise.all(codes.filter((c) => !META[c]).map(async (c) => {
       try {
         const d = await fs.getDoc(groupMode() ? gMetaDoc(lens(), c) : metaDoc(c));
-        META[c] = d.exists() ? (d.data().weeks || {}) : {};
+        META[c] = d.exists() ? (d.data().days || {}) : {};
       } catch (e) { META[c] = {}; }
     }));
   }
   // Fetch one saved week, or take it from the browser's copy when it hasn't been re-uploaded since
-  async function cachedDoc(key, ref, c, w) {
-    const at = (META[c] || {})[w];
+  // a week counts as changed when any of its days was uploaded again
+  const weekAt = (c, w) => { let a = 0; Object.keys(META[c] || {}).forEach((d) => { if (d >= w && d <= addDays(w, 6)) a = Math.max(a, META[c][d] || 0); }); return a || undefined; };
+  async function cachedDoc(key, ref, c, w, at0) {
+    const at = at0 !== undefined ? at0 : weekAt(c, w);
     if (typeof at === "number") { const hit = await idbGet(key); if (hit && hit.at === at) return hit; }
     const d = await fs.getDoc(ref);
     if (!d.exists()) return null;
-    const v = { at: d.data().at, days: d.data().days, data: d.data().data };
+    const x = d.data(), v = { at: x.at, days: x.days, has: x.has, data: x.data, tot: x.tot, h: x.h, names: x.names };
     idbSet(key, v);
     return v;
   }
@@ -239,7 +257,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (!(k in WK)) {
       try {
         const v = await cachedDoc(k, groupMode() ? gwDoc(lens(), c, w) : wkDoc(c, w), c, w);
-        WK[k] = v ? { items: decode(v.data), days: v.days, at: v.at } : null;
+        WK[k] = v ? { items: decode(v.data), days: v.days, has: v.has || [], at: v.at } : null;
       } catch (e) { WK[k] = null; }
     }
     return WK[k];
@@ -256,6 +274,26 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     }
     return TOT[k];
   }
+  // one day's hourly file for a store: Map(item → {hour: units})
+  const DAY = {};
+  async function getDay(c, d) {
+    const k = "d|" + (groupMode() ? lens() + "|" : "") + c + "|" + d;
+    if (!(k in DAY)) {
+      try { const v = await cachedDoc(k, groupMode() ? gDayDoc(lens(), c, d) : dayDoc(c, d), c, d, (META[c] || {})[d]); DAY[k] = v ? { items: decodeDay(v.data), tot: v.tot || [] } : null; }
+      catch (e) { DAY[k] = null; }
+    }
+    return DAY[k];
+  }
+  // units per hour per day for a store's week (all items, or the group's items for group logins)
+  const HRS = {};
+  async function getHours(c, w) {
+    const k = "h|" + (groupMode() ? lens() + "|" : "") + c + "|" + w;
+    if (!(k in HRS)) {
+      try { const v = await cachedDoc(k, groupMode() ? gHrDoc(lens(), c, w) : hrDoc(c, w), c, w); HRS[k] = v ? (v.h || {}) : null; }
+      catch (e) { HRS[k] = null; }
+    }
+    return HRS[k];
+  }
   // allowed by the lens and the filter
   function allowed(code) {
     const gsel = $("grp").value; if (gsel && (!ITEMS.get(code) || ITEMS.get(code).G !== gsel)) return false;
@@ -270,7 +308,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   async function refreshWeeks() {
     const codes = scope().codes;
     await loadMeta(codes);
-    weeks = [...new Set(codes.flatMap((c) => Object.keys(META[c] || {})))].sort().reverse();
+    weeks = [...new Set(codes.flatMap((c) => Object.keys(META[c] || {}).map(mondayOf)))].sort().reverse();
     const keep = $("week").value;
     $("week").innerHTML = "";
     weeks.forEach((w) => $("week").add(new Option(wkLabel(w), w)));
@@ -330,12 +368,13 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (tab === "upload") return renderUpload();
     const w = $("week").value, codes = scope().codes;
     $("stamp").textContent = w ? scope().label + " · " + wkLabel(w) : "";
-    if (!ITEMS.size && fullSales) { ["lkOut", "bestOut", "gapOut", "ordOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "msg warn", text: canUpload ? "Upload the item list first (Upload tab)." : "The item list hasn't been uploaded yet." })); }); return; }
-    if (!w) { ["lkOut", "bestOut", "gapOut", "ordOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "empty", text: canUpload ? "No unit sales yet. Open Upload and drop in the weekly unit files." : "No unit sales have been uploaded yet." })); }); return; }
+    if (!ITEMS.size && fullSales) { ["lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "msg warn", text: canUpload ? "Upload the item list first (Upload tab)." : "The item list hasn't been uploaded yet." })); }); return; }
+    if (!w) { ["lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "empty", text: canUpload ? "No unit sales yet. Open Upload and drop in the hourly item sales files." : "No unit sales have been uploaded yet." })); }); $("soOut").innerHTML = ""; return; }
     if (tab === "lookup") return renderLookup(my);
     if (tab === "best") return renderBest(my, w, codes);
     if (tab === "gaps") return renderGaps(my, w, codes);
     if (tab === "order") return renderOrder(my, w, codes);
+    if (tab === "hours") return renderHours(my, w, codes);
   }
   const loading = (id, txt) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "note", text: txt || "Loading…" })); };
   const needStore = (id, what) => { $(id).innerHTML = ""; $(id).append(E("h2", { text: what }), E("p", { class: "msg warn", text: "Choose one store in View to see " + what.toLowerCase() + "." })); };
@@ -386,7 +425,14 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         kpi("Average a day", num(n ? tot / n / 7 : null), "units"),
         kpi("Cases a week", num(n ? tot / n / it.k : null), "case of " + it.k),
         kpi("This week", num(docs[0] ? sum(docs[0].items.get(picked) || []) : null), wkLabel(w))]),
-        E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Week" }), ...DAYN.map((d) => E("th", { class: "num", text: d })), E("th", { class: "num", text: "Week" })])]), tb])]));
+        E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Week" }), ...DAYN.map((d) => E("th", { class: "num", text: d })), E("th", { class: "num", text: "Week" })])]), tb])]),
+        E("div", { id: "lkHours", style: "margin-top:16px" }));
+      // this item by hour: average over the week's days that have a file
+      const dIn = Array.from({ length: 7 }, (_, i) => addDays(w, i)).filter((d, i) => docs[0] && (docs[0].has || [])[i]);
+      const dd = (await Promise.all(dIn.map((d) => getDay(c, d)))).filter(Boolean);
+      if (my !== seq || !dd.length) return;
+      const hrs = Array(24).fill(0); dd.forEach((d) => { const h = d.items.get(picked) || {}; Object.keys(h).forEach((k) => { hrs[k] += h[k] / dd.length; }); });
+      $("lkHours").append(E("h3", { style: "margin:0 0 6px", text: "By hour · average day this week (" + dd.length + " day" + (dd.length === 1 ? "" : "s") + ")" }), hourChart(hrs, [], "Average units", ""));
     } else {
       loading("lkOut", "Loading " + codes.length + " stores…");
       const i0 = weeks.indexOf(w), prevW = weeks[i0 + 1];
@@ -456,6 +502,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const H = hist.filter(Boolean);
     if (!cur || H.length < 3) { box.appendChild(E("p", { class: "msg warn", text: "Needs this week and at least 3 earlier weeks of unit sales for this store. " + (cur ? "Only " + H.length + " earlier week(s) uploaded so far." : "No report for this week.") })); return; }
     const rows = [];
+    const idx = DAYN.map((_, i) => i).filter((i) => (cur.has || [])[i]);     // days of this week with a report
+    if (!idx.length) { box.appendChild(E("p", { class: "msg warn", text: "No days uploaded for this week yet." })); return; }
+    const avgOn = (code, i) => { const hs = H.filter((d) => (d.has || [])[i]); return hs.length ? sum(hs.map((d) => (d.items.get(code) || [])[i] || 0)) / hs.length : 0; };
     const seen = new Set(); H.forEach((d) => d.items.forEach((q, code) => seen.add(code)));
     seen.forEach((code) => {
       if (!allowed(code)) return;
@@ -463,14 +512,17 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       const weeksSold = per.filter((v) => v > 0).length, avgW = sum(per) / H.length;
       if (weeksSold < 3 || avgW < GAP_MIN_WEEK) return;
       const q = cur.items.get(code) || [0, 0, 0, 0, 0, 0, 0];
-      const avgD = DAYN.map((_, i) => sum(H.map((d) => (d.items.get(code) || [])[i] || 0)) / H.length);
+      const avgD = DAYN.map((_, i) => avgOn(code, i));
+      const usual = sum(idx.map((i) => avgD[i]));
       let kind = null, run = 0, best = 0, from = -1, bestFrom = -1;
-      q.forEach((v, i) => { if (!v) { if (!run) from = i; run++; if (run > best) { best = run; bestFrom = from; } } else run = 0; });
-      if (!sum(q)) kind = "all";
+      idx.forEach((i) => { if (!q[i]) { if (!run) from = i; run++; if (run > best) { best = run; bestFrom = from; } } else run = 0; });
+      if (!sum(idx.map((i) => q[i])) && usual >= GAP_MIN_WEEK * idx.length / 7) kind = "all";
       else if (best >= 2 && avgW / 7 >= GAP_RUN_DAILY) kind = "run";
       if (!kind) return;
-      const lost = kind === "all" ? avgW : sum(avgD.slice(bestFrom, bestFrom + best));
-      rows.push({ code, kind, avgW, week: sum(q), days: kind === "all" ? 7 : best, when: kind === "all" ? "All week" : DAYN[bestFrom] + (best > 1 ? " – " + DAYN[bestFrom + best - 1] : ""), lost });
+      const runDays = idx.slice(idx.indexOf(bestFrom), idx.indexOf(bestFrom) + best);
+      const lost = kind === "all" ? usual : sum(runDays.map((i) => avgD[i]));
+      rows.push({ code, kind, avgW, week: sum(idx.map((i) => q[i])), days: kind === "all" ? idx.length : best,
+        when: kind === "all" ? (idx.length === 7 ? "All week" : "All " + idx.length + " days so far") : DAYN[runDays[0]] + (best > 1 ? " – " + DAYN[runDays[runDays.length - 1]] : ""), lost });
     });
     gapRows = rows.sort((a, b) => b.lost - a.lost);
     box.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
@@ -508,7 +560,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     ordRows = [];
     seen.forEach((code) => {
       if (!allowed(code)) return;
-      const per = dsel.map((i) => sum(H.map((d) => (d.items.get(code) || [])[i] || 0)) / H.length);
+      const per = dsel.map((i) => { const hs = H.filter((d) => (d.has || [])[i]); return hs.length ? sum(hs.map((d) => (d.items.get(code) || [])[i] || 0)) / hs.length : 0; });
       const need = sum(per); if (need <= 0) return;
       const it = itemOf(code), units = Math.ceil(need * (1 + extra) - 1e-9);
       ordRows.push({ code, it, per, need, units, cases: Math.ceil(units / (it.k || 1)) });
@@ -531,6 +583,103 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       ...ordRows.map((r) => [r.code, r.it.d, nm(r.it.D), nm(r.it.C), ...r.per.map((v) => +v.toFixed(1)), r.units, r.it.k, r.cases])]);
   };
 
+  // ── By hour ──
+  let hrDay = "", soRows = [];
+  function hourChart(cur, prev, curLabel, prevLabel) {
+    const hrsUsed = Array.from({ length: 24 }, (_, h) => h).filter((h) => cur[h] || prev[h]);
+    if (!hrsUsed.length) return E("p", { class: "empty", text: "No sales recorded." });
+    const lo = Math.min(...hrsUsed), hi = Math.max(...hrsUsed), H = []; for (let h = lo; h <= hi; h++) H.push(h);
+    const max = Math.max(1, ...H.map((h) => Math.max(cur[h] || 0, prev[h] || 0)));
+    const Wd = 720, Ht = 220, L = 48, B = 28, bw = Math.min(30, (Wd - L - 10) / H.length * 0.6);
+    const x = (i) => L + (i + 0.5) * (Wd - L - 10) / H.length, y = (v) => Ht - B - (v / max) * (Ht - B - 12);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Units by hour");
+    const mk = (tag, a, t) => { const n = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => n.setAttribute(k, v)); if (t != null) n.textContent = t; svg.appendChild(n); return n; };
+    [0, 0.5, 1].forEach((f) => { mk("line", { x1: L, x2: Wd - 10, y1: y(max * f), y2: y(max * f), stroke: "#E9EBEA" }); mk("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, Math.round(max * f)); });
+    const peak = H.reduce((a, h) => (cur[h] || 0) > (cur[a] || 0) ? h : a, H[0]);
+    H.forEach((h, i) => {
+      mk("rect", { x: x(i) - bw / 2, y: y(cur[h] || 0), width: bw, height: Math.max(0, Ht - B - y(cur[h] || 0)), rx: 3, fill: h === peak ? "#EC1B24" : "#1F6FB2", "fill-opacity": 0.85 });
+      if (prev[h]) mk("circle", { cx: x(i), cy: y(prev[h]), r: 3.5, fill: "#fff", stroke: "#60727a", "stroke-width": 2 });
+      if (H.length <= 18 || i % 2 === 0) mk("text", { x: x(i), y: Ht - 9, "text-anchor": "middle", "font-size": 10.5, fill: "#60727a" }, pad(h));
+    });
+    return E("div", null, [svg, E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#1F6FB2" }), curLabel]), E("span", null, [E("i", { style: "background:#EC1B24" }), "Busiest hour"]),
+      E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), prevLabel])])]);
+  }
+  async function renderHours(my, w, codes) {
+    const box = $("hrOut"), so = $("soOut");
+    loading("hrOut"); so.innerHTML = "";
+    const prevW = addDays(w, -7);
+    const [cur, prev] = await Promise.all([Promise.all(codes.map((c) => getHours(c, w))), Promise.all(codes.map((c) => getHours(c, prevW)))]);
+    if (my !== seq) return;
+    const daysIn = Array.from({ length: 7 }, (_, i) => addDays(w, i)).filter((d) => cur.some((h) => h && h[d]));
+    if (!daysIn.length) { box.innerHTML = ""; box.appendChild(E("p", { class: "empty", text: "No hourly files for this week yet." })); return; }
+    if (hrDay !== "week" && !daysIn.includes(hrDay)) hrDay = daysIn[daysIn.length - 1];
+    const pick = E("select", { class: "in", style: "width:auto;padding:7px 9px" });
+    daysIn.forEach((d) => pick.add(new Option(dayLabel(d), d))); pick.add(new Option("Whole week so far", "week")); pick.value = hrDay;
+    pick.onchange = () => { hrDay = pick.value; render(); };
+    // which days to add up, and the matching days a week earlier
+    const ds = hrDay === "week" ? daysIn : [hrDay];
+    const filtered = fullSales && ($("filter").value || $("grp").value || lens());
+    // C = this period; P = the same days a week earlier; CL = this period for stores/days that also have last week (like for like)
+    let C = Array(24).fill(0), P = Array(24).fill(0), CL = Array(24).fill(0), note = "";
+    if (!filtered) {
+      codes.forEach((c, i) => ds.forEach((d) => { const a = (cur[i] || {})[d], b = (prev[i] || {})[addDays(d, -7)]; if (a) a.forEach((v, h) => { C[h] += v || 0; if (b) CL[h] += v || 0; }); if (a && b) b.forEach((v, h) => { P[h] += v || 0; }); }));
+    } else {
+      if (codes.length > 1 && ds.length > 1) { box.innerHTML = ""; box.append(E("h2", { text: "Units by hour" }), E("p", { class: "msg warn", text: "With a Filter or category group, choose one day (or one store) so the hub doesn't have to load every store's whole week." }), E("div", { class: "row" }, [E("b", { text: "Day " }), pick])); return; }
+      for (const c of codes) for (const d of ds) {
+        const [a, b] = await Promise.all([getDay(c, d), getDay(c, addDays(d, -7))]);
+        if (a) a.items.forEach((h, code) => { if (allowed(code)) Object.keys(h).forEach((k) => { C[k] += h[k]; if (b) CL[k] += h[k]; }); });
+        if (a && b) b.items.forEach((h, code) => { if (allowed(code)) Object.keys(h).forEach((k) => { P[k] += h[k]; }); });
+      }
+      if (my !== seq) return;
+      note = " Filtered to " + ($("grp").value ? nm($("grp").value) : $("filter").value ? nm($("filter").value) : groupOf(lens()).name) + ".";
+    }
+    const tC = sum(C), tP = sum(P), tCL = sum(CL);
+    const lfl = tP && tCL < tC - 0.5 ? " (like for like: stores with both days)" : "";
+    const lbl = hrDay === "week" ? "this week so far" : dayLabel(hrDay), plbl = hrDay === "week" ? "same days last week" : dayLabel(addDays(hrDay, -7));
+    box.innerHTML = "";
+    box.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Units by hour · " + scope().label }), E("div", { class: "row" }, [E("b", { style: "font-size:13px", text: "Day" }), pick])]),
+      E("p", { class: "note", style: "margin:0 0 10px", text: num(Math.round(tC)) + " units " + lbl + (tP ? " · " + pct(tCL / tP - 1) + " on " + plbl + lfl : "") + "." + note }),
+      hourChart(C, P, "Units " + lbl, plbl));
+    const tb = E("tbody");
+    for (let h = 0; h < 24; h++) { if (!C[h] && !P[h]) continue;
+      tb.appendChild(E("tr", null, [E("td", { text: hh(h) + " – " + pad(h) + ":59" }), E("td", { class: "num", style: "font-weight:700", text: num(Math.round(C[h])) }), E("td", { class: "num", text: P[h] ? num(Math.round(P[h])) : "–" }),
+        E("td", { class: "num " + (P[h] ? (CL[h] >= P[h] ? "up" : "down") : ""), text: P[h] ? pct(CL[h] / P[h] - 1) : "–" }), E("td", { class: "num", text: tC ? (C[h] / tC * 100).toFixed(1) + "%" : "–" })])); }
+    box.appendChild(E("div", { class: "tablewrap", style: "margin-top:12px" }, [E("table", null, [E("thead", null, [E("tr", null, ["Hour", "Units", "Last week", "Change", "Share of the day"].map((x, i) => E("th", { class: i ? "num" : "", text: x })))]), tb])]));
+
+    // Sold out early? (one store, one day)
+    so.innerHTML = "";
+    so.appendChild(E("h2", { text: "Sold out early?" }));
+    if (!single() || hrDay === "week") { so.appendChild(E("p", { class: "note", text: "Choose one store and one day to check for items that stopped selling hours earlier than usual." })); return; }
+    const c = codes[0], same = [1, 2, 3, 4].map((k) => addDays(hrDay, -7 * k));
+    const [today, ...past] = await Promise.all([hrDay, ...same].map((d) => getDay(c, d)));
+    if (my !== seq) return;
+    const Ps = past.filter(Boolean);
+    if (!today || Ps.length < 2) { so.appendChild(E("p", { class: "msg warn", text: "Needs this day and at least 2 of the same weekday in the previous 4 weeks." })); return; }
+    const closeHour = Math.max(...Object.keys(today.tot || {}).filter((h) => (today.tot || [])[h] > 0).map(Number));
+    soRows = [];
+    today.items.forEach((h, code) => {
+      if (!allowed(code)) return;
+      const last = Math.max(...Object.keys(h).map(Number)); if (last >= closeHour - 1) return;
+      const after = Ps.map((d) => { const x = d.items.get(code) || {}; return sum(Object.keys(x).filter((k) => +k > last).map((k) => x[k])); });
+      const daysSold = Ps.filter((d) => d.items.has(code)).length;
+      const usualAfter = sum(after) / Ps.length, usualDay = sum(Ps.map((d) => dayTotal(d.items.get(code) || {}))) / Ps.length;
+      if (daysSold < Math.min(2, Ps.length) || usualAfter < SOLD_OUT_MIN) return;
+      soRows.push({ code, today: dayTotal(h), last, usualAfter, usualDay });
+    });
+    soRows.sort((a, b) => b.usualAfter - a.usualAfter);
+    so.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
+      E("p", { class: "note", style: "margin:0;flex:1 1 400px", text: "Items that sold " + dayLabel(hrDay) + " but stopped hours before closing, when on the same weekday (last " + Ps.length + " weeks) they usually sell " + SOLD_OUT_MIN + "+ more after that time. Often an empty shelf or a short delivery." }),
+      E("button", { class: "btn secondary small", type: "button", text: "Download as Excel", onclick: () => xl("Sold out early " + c + " " + hrDay, [["Item code", "Description", "Category", "Sold today", "Last sale", "Usually sells after that", "Usual for the day"],
+        ...soRows.map((r) => { const it = itemOf(r.code); return [r.code, it.d, nm(it.C), r.today, hh(r.last), +r.usualAfter.toFixed(1), +r.usualDay.toFixed(1)]; })]) })]));
+    if (!soRows.length) { so.appendChild(E("p", { class: "msg ok", text: "Nothing stopped selling early." })); return; }
+    const t2 = E("tbody");
+    soRows.forEach((r) => { const it = itemOf(r.code); t2.appendChild(E("tr", { style: "cursor:pointer", onclick: () => { picked = r.code; $("q").value = it.d; showTab("lookup"); } }, [
+      E("td", null, [E("span", { class: "code", text: r.code }), E("div", { text: it.d })]), E("td", { class: "note", text: nm(it.C) }), E("td", { class: "num", text: num(r.today) }),
+      E("td", null, [E("span", { class: "pill warn", text: "Last sale " + hh(r.last) })]), E("td", { class: "num", style: "font-weight:700", text: num(Math.round(r.usualAfter)) }), E("td", { class: "num", text: num(Math.round(r.usualDay)) })])); });
+    so.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Item", "Category", "Sold today", "", "Usually sells after that", "Usual for the day"].map((x, i) => E("th", { class: i >= 2 && i !== 3 ? "num" : "", text: x })))]), t2])]));
+  }
+
   // ── Excel ──
   function loadXLSX() {
     if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -551,30 +700,31 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/); if (m) return m[3] + "-" + pad(+m[2]) + "-" + pad(+m[1]);
     return null;
   };
-  // One store's weekly unit file: Outlet / Report From / Report To, then Item Code + Qty pairs for each day
-  function parseUnits(rows, X) {
+  // One store's daily hourly file: Outlet / Report From / Report To, then Item Code, Description and one column per hour
+  function parseHourly(rows, X) {
     const lab = (r) => String((rows[r] || [])[0] || "").trim().toLowerCase();
     const outlet = String((rows[0] || [])[1] || "").trim();
-    if (lab(0) !== "outlet") throw new Error("This isn't a weekly unit sales file (no Outlet line at the top).");
+    if (lab(0) !== "outlet") throw new Error("This isn't an hourly item sales file (no Outlet line at the top).");
     const from = toISO((rows[1] || [])[1], X), to = toISO((rows[2] || [])[1], X);
-    if (!from || !to) throw new Error("The Report From / To dates weren't found.");
-    if (new Date(from + "T12:00:00").getDay() !== 6) throw new Error("The report doesn't start on a Saturday (" + from + ").");
-    let hr = rows.findIndex((r) => (r || []).some((v) => String(v || "").trim() === "Monday"));
-    if (hr < 0) throw new Error("The day columns weren't found.");
-    const cols = {};    // day index Sat..Fri → column of its item codes
-    (rows[hr] || []).forEach((v, c) => { const k = DAYFULL.indexOf(String(v || "").trim()); if (k >= 0) cols[(k + 2) % 7] = c; });
-    if (Object.keys(cols).length !== 7) throw new Error("Not all seven days were found.");
-    const items = new Map();
-    for (let r = hr + 2; r < rows.length; r++) {
-      const row = rows[r] || [];
-      for (let d = 0; d < 7; d++) {
-        const c = cols[d], code = row[c]; if (code == null || code === "") continue;
-        const k = String(code).trim(), q = +row[c + 1] || 0; if (!q) continue;
-        const a = items.get(k) || items.set(k, [0, 0, 0, 0, 0, 0, 0]).get(k); a[d] = Math.round((a[d] + q) * 1000) / 1000;
-      }
+    if (!from) throw new Error("The report date wasn't found.");
+    if (to && to !== from) throw new Error("This file covers more than one day (" + from + " to " + to + "). Use the daily file.");
+    const hr = rows.findIndex((r) => String((r || [])[0] || "").trim().toLowerCase() === "item code");
+    if (hr < 0) throw new Error("The Item Code heading wasn't found.");
+    const hcols = [];   // [column, hour]
+    (rows[hr] || []).forEach((v, c) => { const m = String(v || "").match(/^(\d{1,2}):\d{2}\s*>/); if (m) hcols.push([c, +m[1]]); });
+    if (!hcols.length) throw new Error("No hour columns were found.");
+    const items = new Map(), names = {}, tot = Array(24).fill(0);
+    for (let r = hr + 1; r < rows.length; r++) {
+      const row = rows[r] || [], code = row[0];
+      if (code == null || code === "") continue;   // the Totals line has no item code
+      const k = String(code).trim(), h = {};
+      hcols.forEach(([c, hour]) => { const q = +row[c] || 0; if (q) { h[hour] = Math.round(((h[hour] || 0) + q) * 1000) / 1000; tot[hour] += q; } });
+      if (!Object.keys(h).length) continue;
+      const prev = items.get(k); if (prev) Object.keys(h).forEach((x) => { prev[x] = (prev[x] || 0) + h[x]; }); else items.set(k, h);
+      if (!ITEMS.has(k) && row[1]) names[k] = String(row[1]).trim();
     }
     const num0 = (outlet.match(/^(\d+)/) || [])[1];
-    return { outlet, num: num0, week: from, to, days: Array.from({ length: 7 }, (_, i) => addDays(from, i)), items };
+    return { outlet, num: num0, date: from, items, names, tot: tot.map((v) => Math.round(v * 1000) / 1000), hours: hcols.map((x) => x[1]) };
   }
   function matchOutlet(n, outlet) {
     const byRep = n ? me.allStores.find((s) => String(s.report || "").toLowerCase().replace(/\s/g, "") === "report-" + n) : null;
@@ -598,63 +748,88 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       try {
         const wb = X.read(await f.arrayBuffer(), { type: "array" });
         const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
-        const p = parseUnits(rows, X);
+        const p = parseHourly(rows, X);
         const code = matchOutlet(p.num, p.outlet);
-        let prev = false; if (code) { try { prev = (await fs.getDoc(metaDoc(code))).data()?.weeks?.[p.week] || false; } catch (e) {} }
-        pending.push({ name: f.name, p, code, prev, unknown: [...p.items.keys()].filter((k) => !ITEMS.has(k)).length });
+        if (code && !META[code]) { try { const d = await fs.getDoc(metaDoc(code)); META[code] = d.exists() ? (d.data().days || {}) : {}; } catch (e) {} }
+        pending.push({ name: f.name, p, code, prev: !!(code && META[code] && META[code][p.date]), unknown: [...p.items.keys()].filter((k) => !ITEMS.has(k)).length });
       } catch (e) { pending.push({ name: f.name, err: e.message || "Couldn't read this file." }); }
     }
+    pending.sort((a, b) => (a.p ? a.p.date : "").localeCompare(b.p ? b.p.date : ""));
     showPending();
   }
   function showPending() {
     const pv = $("preview"); pv.innerHTML = ""; if (!pending.length) return;
     const tb = E("tbody");
     pending.forEach((x) => {
-      if (x.err) { tb.appendChild(E("tr", null, [E("td", { text: x.name }), E("td", { colspan: "5" }, [E("span", { class: "down", text: x.err })])])); return; }
+      if (x.err) { tb.appendChild(E("tr", null, [E("td", { text: x.name }), E("td", { colspan: "4" }, [E("span", { class: "down", text: x.err })])])); return; }
       const sel = E("select", { class: "in", style: "padding:6px 8px;min-width:180px" });
       sel.add(new Option(x.code ? "" : "Choose the store…", ""));
       me.allStores.filter((s) => s.active !== false).forEach((s) => sel.add(new Option(s.name + " (" + (s.report || s.code) + ")", s.code)));
       sel.value = x.code; sel.onchange = () => { x.code = sel.value; x.done = false; };
-      const units = sum([...x.p.items.values()].map(sum));
+      const units = sum(x.p.tot);
       tb.appendChild(E("tr", null, [E("td", null, [E("b", { text: x.p.outlet }), E("br"), E("span", { class: "note", text: x.name })]), E("td", null, [sel]),
-        E("td", { text: wkLabel(x.p.week) }), E("td", { class: "num", text: x.p.items.size.toLocaleString("en-GB") + " items · " + num(Math.round(units)) + " units" + (x.unknown ? " · " + x.unknown + " not in item list" : "") }),
-        E("td", { class: x.done ? "up" : "", text: x.done ? "✓ Saved" : x.fail ? "Not saved: " + x.fail : x.prev ? "Replaces the saved week" : "New" })]));
+        E("td", { text: dayLabel(x.p.date) + " · " + hh(Math.min(...x.p.hours)) + "–" + pad(Math.max(...x.p.hours)) + ":59" }),
+        E("td", { class: "num", text: x.p.items.size.toLocaleString("en-GB") + " items · " + num(Math.round(units)) + " units" + (x.unknown ? " · " + x.unknown + " not in item list" : "") }),
+        E("td", { class: x.done ? "up" : "", text: x.done ? "✓ Saved" : x.fail ? "Not saved: " + x.fail : x.prev ? "Replaces the saved day" : "New" })]));
     });
     const ok = pending.filter((x) => x.p && !x.done);
     const go = E("button", { class: "btn", type: "button", text: "Save " + ok.length + " file" + (ok.length === 1 ? "" : "s"), onclick: savePending }); go.disabled = !ok.length;
-    pv.append(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["File", "Store", "Week", "Contents", ""].map((h, i) => E("th", { class: i === 3 ? "num" : "", text: h })))]), tb])]),
+    pv.append(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["File", "Store", "Day", "Contents", ""].map((h, i) => E("th", { class: i === 3 ? "num" : "", text: h })))]), tb])]),
       E("div", { class: "row", style: "margin-top:12px" }, [go, E("button", { class: "btn secondary", type: "button", text: "Clear", onclick: () => { pending = []; showPending(); } }), E("span", { class: "note", id: "upMsg" })]));
   }
-  // a week's data split into each category group's own copy
+  // a set of items split into each category group's own copy
   function groupItems(g, items) { const m = new Map(); items.forEach((q, code) => { if (inGroup(g, ITEMS.get(code))) m.set(code, q); }); return m; }
-  async function saveWeek(code, p, file) {
-    const at = Date.now(), base = { code, week: p.week, days: p.days, at, by: me.email };
+  const hourTot = (items) => { const t = Array(24).fill(0); items.forEach((h) => Object.keys(h).forEach((k) => { t[k] += h[k]; })); return t.map((v) => Math.round(v * 1000) / 1000); };
+  const dayTotal = (h) => sum(Object.values(h));
+  // Save one store's day, and fold it into that store's Monday–Sunday week (and each category group's copies)
+  async function saveDay(code, p, file) {
+    const at = Date.now(), mon = mondayOf(p.date), di = (new Date(p.date + "T12:00:00").getDay() + 6) % 7;
+    const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+    const [wkSnap, hrSnap, ...gHrSnaps] = await Promise.all([fs.getDoc(wkDoc(code, mon)), fs.getDoc(hrDoc(code, mon)), ...GROUPS.map((g) => fs.getDoc(gHrDoc(g.id, code, mon)))]);
+    // the week: units per item per day (Mon–Sun), with this day replaced
+    const wk = wkSnap.exists() ? decode(wkSnap.data().data) : new Map();
+    wk.forEach((q) => { q[di] = 0; });
+    p.items.forEach((h, k) => { const q = wk.get(k) || wk.set(k, [0, 0, 0, 0, 0, 0, 0]).get(k); q[di] = Math.round(dayTotal(h) * 1000) / 1000; });
+    [...wk.keys()].forEach((k) => { if (!sum(wk.get(k))) wk.delete(k); });
+    const H = hrSnap.exists() ? (hrSnap.data().h || {}) : {}; H[p.date] = p.tot;
+    const has = days.map((d) => !!H[d]);
+    const base = { code, at, by: me.email };
     const b = fs.writeBatch(db);
-    b.set(wkDoc(code, p.week), { ...base, file: file || "", outlet: p.outlet || "", n: p.items.size, data: encode(p.items) });
-    b.set(totDoc(code, p.week), { ...base, n: p.items.size, data: encodeTot(p.items) });
-    b.set(metaDoc(code), { weeks: { [p.week]: at }, at }, { merge: true });
-    GROUPS.forEach((g) => {
-      const gi = groupItems(g, p.items);
-      b.set(gwDoc(g.id, code, p.week), { ...base, gid: g.id, n: gi.size, data: encode(gi) });
-      b.set(gMetaDoc(g.id, code), { weeks: { [p.week]: at }, at }, { merge: true });
+    b.set(dayDoc(code, p.date), { ...base, date: p.date, file: file || "", outlet: p.outlet || "", n: p.items.size, tot: p.tot, names: p.names || {}, data: encodeDay(p.items) });
+    b.set(wkDoc(code, mon), { ...base, week: mon, days, has, n: wk.size, data: encode(wk) });
+    b.set(totDoc(code, mon), { ...base, week: mon, days, has, n: wk.size, data: encodeTot(wk) });
+    b.set(hrDoc(code, mon), { ...base, week: mon, h: H });
+    b.set(metaDoc(code), { days: { [p.date]: at }, at }, { merge: true });
+    GROUPS.forEach((g, i) => {
+      const gd = groupItems(g, p.items), gw = groupItems(g, wk);
+      const GH = gHrSnaps[i].exists() ? (gHrSnaps[i].data().h || {}) : {}; GH[p.date] = hourTot(gd);
+      b.set(gDayDoc(g.id, code, p.date), { ...base, gid: g.id, date: p.date, n: gd.size, tot: GH[p.date], data: encodeDay(gd) });
+      b.set(gwDoc(g.id, code, mon), { ...base, gid: g.id, week: mon, days, has, n: gw.size, data: encode(gw) });
+      b.set(gHrDoc(g.id, code, mon), { ...base, gid: g.id, week: mon, h: GH });
+      b.set(gMetaDoc(g.id, code), { days: { [p.date]: at }, at }, { merge: true });
     });
     await b.commit();                     // everything for this file in one trip
+    (META[code] = META[code] || {})[p.date] = at;
   }
   async function savePending() {
     const ok = pending.filter((x) => x.p && !x.done);
     if (ok.some((x) => !x.code)) { SPARUI.toast("Choose the store for each file first", "err"); return; }
-    const keys = ok.map((x) => x.code + "_" + x.p.week);
-    if (new Set(keys).size !== keys.length) { SPARUI.toast("Two files are for the same store and week. Remove one.", "err"); return; }
-    let n = 0, left = ok.slice();
+    const keys = ok.map((x) => x.code + "_" + x.p.date);
+    if (new Set(keys).size !== keys.length) { SPARUI.toast("Two files are for the same store and day. Remove one.", "err"); return; }
+    // one store's days go in order (they share a week); three stores at a time
+    const byStore = {}; ok.forEach((x) => { (byStore[x.code] = byStore[x.code] || []).push(x); });
+    const queues = Object.values(byStore); let n = 0;
     const worker = async () => {
-      while (left.length) {
-        const x = left.shift();
-        $("upMsg").textContent = "Saving " + (ok.length - left.length) + " of " + ok.length + "…";
-        try { await saveWeek(x.code, x.p, x.name); x.done = true; x.fail = null; n++; delete META[x.code]; [WK, TOT].forEach((o) => Object.keys(o).forEach((k) => { if (k.includes(x.code + "|" + x.p.week)) delete o[k]; })); }
-        catch (e) { x.fail = e.code || e.message; }
+      while (queues.length) {
+        const q = queues.shift();
+        for (const x of q) {
+          $("upMsg").textContent = "Saving " + (n + 1) + " of " + ok.length + "…";
+          try { await saveDay(x.code, x.p, x.name); x.done = true; x.fail = null; n++; [WK, TOT, DAY, HRS].forEach((o) => Object.keys(o).forEach((k) => { if (k.includes(x.code + "|")) delete o[k]; })); }
+          catch (e) { x.fail = e.code || e.message; }
+        }
       }
     };
-    await Promise.all([worker(), worker(), worker()]);   // three files at a time
+    await Promise.all([worker(), worker(), worker()]);
     showPending(); SPARUI.toast(n + " file" + (n === 1 ? "" : "s") + " saved");
     await refreshWeeks(); renderMissing();
   }
@@ -693,15 +868,21 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     } catch (e) { msg.textContent = "Couldn't read that file: " + (e.message || e); }
   };
   $("rebuild").onclick = async () => {
-    if (!confirm("Rebuild every category group's copy of the unit sales already uploaded?")) return;
+    if (!confirm("Rebuild every store's weeks, totals and category group copies from the days already uploaded? This can take a few minutes.")) return;
     const btn = $("rebuild"); btn.disabled = true; let n = 0;
     try {
       for (const st of me.allStores.filter((s) => s.active !== false)) {
         $("itemMsg").textContent = "Rebuilding " + st.name + "…";
-        const qs = await fs.getDocs(fs.collection(db, "modules", "units", "stores", st.code, "weeks"));
-        for (const d of qs.docs) { const x = d.data(); await saveWeek(st.code, { week: x.week, days: x.days, items: decode(x.data), outlet: x.outlet }, x.file); n++; }
+        const qs = await fs.getDocs(fs.collection(db, "modules", "units", "stores", st.code, "days"));
+        // clear the week first, then add the days back in order
+        const weeksSeen = new Set();
+        for (const d of qs.docs.sort((a, b) => a.id.localeCompare(b.id))) {
+          const x = d.data(), mon = mondayOf(x.date);
+          if (!weeksSeen.has(mon)) { weeksSeen.add(mon); const b = fs.writeBatch(db); b.delete(wkDoc(st.code, mon)); b.delete(hrDoc(st.code, mon)); GROUPS.forEach((g) => b.delete(gHrDoc(g.id, st.code, mon))); await b.commit(); }
+          await saveDay(st.code, { date: x.date, items: decodeDay(x.data), tot: x.tot || [], names: x.names || {}, outlet: x.outlet }, x.file); n++;
+        }
       }
-      $("itemMsg").textContent = "✓ Rebuilt " + n + " store-weeks.";
+      $("itemMsg").textContent = "✓ Rebuilt " + n + " store-days.";
     } catch (e) { $("itemMsg").textContent = "Stopped: " + (e.code || e.message); }
     btn.disabled = false;
   };
@@ -712,21 +893,20 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   async function renderMissing() {
     if (!canUpload) return;
     const codes = me.allStores.filter((s) => s.active !== false).map((s) => s.code);
-    await Promise.all(codes.map(async (c) => { if (!META[c]) { try { const d = await fs.getDoc(metaDoc(c)); META[c] = d.exists() ? (d.data().weeks || {}) : {}; } catch (e) { META[c] = {}; } } }));
-    const today = iso(new Date());
-    const lastSat = addDays(today, -((new Date(today + "T12:00:00").getDay() + 1) % 7) - 7);   // the last complete Sat–Fri week
+    await Promise.all(codes.map(async (c) => { if (!META[c]) { try { const d = await fs.getDoc(metaDoc(c)); META[c] = d.exists() ? (d.data().days || {}) : {}; } catch (e) { META[c] = {}; } } }));
+    const yday = addDays(iso(new Date()), -1);
     const out = [];
     codes.forEach((c) => {
       const have = Object.keys(META[c] || {}).sort(); if (!have.length) return;
-      for (let w = have[0]; w <= lastSat; w = addDays(w, 7)) if (!META[c][w]) out.push({ c, w });
+      for (let d = have[0]; d <= yday; d = addDays(d, 1)) if (!META[c][d]) out.push({ c, d });
     });
     const box = $("missOut"); box.innerHTML = "";
-    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "Every store on Unit Sales has all its weeks, up to " + wkLabel(lastSat) + "." })); return; }
+    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: "Every store on Unit Sales has all its days, up to " + dayLabel(yday) + "." })); return; }
     const tb = E("tbody");
-    out.forEach((x) => tb.appendChild(E("tr", null, [E("td", null, [E("b", { text: x.c }), " ", E("span", { class: "note", text: (byCode[x.c] || {}).name })]), E("td", { text: wkLabel(x.w) }),
-      E("td", null, ["Look for the unit sales file for ", E("b", { text: wkLabel(x.w) })])])));
-    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: out.length + " store-week" + (out.length === 1 ? "" : "s") + " missing (each store is checked from its first upload)" }),
-      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Week", "What to do"].map((h) => E("th", { text: h })))]), tb])]));
+    out.slice(0, 300).forEach((x) => tb.appendChild(E("tr", null, [E("td", null, [E("b", { text: x.c }), " ", E("span", { class: "note", text: (byCode[x.c] || {}).name })]), E("td", { text: dayLabel(x.d) }),
+      E("td", null, ["Look for the hourly item sales file for ", E("b", { text: dayLabel(x.d) })])])));
+    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: out.length + " store-day" + (out.length === 1 ? "" : "s") + " missing (each store is checked from its first upload)" }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Day", "What to do"].map((h) => E("th", { text: h })))]), tb])]));
   }
 
   // ═════════ START ═════════

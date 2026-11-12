@@ -64,6 +64,29 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .hb-v{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
 @media(max-width:700px){.hb{grid-template-columns:1fr 1fr}.hb .mv-bar{grid-column:1/-1;grid-row:2}}
 .mv-v{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
+.cmpk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
+@media(max-width:700px){.cmpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#cmpType{flex-wrap:wrap}
+.cmpk .card{padding:14px 16px}
+.cmpk label{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.cmpk strong{display:block;font-size:24px;margin:6px 0 4px}
+.cmpk span{font-size:12.5px;color:var(--muted);font-weight:700}
+#report{font-size:14.5px;line-height:1.55;color:var(--ink)}
+#report h1{font-size:22px;margin:0 0 4px}
+#report h3{font-size:16px;margin:18px 0 6px;border-bottom:2px solid #EC1B24;padding-bottom:4px}
+#report ul{margin:6px 0;padding-left:20px}
+#report table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+#report th,#report td{padding:5px 8px;border-bottom:1px solid #E9EBEA;text-align:left}
+#report th{position:static;background:#F1F2F2;font-size:12px}
+#report td.num,#report th.num{text-align:right}
+@media print{
+  body{background:#fff}
+  header.top,.tabs,#bar,#cmpForm,#cmpOut,.noprint,[data-pane]:not([data-pane=compare]){display:none!important}
+  main.page{padding:0;max-width:none}
+  #repBox{border:0;box-shadow:none;padding:0;margin:0}
+  #report h3{break-after:avoid}
+  #report table,#report ul{break-inside:avoid}
+}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 </style>
@@ -76,6 +99,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     <button class="tab active" data-tab="overview" type="button">Overview</button>
     <button class="tab" data-tab="depts" type="button">Departments</button>
     <button class="tab" data-tab="trends" type="button">Trends</button>
+    <button class="tab" data-tab="compare" type="button">Compare</button>
     <button class="tab" data-tab="alerts" type="button">Alerts<span class="count" id="aCount" hidden>0</span></button>
     <button class="tab" data-tab="upload" type="button" hidden>Upload reports</button>
     <button class="tab" data-tab="groups" type="button" hidden>Category groups &amp; targets</button>
@@ -105,6 +129,39 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   <section data-pane="trends" hidden>
     <div class="card panel" style="margin-top:0" id="trMain"></div>
     <div class="card panel" id="trDow"></div>
+  </section>
+
+  <!-- ═════════ COMPARE ═════════ -->
+  <section data-pane="compare" hidden>
+    <div class="card panel" style="margin-top:0" id="cmpForm">
+      <h2>Compare two periods</h2>
+      <p class="note" style="margin:-6px 0 12px">Choose what to compare and a date inside the period. The comparison period is the one just before it (for a single day: the same day last week). Choose “Any dates” to set both periods yourself. It follows the Show and View choices above.</p>
+      <div class="seg" id="cmpType" style="margin-bottom:12px">
+        <button type="button" data-t="day">Day vs day</button><button type="button" data-t="week" class="on">Week vs week</button><button type="button" data-t="2week">2 weeks vs 2 weeks</button><button type="button" data-t="month">Month vs month</button><button type="button" data-t="any">Any dates</button>
+      </div>
+      <div class="row" id="cmpOne"><label class="note" style="font-weight:700;display:flex;flex-direction:column;gap:4px">Date in the period<input class="in" type="date" id="cmpDate" style="width:auto"></label></div>
+      <div class="row" id="cmpAny" hidden>
+        <label class="note" style="font-weight:700;display:flex;flex-direction:column;gap:4px">This period: from<input class="in" type="date" id="aFrom" style="width:auto"></label>
+        <label class="note" style="font-weight:700;display:flex;flex-direction:column;gap:4px">to<input class="in" type="date" id="aTo" style="width:auto"></label>
+        <label class="note" style="font-weight:700;display:flex;flex-direction:column;gap:4px">Compared with: from<input class="in" type="date" id="bFrom" style="width:auto"></label>
+        <label class="note" style="font-weight:700;display:flex;flex-direction:column;gap:4px">to<input class="in" type="date" id="bTo" style="width:auto"></label>
+      </div>
+      <p id="cmpLabel" style="margin:12px 0 4px;font-weight:700"></p>
+      <ul id="cmpWarn" class="note" style="margin:0 0 10px;padding-left:18px"></ul>
+      <div class="row">
+        <button class="btn" id="cmpGo" type="button">Compare</button>
+        <button class="btn secondary" id="repGo" type="button">Generate report</button>
+        <span class="note" id="cmpMsg"></span>
+      </div>
+    </div>
+    <div id="cmpOut"></div>
+    <div class="card panel" id="repBox" hidden>
+      <div class="row noprint" style="justify-content:space-between;margin-bottom:6px">
+        <h2 style="margin:0">Report</h2>
+        <div class="row"><button class="btn small" id="repPdf" type="button">Download PDF</button><button class="btn secondary small" id="repCopy" type="button">Copy for Claude</button></div>
+      </div>
+      <div id="report"></div>
+    </div>
   </section>
 
   <!-- ═════════ ALERTS ═════════ -->
@@ -238,13 +295,14 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
     document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
     $("bar").hidden = name === "upload" || name === "groups";
+    $("week").parentElement.hidden = name === "compare";   // Compare picks its own dates
     syncAllOption();
     render();
   }
   // Which tabs show: whole-store figures have them all; a category group has Overview, Categories and Trends
   function syncTabs() {
     const g = !!lens();
-    const vis = { overview: true, depts: true, trends: true, alerts: !g, upload: canUpload && !g, groups: isHO && fullSales };
+    const vis = { overview: true, depts: true, trends: true, compare: true, alerts: !g, upload: canUpload && !g, groups: isHO && fullSales };
     document.querySelectorAll(".tab[data-tab]").forEach((t) => { t.hidden = !vis[t.dataset.tab]; });
     document.querySelector('.tab[data-tab="depts"]').firstChild.textContent = g ? "Categories" : "Departments";
     if (!vis[tab]) showTab("overview");
@@ -326,6 +384,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     return ws;
   }
   async function loadSummaries(force) {
+    if (force) { for (const k in CS) delete CS[k]; for (const k in CG) delete CG[k]; cmpRes = null; }
     if (lens()) {
       weeks = (await loadGroup(lens(), force)).sort().reverse();
       const keep = $("week").value;
@@ -401,6 +460,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   // ═════════ RENDER ═════════
   function render() {
     if (tab === "upload") return renderUpload();
+    if (tab === "compare") return renderCompareForm();
     if (!curWeek()) {
       $("stamp").textContent = "";
       if (tab === "groups") return renderGroupsAdmin();
@@ -1212,6 +1272,575 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     } catch (e) { $("grMsg").textContent = "Stopped: " + (e.code || e.message); }
     btn.disabled = false;
   };
+
+  // ═════════ COMPARE PERIODS + REPORT ═════════
+  // A = the period chosen, B = the period it's compared with. Uses everything saved: the daily sales summaries,
+  // the department detail, the category-group copies and the hourly unit sales.
+  let cmpType = "week", cmpRes = null, cmpSeq = 0;
+  const CS = {}, CG = {};                       // any week: summaries (code → week) and group weeks (gid → code → week)
+  const UM = {}, UC = {};                       // unit sales: meta per store, docs read this session
+  const mondayOf = (s) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
+  const dowIdx = (s) => (new Date(s + "T12:00:00").getDay() + 6) % 7;
+  const daysIn = (P) => { const o = []; for (let d = P.from; d <= P.to; d = addDays(d, 1)) o.push(d); return o; };
+  const weeksIn = (P) => { const o = []; for (let w = mondayOf(P.from); w <= P.to; w = addDays(w, 7)) o.push(w); return o; };
+  const endOfMonth = (s) => s.slice(0, 8) + pad(dim(s));
+  const prevMonth = (s) => iso(new Date(+s.slice(0, 4), +s.slice(5, 7) - 2, 1));
+  const rangeTxt = (P) => P.from === P.to ? dayLabel(P.from) + " " + P.from.slice(0, 4) : short(P.from) + " – " + short(P.to) + " " + P.to.slice(0, 4);
+  const cPts = (a, b) => a == null || b == null || !isFinite(a) || !isFinite(b) ? null : (a - b) * 100;
+  const cPtsTxt = (v) => v == null ? "–" : Math.abs(v) < 0.05 ? "0.0 pts" : (v > 0 ? "+" : "−") + Math.abs(v).toFixed(1) + " pts";
+  const moved = (v) => v == null ? "not comparable" : Math.abs(v) < 0.0005 ? "unchanged" : (v > 0 ? "up " : "down ") + pct(v).slice(1);
+  const signEur = (v) => v == null || isNaN(v) ? "–" : (v >= 0 ? "+" : "−") + eur(Math.abs(v));
+  const hh = (h) => pad(h) + ":00";
+  const OUT = (c) => c === "D000" || /^D99/.test(c || "");     // BCRS deposits and "DO NOT USE" lines
+  const scopeTxt = () => scope().label + (lens() ? " · " + ((groupOf(lens()) || {}).name || "") : "");
+
+  function latestDate() {
+    let best = ""; const g = lens();
+    scope().codes.forEach((c) => Object.values(g ? ((GG[g] || {})[c] || {}) : (S[c] || {})).forEach((d) => (d.days || []).forEach((x, i) => { if (d.has[i] && x > best) best = x; })));
+    return best || iso(new Date());
+  }
+  function cmpPeriods() {
+    if (cmpType === "any") {
+      const a1 = $("aFrom").value, a2 = $("aTo").value, b1 = $("bFrom").value, b2 = $("bTo").value;
+      if (!a1 || !a2 || !b1 || !b2) return { err: "Choose all four dates." };
+      if (a2 < a1 || b2 < b1) return { err: "A “to” date is before its “from” date." };
+      if (a1 < START_WEEK || b1 < START_WEEK) return { err: "Figures start in Week 1 of 2026 (29 Dec 2025)." };
+      return { A: { from: a1, to: a2 }, B: { from: b1, to: b2 } };
+    }
+    const d = $("cmpDate").value; if (!d) return { err: "Choose a date." };
+    if (cmpType === "day") return { A: { from: d, to: d }, B: { from: addDays(d, -7), to: addDays(d, -7) } };
+    if (cmpType === "week") { const m = mondayOf(d); return { A: { from: m, to: addDays(m, 6) }, B: { from: addDays(m, -7), to: addDays(m, -1) } }; }
+    if (cmpType === "2week") { const m = addDays(mondayOf(d), -7); return { A: { from: m, to: addDays(m, 13) }, B: { from: addDays(m, -14), to: addDays(m, -1) } }; }
+    const f = d.slice(0, 8) + "01", pf = prevMonth(f);
+    return { A: { from: f, to: endOfMonth(f) }, B: { from: pf, to: endOfMonth(pf) } };
+  }
+  const cmpKey = () => JSON.stringify([cmpType, cmpPeriods(), scope().id, lens()]);
+
+  function renderCompareForm() {
+    $("stamp").textContent = "";
+    if (!$("cmpDate").value) $("cmpDate").value = latestDate();
+    $("cmpType").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.t === cmpType));
+    $("cmpOne").hidden = cmpType === "any"; $("cmpAny").hidden = cmpType !== "any";
+    if (cmpType === "any" && !$("aFrom").value) { const d = latestDate(); $("aTo").value = d; $("aFrom").value = addDays(d, -6); $("bTo").value = addDays(d, -7); $("bFrom").value = addDays(d, -13); }
+    const P = cmpPeriods();
+    $("cmpLabel").textContent = P.err ? P.err : "A: " + rangeTxt(P.A) + "   vs   B: " + rangeTxt(P.B) + "   ·   " + scopeTxt();
+    if (cmpRes && cmpRes.key !== cmpKey()) { cmpRes = null; $("cmpOut").innerHTML = ""; $("repBox").hidden = true; $("cmpWarn").innerHTML = ""; }
+  }
+  $("cmpType").querySelectorAll("button").forEach((b) => b.onclick = () => { cmpType = b.dataset.t; renderCompareForm(); });
+  ["cmpDate", "aFrom", "aTo", "bFrom", "bTo"].forEach((id) => $(id).onchange = renderCompareForm);
+  $("cmpGo").onclick = () => runCompare(false);
+  $("repGo").onclick = () => runCompare(true);
+  $("repPdf").onclick = () => {
+    const t = document.title; document.title = "SPAR sales comparison - " + scopeTxt() + " - " + rangeTxt(cmpRes.A) + " vs " + rangeTxt(cmpRes.B);
+    window.print(); setTimeout(() => { document.title = t; }, 1000);
+  };
+  $("repCopy").onclick = async () => {
+    const txt = cmpRes && cmpRes.md; if (!txt) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(txt); ok = true; } catch (e) {
+      const ta = E("textarea", { style: "position:fixed;left:-9999px" }); ta.value = txt; document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand("copy"); } catch (e2) {} ta.remove();
+    }
+    SPARUI.toast(ok ? "Copied. Paste it into a chat with Claude." : "Couldn't copy. Select the report and copy it instead.", ok ? "ok" : "err");
+  };
+
+  async function runCompare(withReport) {
+    const P = cmpPeriods(); if (P.err) { $("cmpMsg").textContent = P.err; return; }
+    const key = cmpKey();
+    if (!(cmpRes && cmpRes.key === key)) {
+      const seq = ++cmpSeq;
+      $("cmpMsg").textContent = "Loading the figures…"; $("cmpGo").disabled = $("repGo").disabled = true;
+      let r;
+      try { r = await compute(P); }
+      catch (e) { console.error(e); $("cmpMsg").textContent = "Couldn't load the figures: " + (e.message || e); $("cmpGo").disabled = $("repGo").disabled = false; return; }
+      $("cmpGo").disabled = $("repGo").disabled = false;
+      if (seq !== cmpSeq) return;
+      $("cmpMsg").textContent = "";
+      r.key = key; cmpRes = r;
+      renderCompareOut(r);
+    }
+    if (withReport && cmpRes && !cmpRes.empty) { buildReport(cmpRes); $("repBox").hidden = false; $("repBox").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  }
+
+  // ── loading ──
+  async function loadWeeksC(codes, gid, P) {
+    const ws = weeksIn(P);
+    await Promise.all(codes.map(async (c) => {
+      const store = gid ? ((CG[gid] = CG[gid] || {})[c] = (CG[gid] || {})[c] || {}) : (CS[c] = CS[c] || {});
+      const need = ws.filter((w) => !(w in store));
+      if (!need.length) return;
+      try {
+        const col = gid ? gwCol(gid, c) : sumCol(c);
+        const qs = await fs.getDocs(fs.query(col, fs.where("week", ">=", need[0]), fs.where("week", "<=", need[need.length - 1])));
+        qs.docs.forEach((d) => { store[d.id] = d.data(); });
+      } catch (e) {}
+      need.forEach((w) => { if (!(w in store)) store[w] = null; });
+    }));
+    if (gid) {   // targets for the years involved
+      GT[gid] = GT[gid] || {};
+      const years = [...new Set([P.from.slice(0, 4), P.to.slice(0, 4)])];
+      await Promise.all(years.filter((y) => !(y in GT[gid])).map(async (y) => { try { const d = await fs.getDoc(tgDoc(gid, y)); GT[gid][y] = d.exists() ? (d.data().t || {}) : {}; } catch (e) { GT[gid][y] = {}; } }));
+    }
+  }
+  // unit sales (same saved files the Unit Sales page reads; the browser copy is shared with it)
+  const uRef = (gid, c, ...x) => gid ? fs.doc(db, "modules", "units", "groups", gid, "stores", c, ...x) : fs.doc(db, "modules", "units", "stores", c, ...x);
+  function idbGet(k) { return new Promise((res) => { try { const r = indexedDB.open("sparHub", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => { const t = r.result.transaction("kv").objectStore("kv").get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(null); }; r.onerror = () => res(null); } catch (e) { res(null); } }); }
+  function idbSet(k, v) { return new Promise((res) => { try { const r = indexedDB.open("sparHub", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => { const t = r.result.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); }; r.onerror = () => res(false); } catch (e) { res(false); } }); }
+  async function uMeta(gid, c) {
+    const k = (gid || "") + "|" + c;
+    if (!(k in UM)) { try { const d = await fs.getDoc(uRef(gid, c, "meta", "days")); UM[k] = d.exists() ? (d.data().days || {}) : {}; } catch (e) { UM[k] = {}; } }
+    return UM[k];
+  }
+  async function uDoc(kind, gid, c, w, meta) {
+    const key = kind + "|" + (gid ? gid + "|" : "") + c + "|" + w;
+    if (key in UC) return UC[key];
+    let at = 0; Object.keys(meta).forEach((d) => { if (d >= w && d <= addDays(w, 6)) at = Math.max(at, meta[d] || 0); });
+    let v = null;
+    try {
+      const hit = at ? await idbGet(key) : null;
+      if (hit && hit.at === at) v = hit;
+      else { const d = await fs.getDoc(uRef(gid, c, kind === "h" ? "hours" : "wk", w)); if (d.exists()) { const x = d.data(); v = { at: x.at, days: x.days, has: x.has, data: x.data, h: x.h }; idbSet(key, v); } }
+    } catch (e) { v = null; }
+    return (UC[key] = v);
+  }
+  const decodeWk = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), p.slice(i + 1).split(",").map((v) => v ? +v : 0)); }); return m; };
+  let ITEMN = null;      // item code → [description, department]
+  async function loadItemNames() {
+    if (ITEMN) return ITEMN;
+    ITEMN = new Map();
+    try {
+      const info = await fs.getDoc(fs.doc(db, "modules", "units", "config", "items-info"));
+      if (!info.exists()) return ITEMN;
+      const I = info.data(); let rows = null;
+      const hit = await idbGet("units-items"); if (hit && hit.at === I.at) rows = hit.rows;
+      if (!rows) {
+        const parts = await Promise.all(Array.from({ length: I.chunks }, (_, i) => fs.getDoc(fs.doc(db, "modules", "units", "config", "items-" + pad(i))).then((d) => d.exists() ? d.data() : {})));
+        if (I.compressed) {
+          const bin = atob(parts.map((p) => p.z || "").join("")), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+          rows = JSON.parse(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+        } else rows = parts.flatMap((p) => p.data ? JSON.parse(p.data) : []);
+        idbSet("units-items", { at: I.at, rows });
+      }
+      rows.forEach((r) => ITEMN.set(r[0], [r[1], r[2]]));
+      Object.entries(I.names || {}).forEach(([k, v]) => { if (!ITEMN.has(k)) ITEMN.set(k, [v, ""]); });
+    } catch (e) {}
+    return ITEMN;
+  }
+
+  // ── the comparison ──
+  async function compute(P0) {
+    const codes = scope().codes, gid = lens(), g = gid ? groupOf(gid) || { name: gid } : null;
+    const A = { ...P0.A }, B = { ...P0.B }, notes = [];
+    await Promise.all([loadWeeksC(codes, gid, A), loadWeeksC(codes, gid, B)]);
+    const wkOf = (c, d) => gid ? (((CG[gid] || {})[c] || {})[mondayOf(d)]) : ((CS[c] || {})[mondayOf(d)]);
+    const has = (c, d) => { const x = wkOf(c, d); return !!(x && x.has && x.has[dowIdx(d)]); };
+    const anyOn = (d) => codes.some((c) => has(c, d));
+    // a period still running is compared over the same number of days (e.g. this week so far vs the same days last week)
+    if (cmpType !== "any") {
+      let L = ""; daysIn(A).forEach((d) => { if (anyOn(d)) L = d; });
+      if (!L) return { empty: true, A, B };
+      if (L < A.to) {
+        const n = daysIn({ from: A.from, to: L }).length; A.to = L;
+        const bTo = addDays(B.from, n - 1); if (bTo < B.to) B.to = bTo;
+        notes.push("A has figures up to " + dayLabel(L) + ", so both periods cover the same " + n + " day" + (n === 1 ? "" : "s") + " (B: " + rangeTxt(B) + ").");
+      }
+    }
+    const dA = daysIn(A).filter(anyOn), dB = daysIn(B).filter(anyOn);
+    if (!dA.length || !dB.length) return { empty: true, A, B, none: !dA.length ? "A" : "B" };
+    const lenA = daysIn(A).length, lenB = daysIn(B).length;
+    if (dA.length < lenA) notes.push("A has no figures for " + (lenA - dA.length) + " of its " + lenA + " days.");
+    if (dB.length < lenB) notes.push("B has no figures for " + (lenB - dB.length) + " of its " + lenB + " days.");
+    // compare daily averages when the periods have a different number of trading days
+    const k = dA.length / dB.length, perDay = dA.length !== dB.length;
+    if (perDay) notes.push("The periods have a different number of days with figures (" + dA.length + " against " + dB.length + "), so changes compare the average per day; totals are shown as they are.");
+
+    const fig = (c, P) => { let o = null; daysIn(P).forEach((d) => { const x = wkOf(c, d), i = dowIdx(d); if (x && x.has[i]) o = gid ? gAdd(o, gAgg(x, [i], gid, c)) : add(o, agg(x, [i])); }); return o; };
+    const rows = codes.map((c) => {
+      const a = fig(c, A), b = fig(c, B);
+      return { c, name: (byCode[c] || {}).name || c, rom: romOf(c), a, b, missA: a ? dA.filter((d) => !has(c, d)).length : 0, missB: b ? dB.filter((d) => !has(c, d)).length : 0 };
+    });
+    const lfl = rows.filter((r) => r.a && r.b);
+    const oneSide = rows.filter((r) => !!r.a !== !!r.b);
+    if (oneSide.length) notes.push(oneSide.length + " store" + (oneSide.length === 1 ? " has" : "s have") + " figures for one period only and " + (oneSide.length === 1 ? "is" : "are") + " left out of the totals: " + oneSide.map((r) => r.name + " (" + (r.a ? "A" : "B") + " only)").join(", ") + ".");
+    const gaps = lfl.filter((r) => r.missA || r.missB);
+    if (gaps.length) notes.push("Missing days: " + gaps.slice(0, 8).map((r) => r.name + " (" + [r.missA ? r.missA + " in A" : "", r.missB ? r.missB + " in B" : ""].filter(Boolean).join(", ") + ")").join("; ") + (gaps.length > 8 ? " and " + (gaps.length - 8) + " more" : "") + ". Check the Missing weeks list for which daily emails to upload.");
+    if (!lfl.length) return { empty: true, A, B, notes, none: "both" };
+    let TA = null, TB = null;
+    lfl.forEach((r) => { TA = gid ? gAdd(TA, r.a) : add(TA, r.a); TB = gid ? gAdd(TB, r.b) : add(TB, r.b); });
+    const lflCodes = lfl.map((r) => r.c);
+
+    // departments / categories, waste, payments, night trade
+    const det = { dep: {}, cat: {}, waste: {}, pay: {}, m: {} };
+    const acc = (map, key, base, side, v) => { const o = map[key] || (map[key] = { ...base, a: 0, b: 0 }); o[side] += v || 0; };
+    const S2 = (arr, idx) => arr ? sum(idx.map((j) => arr[j] || 0)) : 0;
+    const TK = "tobacco_related_products_incl_vat";
+    const MK = ["sales_between_22_00_23_59_inc_vat", "sales_between_00_00_06_00_inc_vat", "nr_of_chits_between_22_00_23_59", "nr_of_chits_between_00_00_06_00", "online_sales_inc_vat", "credit_sales_inc_vat", "total_waste"];
+    await Promise.all(lflCodes.flatMap((c) => [["a", A], ["b", B]].flatMap(([side, P]) => weeksIn(P).map(async (w) => {
+      const idx = daysIn(P).filter((d) => mondayOf(d) === w).map(dowIdx);
+      if (gid) {
+        const d = ((CG[gid] || {})[c] || {})[w]; if (!d) return;
+        const ix = idx.filter((i) => d.has[i]);
+        (d.lines || []).forEach((x) => { if (x.top) acc(det.dep, x.c, { c: x.c, n: x.n }, side, S2(x.d, ix)); else acc(det.cat, x.p + "|" + x.c, { c: x.c, n: x.n, p: x.p }, side, S2(x.d, ix)); });
+        return;
+      }
+      const d = await getDetail(c, w); if (!d) return;
+      const ix = idx.filter((i) => d.has[i]);
+      (d.depts || []).forEach((x) => acc(det.dep, x.c, { c: x.c, n: x.n }, side, S2(x.d, ix)));
+      (d.cats || []).forEach((x) => acc(det.cat, x.p + "|" + x.c, { c: x.c, n: x.n, p: x.p }, side, S2(x.d, ix)));
+      if (d.m && d.m[TK]) { acc(det.dep, "D030", { c: "D030", n: "Tobacco & Related Products" }, side, S2(d.m[TK], ix)); ((d.tob || {})[TK] || []).forEach((y) => acc(det.cat, "D030|" + y.c, { c: y.c, n: y.n, p: "D030" }, side, S2(y.d, ix))); }
+      Object.keys(d.waste || {}).forEach((wk) => acc(det.waste, wk.toUpperCase(), { c: wk.toUpperCase() }, side, S2(d.waste[wk], ix)));
+      Object.keys(d.m || {}).forEach((mk) => { if (mk.indexOf("pay_") === 0) acc(det.pay, mk, { k: mk }, side, S2(d.m[mk], ix)); });
+      MK.forEach((mk) => acc(det.m, mk, { k: mk }, side, S2((d.m || {})[mk], ix)));
+    }))));
+    const depName = Object.fromEntries(Object.values(det.dep).map((x) => [x.c, x.n]));
+    const deps = Object.values(det.dep).filter((x) => (x.a || x.b) && !OUT(x.c)).sort((p, q) => q.a - p.a);
+    const cats = Object.values(det.cat).filter((x) => (x.a || x.b) && !OUT(x.p) && !OUT(x.c)).map((x) => ({ ...x, dep: depName[x.p] || "" }));
+    const wastes = Object.values(det.waste).filter((x) => x.a || x.b).map((x) => ({ ...x, n: depName[x.c] || x.c }));
+
+    // hourly unit sales
+    const U = await unitsCompare(lflCodes, gid, A, B);
+    return { A, B, gid, g, codes, rows, lfl, TA, TB, k, perDay, lenA: dA.length, lenB: dB.length, deps, cats, wastes, pay: Object.values(det.pay), m: det.m, U, notes, at: Date.now() };
+  }
+
+  async function unitsCompare(codes, gid, A, B) {
+    const metas = await Promise.all(codes.map((c) => uMeta(gid, c)));
+    const inP = (P, meta) => Object.keys(meta).filter((d) => d >= P.from && d <= P.to).sort();
+    const st = codes.map((c, i) => ({ c, meta: metas[i], a: inP(A, metas[i]), b: inP(B, metas[i]) })).filter((x) => x.a.length && x.b.length);
+    const anyA = codes.some((c, i) => inP(A, metas[i]).length), anyB = codes.some((c, i) => inP(B, metas[i]).length);
+    if (!st.length) return { none: true, anyA, anyB };
+    const hA = Array(24).fill(0), hB = Array(24).fill(0); let sdA = 0, sdB = 0;
+    const storeWeeks = sum(st.map((x) => new Set(x.a.concat(x.b).map(mondayOf)).size));
+    const doItems = storeWeeks <= 60;
+    const iA = new Map(), iB = new Map();
+    await Promise.all(st.flatMap((x) => [["a", x.a], ["b", x.b]].flatMap(([side, days]) => [...new Set(days.map(mondayOf))].map(async (w) => {
+      const dd = days.filter((d) => mondayOf(d) === w);
+      const hd = await uDoc("h", gid, x.c, w, x.meta);
+      dd.forEach((d) => { const arr = hd && hd.h && hd.h[d]; if (!arr) return; (side === "a" ? sdA++ : sdB++); arr.forEach((v, h) => { (side === "a" ? hA : hB)[h] += v || 0; }); });
+      if (!doItems) return;
+      const wk = await uDoc("u", gid, x.c, w, x.meta); if (!wk) return;
+      const idx = dd.map(dowIdx).filter((i) => !wk.has || wk.has[i]);
+      const M = side === "a" ? iA : iB;
+      decodeWk(wk.data).forEach((q, code) => { const v = sum(idx.map((i) => q[i] || 0)); if (v) M.set(code, (M.get(code) || 0) + v); });
+    }))));
+    let items = null;
+    if (doItems) {
+      const N = await loadItemNames();
+      const f = sdA && sdB ? sdA / sdB : 1;
+      items = [...new Set([...iA.keys(), ...iB.keys()])].map((code) => {
+        const it = N.get(code) || [code, ""], a = iA.get(code) || 0, b = iB.get(code) || 0;
+        return { code, n: it[0] || code, D: it[1], a, b, diff: a - b * f };
+      }).filter((x) => !OUT(x.D));
+    }
+    return { stores: st.length, of: codes.length, hA, hB, sdA, sdB, items, doItems, storeWeeks };
+  }
+
+  // ── on screen ──
+  function cmpTile(label, a, bTxt, chg, klass) {
+    return E("div", { class: "card" }, [E("label", { text: label }), E("strong", { class: klass || "", text: a }), E("span", null, [bTxt, chg])]);
+  }
+  const chgSpan = (v, txt, good = 1) => E("span", { class: cls(v, good), text: txt != null ? txt : pct(v) });
+  const avgBasket = (o) => o && o.c ? o.s / o.c : null;
+  function headline(r) {
+    const { TA, TB, k } = r;
+    if (r.gid) {
+      const tg = hasTargets(r.gid);
+      return { sales: [TA.s, TB.s, ch(TA.s, TB.s * k)], vt: tg ? [ch(TA.st, TA.t), ch(TB.st, TB.t)] : null, sh: [TA.x ? TA.s / TA.x : null, TB.x ? TB.s / TB.x : null],
+        waste: TA.hasW || TB.hasW ? [TA.s ? TA.w / TA.s : null, TB.s ? TB.w / TB.s : null, TA.w, TB.w] : null };
+    }
+    return { sales: [TA.s, TB.s, ch(TA.s, TB.s * k)], vt: TA.t || TB.t ? [vT(TA), vT(TB)] : null, vly: [vLY(TA), vLY(TB)], cust: [TA.c, TB.c, ch(TA.c, TB.c * k)],
+      bask: [avgBasket(TA), avgBasket(TB), ch(avgBasket(TA), avgBasket(TB))], waste: [TA.s ? TA.w / TA.s : null, TB.s ? TB.w / TB.s : null, TA.w, TB.w] };
+  }
+  function renderCompareOut(r) {
+    const out = $("cmpOut"); out.innerHTML = ""; $("repBox").hidden = true;
+    $("cmpWarn").innerHTML = "";
+    (r.notes || []).forEach((n) => $("cmpWarn").appendChild(E("li", { text: n })));
+    if (r.empty) { out.appendChild(E("div", { class: "card empty", text: r.none === "B" ? "There are no figures for B (" + rangeTxt(r.B) + ") in this view." : r.none === "both" ? "No store in this view has figures for both periods." : "There are no figures for A (" + rangeTxt(r.A) + ") in this view." })); return; }
+    $("cmpLabel").textContent = "A: " + rangeTxt(r.A) + "   vs   B: " + rangeTxt(r.B) + "   ·   " + scopeTxt() + (r.lfl.length < r.codes.length ? "   ·   " + r.lfl.length + " of " + r.codes.length + " stores" : "");
+    const H = headline(r), gname = r.g ? r.g.name + " " : "";
+    const tiles = [cmpTile(gname + "Sales", eur(H.sales[0]), "B " + eur(H.sales[1]) + " · ", chgSpan(H.sales[2], pct(H.sales[2]) + (r.perDay ? " a day" : "")), H.sales[2] < 0 ? "bad" : "good")];
+    if (H.vt) tiles.push(cmpTile("vs target", pct(H.vt[0]), "B " + pct(H.vt[1]) + " · ", chgSpan(cPts(H.vt[0], H.vt[1]), cPtsTxt(cPts(H.vt[0], H.vt[1]))), H.vt[0] < 0 ? "bad" : "good"));
+    if (H.vly) tiles.push(cmpTile("vs last year", pct(H.vly[0]), "B " + pct(H.vly[1]) + " · ", chgSpan(cPts(H.vly[0], H.vly[1]), cPtsTxt(cPts(H.vly[0], H.vly[1]))), H.vly[0] < 0 ? "bad" : "good"));
+    if (H.cust) tiles.push(cmpTile("Customers", int(H.cust[0]), "B " + int(H.cust[1]) + " · ", chgSpan(H.cust[2], pct(H.cust[2]) + (r.perDay ? " a day" : ""))));
+    if (H.bask) tiles.push(cmpTile("Average basket", eur2(H.bask[0]), "B " + eur2(H.bask[1]) + " · ", chgSpan(H.bask[2])));
+    if (H.sh) tiles.push(cmpTile("Share of store sales", share(H.sh[0]), "B " + share(H.sh[1]) + " · ", chgSpan(cPts(H.sh[0], H.sh[1]), cPtsTxt(cPts(H.sh[0], H.sh[1])))));
+    if (H.waste) tiles.push(cmpTile("Waste", share(H.waste[0]), "B " + share(H.waste[1]) + " · ", chgSpan(cPts(H.waste[0], H.waste[1]), cPtsTxt(cPts(H.waste[0], H.waste[1])), -1), H.waste[0] > WASTE_ALERT ? "bad" : ""));
+    else if (r.gid) tiles.push(cmpTile("Waste", "–", "Not in the daily report: will come from the Waste Tracker", ""));
+    out.appendChild(E("div", { class: "cmpk" }, tiles));
+
+    const table = (heads, body, foot) => E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, heads.map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), E("tbody", null, body.concat(foot ? [foot] : []))])]);
+    const td = (t, c) => E("td", { class: "num " + (c || ""), text: t });
+
+    // stores
+    if (r.codes.length > 1) {
+      const rows = r.rows.filter((x) => x.a || x.b).sort((p, q) => (p.a && p.b ? ch(p.a.s, p.b.s * r.k) : 9) - (q.a && q.b ? ch(q.a.s, q.b.s * r.k) : 9));
+      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: gname + "Store by store" }),
+        E("p", { class: "note", style: "margin:-6px 0 12px", text: "Sorted from the biggest fall to the biggest rise. Click a store to open it." + (r.rows.some((x) => !x.a && !x.b) ? " " + r.rows.filter((x) => !x.a && !x.b).length + " store(s) in this view have no figures for either period." : "") }),
+        table(r.gid ? ["Store", "Sales A", "Sales B", "Change", "Change €", "vs target A", "Share A", "Share B"] : ["Store", "Sales A", "Sales B", "Change", "Change €", "vs target A", "Customers", "Basket", "Waste % A", "Waste % B"],
+          rows.map((x) => {
+            const a = x.a, b = x.b, c1 = a && b ? ch(a.s, b.s * r.k) : null;
+            const name = E("td", null, [E("button", { class: "linkbtn", type: "button", text: x.name, onclick: () => { $("scope").value = "s:" + x.c; changeScope(); } })]);
+            if (r.gid) return E("tr", null, [name, td(a ? eur(a.s) : "–"), td(b ? eur(b.s) : "–"), td(a && b ? pct(c1) : a ? "A only" : b ? "B only" : "no figures", cls(c1)),
+              td(a && b ? signEur(a.s - b.s * r.k) : "–"), td(a && a.t ? pct(ch(a.st, a.t)) : "–", a && a.t ? cls(ch(a.st, a.t)) : ""), td(a && a.x ? share(a.s / a.x) : "–"), td(b && b.x ? share(b.s / b.x) : "–")]);
+            return E("tr", null, [name, td(a ? eur(a.s) : "–"), td(b ? eur(b.s) : "–"), td(a && b ? pct(c1) : a ? "A only" : b ? "B only" : "no figures", cls(c1)),
+              td(a && b ? signEur(a.s - b.s * r.k) : "–"), td(a ? pct(vT(a)) : "–", a ? cls(vT(a)) : ""), td(a && b ? pct(ch(a.c, b.c * r.k)) : "–", a && b ? cls(ch(a.c, b.c * r.k)) : ""),
+              td(a && b ? pct(ch(avgBasket(a), avgBasket(b))) : "–", a && b ? cls(ch(avgBasket(a), avgBasket(b))) : ""), td(a && a.s ? share(a.w / a.s) : "–", a && a.s && a.w / a.s > WASTE_ALERT ? "down" : ""), td(b && b.s ? share(b.w / b.s) : "–")]);
+          }))]));
+    }
+
+    // departments / categories
+    const totA = sum(r.deps.map((x) => x.a)), totB = sum(r.deps.map((x) => x.b));
+    if (r.deps.length) {
+      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: r.gid ? r.g.name + " categories" : "Departments" }),
+        E("p", { class: "note", style: "margin:-6px 0 12px", text: "Share is each line's part of " + (r.gid ? "the group's" : "total") + " sales in that period. A change in share shows what customers are buying more or less of, whatever happened to total sales." }),
+        table([r.gid ? "Category" : "Department", "A", "B", "Change €", "Change", "Share A", "Share B", "Share change"], r.deps.map((x) => {
+          const d = cPts(totA ? x.a / totA : null, totB ? x.b / totB : null);
+          return E("tr", null, [E("td", { text: x.n }), td(eur(x.a)), td(eur(x.b)), td(signEur(x.a - x.b * r.k), cls(x.a - x.b * r.k)), td(pct(ch(x.a, x.b * r.k)), cls(ch(x.a, x.b * r.k))),
+            td(share(totA ? x.a / totA : null)), td(share(totB ? x.b / totB : null)), td(cPtsTxt(d), d == null ? "" : d > 0.05 ? "up" : d < -0.05 ? "down" : "")]);
+        }), E("tr", { class: "tot" }, [E("td", { text: "Total" }), td(eur(totA)), td(eur(totB)), td(signEur(totA - totB * r.k)), td(pct(ch(totA, totB * r.k))), td("100%"), td("100%"), td("")]))]));
+    }
+    // movers
+    const mv = moversOf(r);
+    if (mv.ups.length || mv.downs.length) {
+      const maxAbs = Math.max(1, ...mv.ups.map((y) => y.diff), ...mv.downs.map((y) => -y.diff));
+      const col = (title, list, up) => E("div", null, [E("p", { class: "mv-h", text: title }), ...(list.length ? list.map((y) => E("div", { class: "mv" }, [
+        E("div", { class: "mv-n" }, [E("b", { text: y.n, title: y.n }), E("span", { text: y.dep })]),
+        E("div", { class: "mv-bar" }, [E("i", { style: "width:" + Math.max(3, Math.round(Math.abs(y.diff) / maxAbs * 100)) + "%;background:" + (up ? "var(--gd)" : "var(--red)") })]),
+        E("div", { class: "mv-v " + (up ? "up" : "down"), text: signEur(y.diff) + " · " + (y.b ? pct(ch(y.a, y.b * r.k)) : "new") })])) : [E("p", { class: "note", text: "None." })])]);
+      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Biggest movers · A vs B" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: (r.gid ? "Lines within the group" : "Categories") + " with the biggest change in €" + (r.perDay ? " (B adjusted to A's number of days)" : "") + "." }),
+        E("div", { class: "grid-2" }, [col("Up", mv.ups, true), col("Down", mv.downs, false)])]));
+    }
+    // hours
+    out.appendChild(hoursCard(r));
+    // items
+    if (r.U && r.U.items) {
+      const im = itemMovers(r);
+      const col = (title, list, up) => E("div", null, [E("p", { class: "mv-h", text: title }), ...(list.length ? list.map((y) => E("div", { class: "mv" }, [
+        E("div", { class: "mv-n" }, [E("b", { text: y.n, title: y.code + " · " + y.n }), E("span", { text: y.code })]),
+        E("div", { class: "mv-bar" }, [E("i", { style: "width:" + Math.max(3, Math.round(Math.abs(y.diff) / im.max * 100)) + "%;background:" + (up ? "var(--gd)" : "var(--red)") })]),
+        E("div", { class: "mv-v " + (up ? "up" : "down"), text: (y.diff >= 0 ? "+" : "−") + int(Math.abs(y.diff)) + " units · " + int(y.a) + " vs " + int(y.b) })])) : [E("p", { class: "note", text: "None." })])]);
+      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Items · biggest changes in units" }),
+        E("p", { class: "note", style: "margin:-6px 0 12px", text: "From the hourly unit sales, " + r.U.stores + " of " + r.U.of + " stores (those with unit sales in both periods)" + (r.U.sdA !== r.U.sdB ? "; B adjusted to A's number of store-days" : "") + "." }),
+        E("div", { class: "grid-2" }, [col("Selling more", im.ups, true), col("Selling less", im.downs, false)])]));
+    } else if (r.U && !r.U.none && !r.U.doItems) out.appendChild(E("p", { class: "note", text: "Item movers are left out for this many stores and weeks (" + r.U.storeWeeks + " store-weeks) to keep it quick. Choose fewer stores in View to see them." }));
+
+    // waste, payments, night trade (whole store only: the group copies don't carry them)
+    if (!r.gid) {
+      const more = E("div", { class: "grid-2" });
+      const wl = r.wastes.slice().sort((p, q) => (q.a - q.b * r.k) - (p.a - p.b * r.k));
+      const depS = Object.fromEntries(r.deps.map((x) => [x.c, x]));
+      more.appendChild(E("div", { class: "card panel" }, [E("h3", { text: "Waste by department" }), wl.length ? table(["Department", "A", "B", "Change €", "% of sales A", "% B"], wl.map((x) => {
+        const d = depS[x.c] || {}; const ra = d.a ? x.a / d.a : null, rb = d.b ? x.b / d.b : null;
+        return E("tr", null, [E("td", { text: x.n }), td(eur2(x.a)), td(eur2(x.b)), td(signEur(x.a - x.b * r.k), cls(x.a - x.b * r.k, -1)), td(share(ra), ra > WASTE_ALERT ? "down" : ""), td(share(rb))]);
+      })) : E("p", { class: "note", text: "No waste recorded." })]));
+      const pA = sum(r.pay.map((x) => x.a)), pB = sum(r.pay.map((x) => x.b));
+      const payName = (k) => ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " "));
+      const M = (k, s) => (r.m[k] || {})[s] || 0;
+      more.appendChild(E("div", { class: "card panel" }, [E("h3", { text: "Payments, online, credit and night trade" }),
+        table(["", "A", "B", "Change"], r.pay.filter((x) => Math.abs(x.a) >= 0.5 || Math.abs(x.b) >= 0.5).sort((p, q) => q.a - p.a).map((x) => {
+          const d = cPts(pA ? x.a / pA : null, pB ? x.b / pB : null);
+          return E("tr", null, [E("td", { text: payName(x.k) + " (share)" }), td(share(pA ? x.a / pA : null)), td(share(pB ? x.b / pB : null)), td(cPtsTxt(d))]);
+        }).concat([["Online sales", "online_sales_inc_vat"], ["Credit sales", "credit_sales_inc_vat"], ["Night 22:00–23:59", "sales_between_22_00_23_59_inc_vat"], ["Night 00:00–06:00", "sales_between_00_00_06_00_inc_vat"]].map(([l, k]) =>
+          E("tr", null, [E("td", { text: l }), td(eur(M(k, "a"))), td(eur(M(k, "b"))), td(pct(ch(M(k, "a"), M(k, "b") * r.k)), cls(ch(M(k, "a"), M(k, "b") * r.k)))])))),
+        E("p", { class: "note", style: "margin:8px 0 0", text: "Night chits: " + int(M("nr_of_chits_between_22_00_23_59", "a") + M("nr_of_chits_between_00_00_06_00", "a")) + " in A, " + int(M("nr_of_chits_between_22_00_23_59", "b") + M("nr_of_chits_between_00_00_06_00", "b")) + " in B." })]));
+      out.appendChild(more);
+    }
+    out.appendChild(E("p", { class: "note", text: "Sales are Total inc VAT inc D030 (including tobacco). Totals count only stores with figures in both periods. Press Generate report for a written summary you can download as a PDF or copy into Claude." }));
+  }
+  function moversOf(r) {
+    const m = r.cats.map((y) => ({ ...y, diff: y.a - y.b * r.k }));
+    return { ups: m.filter((y) => y.diff > 0.5).sort((p, q) => q.diff - p.diff).slice(0, 8), downs: m.filter((y) => y.diff < -0.5).sort((p, q) => p.diff - q.diff).slice(0, 8) };
+  }
+  function itemMovers(r) {
+    const it = r.U.items || [];
+    const ups = it.filter((y) => y.diff >= 1).sort((p, q) => q.diff - p.diff).slice(0, 10), downs = it.filter((y) => y.diff <= -1).sort((p, q) => p.diff - q.diff).slice(0, 10);
+    return { ups, downs, max: Math.max(1, ...ups.map((y) => y.diff), ...downs.map((y) => -y.diff)) };
+  }
+  // average units per day by hour for the view
+  function hourAvg(r) {
+    const U = r.U; if (!U || U.none || !U.sdA || !U.sdB) return null;
+    const a = U.hA.map((v) => v / U.sdA * U.stores), b = U.hB.map((v) => v / U.sdB * U.stores);
+    const used = a.map((v, h) => v > 0 || b[h] > 0 ? h : -1).filter((h) => h >= 0);
+    return { a, b, from: Math.min(...used), to: Math.max(...used) };
+  }
+  function hoursCard(r) {
+    const card = E("div", { class: "card panel" }, [E("h2", { text: "Time of day · units sold per hour" })]);
+    const U = r.U, HA = hourAvg(r);
+    if (!HA) { card.appendChild(E("p", { class: "note", text: U && U.none ? (U.anyA || U.anyB ? "Hourly unit sales are only uploaded for " + (U.anyA ? "A" : "B") + ", so time of day can't be compared." : "No hourly unit sales uploaded for these periods yet (Unit Sales → Upload).") : "No hourly figures for these periods." })); return card; }
+    card.appendChild(E("p", { class: "note", style: "margin:-6px 0 12px", text: "Average units per day, " + U.stores + " of " + U.of + " stores (those with hourly files in both periods). Red bars = A, grey dots = B. The busiest hour in A is darker." }));
+    const hs = []; for (let h = HA.from; h <= HA.to; h++) hs.push(h);
+    const max = Math.max(1, ...hs.map((h) => Math.max(HA.a[h], HA.b[h])));
+    const Wd = 720, Ht = 220, L = 46, Bt = 26, n = hs.length, bw = Math.min(26, (Wd - L - 10) / n * 0.6);
+    const x = (i) => L + (i + 0.5) * (Wd - L - 10) / n, y = (v) => Ht - Bt - (v / max) * (Ht - Bt - 12);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Units per hour, A against B");
+    const mk = (tag, a, txt) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; svg.appendChild(nd); return nd; };
+    [0, 0.5, 1].forEach((f) => { mk("line", { x1: L, x2: Wd - 10, y1: y(max * f), y2: y(max * f), stroke: "#E9EBEA" }); mk("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, int(max * f) === "–" ? "0" : int(max * f)); });
+    const peak = hs.reduce((p, h) => HA.a[h] > HA.a[p] ? h : p, hs[0]);
+    hs.forEach((h, i) => {
+      mk("rect", { x: x(i) - bw / 2, y: y(HA.a[h]), width: bw, height: Math.max(0, Ht - Bt - y(HA.a[h])), rx: 3, fill: h === peak ? "#B5121B" : "#EC1B24", "fill-opacity": h === peak ? 1 : 0.75 });
+      if (HA.b[h] > 0) mk("circle", { cx: x(i), cy: y(HA.b[h]), r: 4, fill: "#fff", stroke: "#60727a", "stroke-width": 2 });
+      if (n <= 14 || i % 2 === 0) mk("text", { x: x(i), y: Ht - 8, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, pad(h));
+    });
+    card.appendChild(svg);
+    const parts = dayparts(HA);
+    card.appendChild(E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#EC1B24" }), "A"]), E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), "B"]),
+      ...parts.map((p) => E("span", { text: p.label + ": " + share(p.a) + " of units (B " + share(p.b) + ")" }))]));
+    return card;
+  }
+  function dayparts(HA) {
+    const tA = sum(HA.a), tB = sum(HA.b);
+    return [["Before 12:00", 0, 11], ["12:00–16:59", 12, 16], ["17:00 onwards", 17, 23]].map(([label, f, t]) => {
+      let a = 0, b = 0; for (let h = f; h <= t; h++) { a += HA.a[h]; b += HA.b[h]; }
+      return { label, a: tA ? a / tA : null, b: tB ? b / tB : null };
+    });
+  }
+
+  // ── the written report (rule based: every sentence comes from the figures above) ──
+  function buildReport(r) {
+    const H = headline(r), secs = [];
+    const gname = r.g ? r.g.name + " " : "";
+    const per = r.perDay ? " per day" : "";
+    const sec = (title, bullets, tbl) => { const s = { title, bullets: bullets.filter(Boolean), tbl }; if (s.bullets.length || tbl) secs.push(s); return s; };
+    const dEur = H.sales[0] - H.sales[1] * r.k;
+    // headline
+    const hb = [
+      gname + "Sales were " + eur(H.sales[0]) + " in A against " + eur(H.sales[1]) + " in B: " + moved(H.sales[2]) + per + " (" + signEur(dEur) + (r.perDay ? ", B adjusted to A's days" : "") + ").",
+      H.vt ? "Against target: " + pct(H.vt[0]) + " in A, " + pct(H.vt[1]) + " in B." : null,
+      H.vly && (H.vly[0] != null || H.vly[1] != null) ? "Against last year: " + pct(H.vly[0]) + " in A, " + pct(H.vly[1]) + " in B." : null
+    ];
+    if (H.cust && r.TA.c && r.TB.c) {
+      const bA = avgBasket(r.TA), bB = avgBasket(r.TB);
+      const custEff = (r.TA.c - r.TB.c * r.k) * bB, baskEff = (bA - bB) * r.TA.c;
+      hb.push("Customers " + moved(H.cust[2]) + per + " (" + int(r.TA.c) + " vs " + int(r.TB.c) + "); average basket " + moved(H.bask[2]) + " (" + eur2(bA) + " vs " + eur2(bB) + ").");
+      if (Math.abs(dEur) >= 1 && Math.abs(baskEff) + Math.abs(custEff) > 0) hb.push("Of the " + signEur(dEur) + " change, about " + signEur(custEff) + " came from " + (custEff >= 0 ? "more" : "fewer") + " customers and " + signEur(baskEff) + " from " + (baskEff >= 0 ? "bigger" : "smaller") + " baskets, so the " + (Math.abs(custEff) >= Math.abs(baskEff) ? "number of customers" : "basket size") + " was the main driver.");
+    }
+    if (H.sh) hb.push("Share of store sales: " + share(H.sh[0]) + " in A, " + share(H.sh[1]) + " in B (" + cPtsTxt(cPts(H.sh[0], H.sh[1])) + ").");
+    if (H.waste && (H.waste[2] || H.waste[3])) hb.push("Waste was " + share(H.waste[0]) + " of sales (" + eur(H.waste[2]) + ") against " + share(H.waste[1]) + " (" + eur(H.waste[3]) + "): " + cPtsTxt(cPts(H.waste[0], H.waste[1])) + ".");
+    const kpiRows = [["Sales", eur(H.sales[0]), eur(H.sales[1]), pct(H.sales[2]) + per]];
+    if (H.vt) kpiRows.push(["vs target", pct(H.vt[0]), pct(H.vt[1]), cPtsTxt(cPts(H.vt[0], H.vt[1]))]);
+    if (H.vly) kpiRows.push(["vs last year", pct(H.vly[0]), pct(H.vly[1]), cPtsTxt(cPts(H.vly[0], H.vly[1]))]);
+    if (H.cust) kpiRows.push(["Customers", int(H.cust[0]), int(H.cust[1]), pct(H.cust[2]) + per]);
+    if (H.bask) kpiRows.push(["Average basket", eur2(H.bask[0]), eur2(H.bask[1]), pct(H.bask[2])]);
+    if (H.sh) kpiRows.push(["Share of store sales", share(H.sh[0]), share(H.sh[1]), cPtsTxt(cPts(H.sh[0], H.sh[1]))]);
+    if (H.waste) kpiRows.push(["Waste % of sales", share(H.waste[0]), share(H.waste[1]), cPtsTxt(cPts(H.waste[0], H.waste[1]))]);
+    sec("Headline", hb, { head: ["Measure", "A", "B", "Change"], rows: kpiRows });
+
+    // drivers
+    const totA = sum(r.deps.map((x) => x.a)), totB = sum(r.deps.map((x) => x.b));
+    const dl = r.deps.map((x) => ({ ...x, diff: x.a - x.b * r.k, sh: cPts(totA ? x.a / totA : null, totB ? x.b / totB : null) }));
+    const lineTxt = (x) => x.n + " " + signEur(x.diff) + " (" + (x.b ? pct(ch(x.a, x.b * r.k)) : "new") + ")";
+    const gains = dl.filter((x) => x.diff > 0.5).sort((p, q) => q.diff - p.diff).slice(0, 3), falls = dl.filter((x) => x.diff < -0.5).sort((p, q) => p.diff - q.diff).slice(0, 3);
+    const shifts = dl.filter((x) => x.sh != null && Math.abs(x.sh) >= 0.3).sort((p, q) => Math.abs(q.sh) - Math.abs(p.sh)).slice(0, 4);
+    const mv = moversOf(r);
+    const word = r.gid ? "categories" : "departments";
+    sec("What drove the change", [
+      gains.length ? "Biggest rises (" + word + "): " + gains.map(lineTxt).join("; ") + "." : null,
+      falls.length ? "Biggest falls (" + word + "): " + falls.map(lineTxt).join("; ") + "." : null,
+      shifts.length ? "Share of sales moved most for " + shifts.map((x) => x.n + " " + cPtsTxt(x.sh)).join(", ") + ": customers are spending " + (shifts[0].sh > 0 ? "more" : "less") + " of their basket on " + shifts[0].n + "." : null,
+      mv.ups.length ? (r.gid ? "Lines" : "Categories") + " up most: " + mv.ups.slice(0, 5).map((y) => y.n + (y.dep ? " (" + y.dep + ")" : "") + " " + signEur(y.diff)).join("; ") + "." : null,
+      mv.downs.length ? (r.gid ? "Lines" : "Categories") + " down most: " + mv.downs.slice(0, 5).map((y) => y.n + (y.dep ? " (" + y.dep + ")" : "") + " " + signEur(y.diff)).join("; ") + "." : null
+    ], dl.length ? { head: [r.gid ? "Category" : "Department", "A", "B", "Change", "Share A", "Share change"], rows: dl.slice(0, 15).map((x) => [x.n, eur(x.a), eur(x.b), x.b ? pct(ch(x.a, x.b * r.k)) : "new", share(totA ? x.a / totA : null), cPtsTxt(x.sh)]) } : null);
+
+    // stores
+    const sr = r.lfl.map((x) => ({ ...x, chg: ch(x.a.s, x.b.s * r.k), vt: r.gid ? (x.a.t ? ch(x.a.st, x.a.t) : null) : vT(x.a) })).sort((p, q) => q.chg - p.chg);
+    if (r.codes.length > 1 && sr.length) {
+      const up = sr.filter((x) => x.chg > 0).length, below = sr.filter((x) => x.vt != null && x.vt < 0);
+      sec("Stores", [
+        up + " of " + sr.length + " stores sold more in A than in B" + per + ".",
+        "Best: " + sr.slice(0, 3).map((x) => x.name + " " + pct(x.chg)).join(", ") + ".",
+        sr.length > 3 ? "Weakest: " + sr.slice(-3).reverse().map((x) => x.name + " " + pct(x.chg)).join(", ") + "." : null,
+        below.length ? below.length + " store" + (below.length === 1 ? " was" : "s were") + " below target in A: " + below.sort((p, q) => p.vt - q.vt).slice(0, 8).map((x) => x.name + " " + pct(x.vt)).join(", ") + "." : (H.vt ? "Every store was at or above target in A." : null)
+      ], { head: ["Store", "ROM", "Sales A", "Sales B", "Change", "vs target A"], rows: sr.map((x) => [x.name, x.rom, eur(x.a.s), eur(x.b.s), pct(x.chg), pct(x.vt)]) });
+    }
+
+    // time of day
+    const HA = hourAvg(r);
+    if (HA) {
+      const hs = []; for (let h = HA.from; h <= HA.to; h++) hs.push(h);
+      const pk = (arr) => hs.reduce((p, h) => arr[h] > arr[p] ? h : p, hs[0]);
+      const big = Math.max(...hs.map((h) => HA.a[h]));
+      const ch2 = hs.filter((h) => HA.b[h] >= big * 0.1).map((h) => ({ h, c: ch(HA.a[h], HA.b[h]) })).filter((x) => x.c != null);
+      const hu = ch2.slice().sort((p, q) => q.c - p.c)[0], hd = ch2.slice().sort((p, q) => p.c - q.c)[0];
+      const parts = dayparts(HA), mp = parts.slice().sort((p, q) => Math.abs(cPts(q.a, q.b) || 0) - Math.abs(cPts(p.a, p.b) || 0))[0];
+      sec("Time of day (hourly unit sales)", [
+        "Busiest hour: " + hh(pk(HA.a)) + " in A" + (pk(HA.a) === pk(HA.b) ? ", the same as B." : ", " + hh(pk(HA.b)) + " in B."),
+        "Units per day " + moved(ch(sum(HA.a), sum(HA.b))) + " (" + int(sum(HA.a)) + " vs " + int(sum(HA.b)) + ", average per day).",
+        hu && hu.c > 0.05 ? "Strongest hour against B: " + hh(hu.h) + " (" + pct(hu.c) + ")." : null,
+        hd && hd.c < -0.05 ? "Weakest hour against B: " + hh(hd.h) + " (" + pct(hd.c) + ")." : null,
+        mp && Math.abs(cPts(mp.a, mp.b) || 0) >= 1 ? "The day's shape moved most " + mp.label.toLowerCase() + ": " + share(mp.a) + " of units against " + share(mp.b) + "." : "The shape of the day was much the same in both periods.",
+        "Based on " + r.U.stores + " of " + r.U.of + " stores with hourly files in both periods."
+      ], { head: ["Hour", "A units/day", "B units/day", "Change"], rows: hs.map((h) => [hh(h), int(HA.a[h]) === "–" ? "0" : int(HA.a[h]), int(HA.b[h]) === "–" ? "0" : int(HA.b[h]), pct(ch(HA.a[h], HA.b[h]))]) });
+    } else sec("Time of day (hourly unit sales)", [r.U && r.U.none && (r.U.anyA || r.U.anyB) ? "Hourly unit sales are only uploaded for " + (r.U.anyA ? "A" : "B") + ", so time of day isn't compared." : "No hourly unit sales uploaded for these periods."]);
+
+    // items
+    if (r.U && r.U.items) {
+      const im = itemMovers(r);
+      sec("Items (unit sales)", [
+        im.ups.length ? "Selling more: " + im.ups.slice(0, 5).map((y) => y.n + " +" + int(y.diff) + " units").join("; ") + "." : null,
+        im.downs.length ? "Selling less: " + im.downs.slice(0, 5).map((y) => y.n + " −" + int(-y.diff) + " units").join("; ") + "." : null
+      ], im.ups.length || im.downs.length ? { head: ["Item", "Code", "Units A", "Units B", "Change"], rows: im.ups.concat(im.downs).map((y) => [y.n, y.code, int(y.a), int(y.b), (y.diff >= 0 ? "+" : "−") + int(Math.abs(y.diff))]) } : null);
+    }
+
+    // waste, payments, night
+    if (!r.gid) {
+      const depS = Object.fromEntries(r.deps.map((x) => [x.c, x]));
+      const wl = r.wastes.map((x) => ({ ...x, diff: x.a - x.b * r.k })).sort((p, q) => q.diff - p.diff);
+      const pA = sum(r.pay.map((x) => x.a)), pB = sum(r.pay.map((x) => x.b));
+      const payName = (k) => ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " "));
+      const ps = r.pay.map((x) => ({ n: payName(x.k), d: cPts(pA ? x.a / pA : null, pB ? x.b / pB : null), a: pA ? x.a / pA : null })).filter((x) => x.d != null).sort((p, q) => Math.abs(q.d) - Math.abs(p.d));
+      const M = (k, s) => (r.m[k] || {})[s] || 0;
+      const nA = M("sales_between_22_00_23_59_inc_vat", "a") + M("sales_between_00_00_06_00_inc_vat", "a"), nB = M("sales_between_22_00_23_59_inc_vat", "b") + M("sales_between_00_00_06_00_inc_vat", "b");
+      sec("Waste, payments and night trade", [
+        wl.length && wl[0].diff > 1 ? "Waste rose most in " + wl.filter((x) => x.diff > 1).slice(0, 3).map((x) => x.n + " " + signEur(x.diff) + " (" + share(depS[x.c] && depS[x.c].a ? x.a / depS[x.c].a : null) + " of its sales)").join("; ") + "." : null,
+        wl.length && wl[wl.length - 1].diff < -1 ? "Waste fell most in " + wl.filter((x) => x.diff < -1).slice(-3).reverse().map((x) => x.n + " " + signEur(x.diff)).join("; ") + "." : null,
+        ps.length ? "Payments: " + ps.slice(0, 3).map((x) => x.n + " " + share(x.a) + " of takings (" + cPtsTxt(x.d) + ")").join("; ") + "." : null,
+        M("online_sales_inc_vat", "a") || M("online_sales_inc_vat", "b") ? "Online sales " + eur(M("online_sales_inc_vat", "a")) + " against " + eur(M("online_sales_inc_vat", "b")) + " (" + pct(ch(M("online_sales_inc_vat", "a"), M("online_sales_inc_vat", "b") * r.k)) + ")." : null,
+        nA || nB ? "Night trade (22:00–06:00) " + eur(nA) + " against " + eur(nB) + " (" + pct(ch(nA, nB * r.k)) + ")." : null
+      ]);
+    }
+
+    // points to follow up
+    const fu = [];
+    if (H.sales[2] != null && H.sales[2] < -0.05) fu.push(gname + "Sales are down " + pct(H.sales[2]).slice(1) + per + ": start with the biggest falls under “What drove the change”.");
+    if (H.vt && H.vt[0] != null && H.vt[0] < 0) fu.push("A finished " + pct(H.vt[0]).slice(1) + " below target.");
+    if (H.cust && H.cust[2] != null && H.cust[2] < -0.05) fu.push("Customer numbers fell " + pct(H.cust[2]).slice(1) + per + ": check for opening-hour changes, roadworks, competitor openings or local events.");
+    if (H.bask && H.bask[2] != null && H.bask[2] < -0.03) fu.push("The average basket fell " + pct(H.bask[2]).slice(1) + ": check availability of top lines, promotions and link sales.");
+    if (H.waste && cPts(H.waste[0], H.waste[1]) > 0.3) fu.push("Waste is up " + cPtsTxt(cPts(H.waste[0], H.waste[1])) + " of sales: review ordering in the departments listed under waste.");
+    dl.filter((x) => x.b && totB && x.b / totB >= 0.02 && ch(x.a, x.b * r.k) < -0.10).slice(0, 4).forEach((x) => fu.push(x.n + " is down " + pct(ch(x.a, x.b * r.k)).slice(1) + ": check gaps and availability (a Gap Check would help)."));
+    if (r.codes.length > 1) sr.filter((x) => x.chg < -0.10).slice(-5).reverse().forEach((x) => fu.push(x.name + ": sales down " + pct(x.chg).slice(1) + ". Ask the Store Manager and ROM for the reason."));
+    if (HA) {
+      const big = Math.max(...HA.a); for (let h = HA.from; h <= HA.to; h++) if (HA.b[h] >= big * 0.15 && ch(HA.a[h], HA.b[h]) < -0.2) fu.push("Units at " + hh(h) + " are down " + pct(ch(HA.a[h], HA.b[h])).slice(1) + ": check staffing and shelf availability at that time.");
+    }
+    sec("Points to follow up", fu.length ? fu.slice(0, 10) : ["Nothing stands out: the figures are in line with the comparison period."]);
+    sec("About these figures", [
+      "Sales are Total inc VAT inc D030 (including tobacco). Last year and last week include tobacco too. The report's own target % excludes tobacco, so “vs target” here reads a little higher.",
+      "Totals count only stores with figures in both periods (" + r.lfl.length + " of " + r.codes.length + ").",
+      ...(r.notes || [])
+    ]);
+
+    // draw it
+    const title = "Sales comparison · " + scopeTxt();
+    const sub = "A: " + rangeTxt(r.A) + " · B: " + rangeTxt(r.B) + " · prepared " + SPARUI.fmtDateTime(Date.now()) + " by " + (me.name || me.email);
+    const box = $("report"); box.innerHTML = "";
+    box.appendChild(E("div", { style: "display:flex;align-items:center;gap:14px;margin-bottom:6px" }, [E("img", { src: "spar-logo.png", alt: "SPAR", style: "height:34px" }), E("h1", { text: title })]));
+    box.appendChild(E("p", { class: "note", style: "margin:0 0 6px", text: sub }));
+    secs.forEach((s) => {
+      box.appendChild(E("h3", { text: s.title }));
+      if (s.bullets.length) box.appendChild(E("ul", null, s.bullets.map((b) => E("li", { text: b }))));
+      if (s.tbl) box.appendChild(E("table", null, [E("thead", null, [E("tr", null, s.tbl.head.map((h, i) => E("th", { class: i && !(s.title === "Stores" && i === 1) && !(s.title.indexOf("Items") === 0 && i === 1) ? "num" : "", text: h })))]),
+        E("tbody", null, s.tbl.rows.map((row) => E("tr", null, row.map((v, i) => E("td", { class: i && !(s.title === "Stores" && i === 1) && !(s.title.indexOf("Items") === 0 && i === 1) ? "num" : "", text: v })))))]));
+    });
+    // for Claude
+    const md = ["I run SPAR Malta's stores. Below is a comparison of two trading periods from our Sales Tracker (sales inc VAT including tobacco). " +
+      "Please write a short management commentary for the Store Managers and ROMs: what changed and why it most likely changed, which stores or departments need attention, and 3–5 practical actions. " +
+      "Use only the figures given; say where the data is incomplete; don't invent numbers.", "", "# " + title, sub, ""];
+    secs.forEach((s) => {
+      md.push("## " + s.title); s.bullets.forEach((b) => md.push("- " + b));
+      if (s.tbl) { md.push("", "| " + s.tbl.head.join(" | ") + " |", "|" + s.tbl.head.map(() => "---").join("|") + "|"); s.tbl.rows.forEach((row) => md.push("| " + row.join(" | ") + " |")); }
+      md.push("");
+    });
+    r.md = md.join("\n");
+  }
 
   // ── Missing weeks ──
   const START_WEEK = "2025-12-29";            // Monday of ISO Week 1, 2026
