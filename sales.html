@@ -70,6 +70,20 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 @media(max-width:700px){.cmpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 #cmpType{flex-wrap:wrap}
 .yrwrap{position:relative}
+.heat table{border-collapse:separate;border-spacing:0}
+.heat th,.heat td{padding:0;border-bottom:1px solid #fff;border-right:1px solid #fff}
+.heat thead th{padding:8px 10px;text-align:center;font-size:12px;line-height:1.3;white-space:nowrap}
+.heat th:first-child,.heat td:first-child{position:sticky;left:0;z-index:3;background:#fff;text-align:left;padding:8px 12px;font-weight:700;white-space:nowrap;box-shadow:1px 0 0 var(--line)}
+.heat thead th:first-child{z-index:4;background:#F1F2F2}
+.heat .hc{min-width:112px;white-space:nowrap;padding:8px 10px;text-align:center;font-size:11.5px;line-height:1.35;color:var(--muted)}
+.heat .hc b{display:block;font-size:15px;margin-bottom:2px}
+.heat .hc.g{background:#DDF1E4}.heat .hc.g b{color:#00703C}
+.heat .hc.a{background:#FFF0D2}.heat .hc.a b{color:#9A6200}
+.heat .hc.r{background:#FBE0E1}.heat .hc.r b{color:#C5121A}
+.heat .hc.n{background:#F7F8F8}
+.heat tr.tot td{border-top:2px solid var(--line)}
+.heat.tablewrap tr.tot td:first-child{background:#F7F8F8;position:sticky;left:0;bottom:0;z-index:5}
+.hkey{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin:0 4px 0 10px}
 .yrtip{position:absolute;top:8px;z-index:5;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(16,37,43,.14);padding:10px 12px;font-size:13px;line-height:1.55;min-width:190px;pointer-events:none}
 .yrtip i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
 .yrtip .muted{color:var(--muted);font-size:12px}
@@ -143,6 +157,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   <section data-pane="trends" hidden>
     <div class="card panel" style="margin-top:0" id="trYear"></div>
     <div class="grid-2" id="trDaily" style="margin-top:16px"></div>
+    <div class="card panel" id="trHeat"></div>
     <div class="card panel" id="trMain"></div>
     <div class="card panel" id="trDow"></div>
   </section>
@@ -1325,7 +1340,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
   async function renderYear(codes, gid) {
     const box = $("trYear"), seq = ++yrSeq;
-    $("trDaily").innerHTML = "";
+    $("trDaily").innerHTML = ""; $("trHeat").innerHTML = "";
     const g = gid ? groupOf(gid) || { name: gid } : null;
     box.innerHTML = "";
     const tg = gid ? hasTargets(gid) : true;
@@ -1338,6 +1353,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     await loadWeeksC(codes, gid, P);
     if (seq !== yrSeq) return;
     renderDaily(codes, gid, last);
+    renderHeat(codes, gid, last);
     const wks = weeksIn(P);
     const rows = wks.map((wk) => {
       let o = null, ly = 0, lyOk = true, days = 0;
@@ -1502,6 +1518,86 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       c2.style.margin = "0";
       host.append(card1, c2);
     } else host.append(card1, E("div", { class: "card panel", style: "margin:0" }, [E("h3", { text: "Day-of-week pattern" }), E("p", { class: "note", text: "Needs at least one full week of figures." })]));
+  }
+
+  // ── Weekly heat map (like Keith's): a row per store, a column per week, coloured against the chosen measure ──
+  let hmMetric = "tgt";
+  try { hmMetric = localStorage.getItem("sparSalesHeat") || "tgt"; } catch (e) {}
+  function renderHeat(codes, gid, last) {
+    const box = $("trHeat"); box.innerHTML = "";
+    const tg = gid ? hasTargets(gid) : true, g = gid ? groupOf(gid) || { name: gid } : null;
+    const get = (c, wk) => {
+      const d = gid ? (((CG[gid] || {})[c] || {})[wk]) : ((CS[c] || {})[wk]); if (!d) return null;
+      const idx = hasIdx(d); if (!idx.length) return null;
+      const o = gid ? gAgg(d, idx, gid, c) : agg(d, idx);
+      return Object.assign({}, o, { days: idx.length, lyw: gid ? (idx.length === 7 && d.ly ? d.ly : null) : null });
+    };
+    let wks = weeksIn({ from: START_WEEK, to: last });
+    const stores = codes.filter((c) => wks.some((w) => get(c, w)));
+    wks = wks.filter((w) => stores.some((c) => get(c, w)));
+    const hasW = !gid || stores.some((c) => wks.some((w) => { const o = get(c, w); return o && o.hasW; }));
+    const metrics = gid ? [...(tg ? [["tgt", "vs target"]] : []), ["ly", "vs last year"], ["share", "Share of store"], ...(hasW ? [["waste", "Waste"]] : [])]
+      : [["tgt", "vs target"], ["ly", "vs last year"], ["waste", "Waste vs target"], ["bask", "Basket spend"]];
+    if (!metrics.some((m) => m[0] === hmMetric)) hmMetric = metrics[0][0];
+    const notes = {
+      tgt: "Each week: % of target, actual sales and the target. Green 100% or more, amber 95–100%, red below 95%.",
+      ly: "Each week: sales as a % of the same week last year. Green 100% or more, amber 95–100%, red below 95%." + (gid ? " Group last-year figures are weekly, so only complete weeks show." : ""),
+      waste: "Each week: waste as a % of sales against the " + share(WASTE_ALERT) + " limit. Green under " + share(WASTE_ALERT * 0.75) + ", amber up to " + share(WASTE_ALERT) + ", red above.",
+      bask: "Each week: average basket and customers. Coloured against the store's own average basket for the year: green at or above it, amber within 3% below, red more than 3% below.",
+      share: "Each week: " + (g ? g.name : "") + " sales as a share of the store's sales. Coloured against the store's own average share for the year: green at or above it, amber within 5% below, red more than 5% below."
+    };
+    box.append(E("div", { class: "row", style: "justify-content:space-between;align-items:flex-start;margin-bottom:6px" }, [
+      E("div", null, [E("h2", { style: "margin:0 0 4px", text: (g ? g.name + " weekly" : "Weekly") + " heat map · " + scope().label }), E("p", { class: "note", style: "margin:0", text: notes[hmMetric] + " * = week not finished yet." })]),
+      E("div", { class: "seg", style: "flex-wrap:wrap" }, metrics.map(([k, l]) => E("button", { type: "button", class: k === hmMetric ? "on" : "", text: l, onclick: () => { hmMetric = k; try { localStorage.setItem("sparSalesHeat", k); } catch (e) {} renderHeat(codes, gid, last); } })))]));
+    if (!stores.length) { box.appendChild(E("p", { class: "note", text: "No figures yet for this view." })); return; }
+    // the year's average per store (for basket / share colouring)
+    const yearAvg = {};
+    stores.forEach((c) => { let a = null; wks.forEach((w) => { const o = get(c, w); if (o) a = gid ? gAdd(a, o) : add(a, o); }); yearAvg[c] = a; });
+    const pctTxt = (v) => (v * 100).toFixed(1) + "%";
+    const band = (v, g1, a1) => v == null ? "n" : v >= g1 ? "g" : v >= a1 ? "a" : "r";
+    function cell(o, avg) {
+      if (!o) return E("td", { class: "hc n", text: "–" });
+      let main = null, lines = [], k = "n";
+      if (hmMetric === "tgt") {
+        const t = o.t, p = t ? (gid ? o.st / t : (o.sT || 0) / t) : null;
+        if (p != null) { main = pctTxt(p); k = band(p, 1, 0.95); }
+        lines = ["Sales " + eur(o.s), t ? "Target " + eur(t) : "No target"];
+      } else if (hmMetric === "ly") {
+        const p = gid ? (o.lyw ? o.s / o.lyw : null) : (o.ly ? (o.sLY || 0) / o.ly : null);
+        if (p != null) { main = pctTxt(p); k = band(p, 1, 0.95); }
+        lines = ["Sales " + eur(o.s), "Last year " + (gid ? (o.lyw ? eur(o.lyw) : "–") : (o.ly ? eur(o.ly) : "–"))];
+      } else if (hmMetric === "waste") {
+        const p = o.s ? o.w / o.s : null;
+        if (p != null && (!gid || o.hasW)) { main = share(p); k = p <= WASTE_ALERT * 0.75 ? "g" : p <= WASTE_ALERT ? "a" : "r"; }
+        lines = ["Waste " + eur(o.w), "Sales " + eur(o.s)];
+      } else if (hmMetric === "bask") {
+        const b = o.c ? o.s / o.c : null, ab = avg && avg.c ? avg.s / avg.c : null;
+        if (b != null) { main = eur2(b); k = ab ? band(b / ab, 1, 0.97) : "n"; }
+        lines = ["Customers " + int(o.c), ab && b ? "vs avg " + pct(b / ab - 1) : ""];
+      } else if (hmMetric === "share") {
+        const p = o.x ? o.s / o.x : null, ap = avg && avg.x ? avg.s / avg.x : null;
+        if (p != null) { main = share(p); k = ap ? band(p / ap, 1, 0.95) : "n"; }
+        lines = [g.name + " " + eur(o.s), "Store " + eur(o.x)];
+      }
+      return E("td", { class: "hc " + k, title: lines.filter(Boolean).join(" · ") }, [E("b", { text: main == null ? "–" : main + (o.days < 7 ? "*" : "") }), ...lines.filter(Boolean).map((l) => E("div", { text: l }))]);
+    }
+    const partial = (w) => stores.some((c) => { const o = get(c, w); return o && o.days < 7; });
+    const thead = E("thead", null, [E("tr", null, [E("th", { text: "Store" }), ...wks.map((w) => E("th", null, [E("div", { text: "Wk " + isoWeek(w) + (partial(w) ? "*" : "") }), E("div", { style: "font-weight:400;color:var(--muted)", text: short(w) })]))])]);
+    const tb = E("tbody");
+    stores.forEach((c) => tb.appendChild(E("tr", null, [E("td", { text: shortStore((byCode[c] || {}).name || c) }), ...wks.map((w) => cell(get(c, w), yearAvg[c]))])));
+    if (stores.length > 1) {
+      let all = null; Object.values(yearAvg).forEach((a) => { all = gid ? gAdd(all, a) : add(all, a); });
+      tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "All stores" }), ...wks.map((w) => {
+        let o = null, days = 0, ly = 0, lyOk = true;
+        stores.forEach((c) => { const x = get(c, w); if (!x) return; o = gid ? gAdd(o, x) : add(o, x); days = Math.max(days, x.days); if (gid) { if (x.lyw) ly += x.lyw; else lyOk = false; } });
+        if (o) { o.days = days; o.lyw = gid && lyOk && ly ? ly : null; }
+        return cell(o, all);
+      })]));
+    }
+    const wrap = E("div", { class: "tablewrap heat" }, [E("table", null, [thead, tb])]);
+    box.appendChild(wrap);
+    box.appendChild(E("p", { class: "note", style: "margin:8px 0 0" }, ["Scroll sideways for earlier weeks.", E("span", { class: "hkey", style: "background:#DDF1E4" }), "good", E("span", { class: "hkey", style: "background:#FFF0D2" }), "watch", E("span", { class: "hkey", style: "background:#FBE0E1" }), "act"]));
+    requestAnimationFrame(() => { wrap.scrollLeft = wrap.scrollWidth; });
   }
   // units per trading hour, week by week, from the hourly unit files
   async function yearUnits(codes, gid, wks) {
