@@ -69,6 +69,13 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .cmpk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
 @media(max-width:700px){.cmpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 #cmpType{flex-wrap:wrap}
+.yrwrap{position:relative}
+.yrtip{position:absolute;top:8px;z-index:5;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(16,37,43,.14);padding:10px 12px;font-size:13px;line-height:1.55;min-width:190px;pointer-events:none}
+.yrtip i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
+.yrtip .muted{color:var(--muted);font-size:12px}
+.yrnav{position:absolute;top:44%;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;box-shadow:0 2px 8px rgba(16,37,43,.12);font-size:22px;line-height:30px;color:var(--ink);cursor:pointer;padding:0}
+.yrnav:hover{border-color:#EC1B24;color:#EC1B24}
+.yrnav.l{left:-6px}.yrnav.r{right:-6px}
 .cmpchart{margin-top:0}
 .cmpchart h3{margin:0 0 6px}
 #report .cmpchart{border:0;box-shadow:none;padding:0;margin:8px 0;break-inside:avoid}
@@ -134,7 +141,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
   <!-- ═════════ TRENDS ═════════ -->
   <section data-pane="trends" hidden>
-    <div class="card panel" style="margin-top:0" id="trMain"></div>
+    <div class="card panel" style="margin-top:0" id="trYear"></div>
+    <div class="card panel" id="trMain"></div>
     <div class="card panel" id="trDow"></div>
   </section>
 
@@ -511,7 +519,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       E("br"), (ups.length < codes.length ? ups.length + " of " + codes.length + " stores reported · " : "") + (last ? "updated " + SPARUI.fmtDateTime(last) : ""));
     if (tab === "overview") renderOverview(w, codes, ld);
     if (tab === "depts") renderDepts(w, codes);
-    if (tab === "trends") renderTrends(w, codes);
+    if (tab === "trends") { renderYear(codes, null); renderTrends(w, codes); }
     renderAlerts(w, codes, ld);
     if (tab === "alerts" || lastMissScope !== scope().id) { lastMissScope = scope().id; renderMissing(); }
   }
@@ -1023,7 +1031,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       (docs.length < codes.length ? docs.length + " of " + codes.length + " stores reported · " : "") + (last ? "updated " + SPARUI.fmtDateTime(last) : ""));
     if (tab === "overview") renderGroupOverview(gid, g, w, codes, ld);
     if (tab === "depts") renderGroupCats(gid, g, w, codes);
-    if (tab === "trends") renderGroupTrends(gid, g, w, codes);
+    if (tab === "trends") { renderYear(codes, gid); renderGroupTrends(gid, g, w, codes); }
   }
 
   function renderGroupOverview(gid, g, w, codes, ld) {
@@ -1304,6 +1312,156 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     } catch (e) { $("grMsg").textContent = "Stopped: " + (e.code || e.message); }
     btn.disabled = false;
   };
+
+  // ═════════ TRENDS: THE YEAR WEEK BY WEEK (line chart, like Keith's) ═════════
+  let yrMetric = "sales", yrSeq = 0;
+  try { yrMetric = localStorage.getItem("sparSalesYrMetric") || "sales"; } catch (e) {}
+  const YR_COL = { ty: "#EC1B24", t: "#10252b", ly: "#8FA3B8", ref: "#60727a" };
+  function niceScale(lo, hi, steps = 4) {
+    if (hi === lo) hi = lo + 1;
+    const raw = (hi - lo) / steps, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw) || raw;
+    return { lo: Math.floor(lo / st) * st, hi: Math.ceil(hi / st) * st, st };
+  }
+  async function renderYear(codes, gid) {
+    const box = $("trYear"), seq = ++yrSeq;
+    const g = gid ? groupOf(gid) || { name: gid } : null;
+    box.innerHTML = "";
+    const tg = gid ? hasTargets(gid) : true;
+    const last = latestDate();
+    const P = { from: START_WEEK, to: last };
+    const head = E("div", { class: "row", style: "justify-content:space-between;align-items:flex-start;margin-bottom:6px" });
+    box.appendChild(head);
+    const body = E("div", null, [E("p", { class: "note", text: "Loading the year…" })]);
+    box.appendChild(body);
+    await loadWeeksC(codes, gid, P);
+    if (seq !== yrSeq) return;
+    const wks = weeksIn(P);
+    const rows = wks.map((wk) => {
+      let o = null, ly = 0, lyOk = true, days = 0;
+      codes.forEach((c) => {
+        const d = gid ? (((CG[gid] || {})[c] || {})[wk]) : ((CS[c] || {})[wk]); if (!d) return;
+        const idx = hasIdx(d); if (!idx.length) return;
+        days = Math.max(days, idx.length);
+        if (gid) { o = gAdd(o, gAgg(d, idx, gid, c)); if (idx.length < 7 || !d.ly) lyOk = false; ly += d.ly || 0; }
+        else o = add(o, agg(d, idx));
+      });
+      return { wk, o, days, ly: !o ? null : gid ? (lyOk && ly ? ly : null) : (o.ly || null) };
+    });
+    // drop empty weeks at the start (store opened later / first upload)
+    while (rows.length && !rows[0].o) rows.shift();
+    const hasW = rows.some((r) => r.o && (gid ? r.o.hasW : r.o.w));
+    const metrics = gid
+      ? [["sales", "Sales"], ["ach", "Achievement"], ["share", "Share of store"], ...(hasW ? [["waste", "Waste €"], ["wastep", "Waste %"]] : []), ["uph", "Units/hour"]]
+      : [["sales", "Sales"], ["ach", "Achievement"], ["cust", "Customers"], ["bask", "Basket spend"], ["waste", "Waste €"], ["wastep", "Waste %"], ["uph", "Units/hour"]];
+    if (!metrics.some((m) => m[0] === yrMetric)) yrMetric = "sales";
+    const opts = [...$("scope").options], at = opts.findIndex((o) => o.value === $("scope").value);
+    const step = async (d) => { if (opts.length < 2) return; $("scope").value = opts[(at + d + opts.length) % opts.length].value; await changeScope(); };
+    head.append(
+      E("div", null, [E("h2", { style: "margin:0 0 4px", text: (g ? g.name + " " : "") + metrics.find((m) => m[0] === yrMetric)[1].toLowerCase().replace(/^\w/, (x) => x.toUpperCase()) + " week by week · " + scope().label }),
+        E("p", { class: "note", style: "margin:0", text: "Every week since the start of the year. Hover or tap a point for the figures" + (opts.length > 1 ? "; ‹ › step through the stores." : ".") })]),
+      E("div", { class: "seg", style: "flex-wrap:wrap" }, metrics.map(([k, l]) => E("button", { type: "button", class: k === yrMetric ? "on" : "", text: l, onclick: () => { yrMetric = k; try { localStorage.setItem("sparSalesYrMetric", k); } catch (e) {} renderYear(codes, gid); } }))));
+    if (!rows.length) { body.innerHTML = ""; body.appendChild(E("p", { class: "note", text: "No figures yet for this view." })); return; }
+
+    // the series for the chosen measure
+    const n = rows.length, val = (f) => rows.map((r) => { if (!r.o) return null; const v = f(r); return v == null || !isFinite(v) ? null : v; });
+    let series = [], fmt = eur, axis = eurAxis, ref = null, note = "";
+    const tgOf = (o) => gid ? (o.t ? ch(o.st, o.t) : null) : (o.t ? vT(o) : null);
+    const lyOf = (r) => gid ? (r.ly ? ch(r.o.s, r.ly) : null) : vLY(r.o);
+    if (yrMetric === "sales") {
+      series = [{ name: "This year", v: val((r) => r.o.s), col: YR_COL.ty, w: 3 }];
+      if (tg) series.push({ name: "Target", v: val((r) => r.o.t || null), col: YR_COL.t, dash: "6 5", w: 2 });
+      series.push({ name: "Last year", v: rows.map((r) => r.ly), col: YR_COL.ly, w: 2.5 });
+    } else if (yrMetric === "ach") {
+      fmt = pct; axis = (v) => pct(v).replace(".0", ""); ref = 0;
+      if (tg) series.push({ name: "vs target", v: val((r) => tgOf(r.o)), col: YR_COL.ty, w: 3 });
+      series.push({ name: "vs last year", v: rows.map((r) => r.o ? lyOf(r) : null), col: YR_COL.ly, w: 2.5 });
+      note = "Above 0% = ahead. " + (gid ? "" : "Target is the store's sales target; last year is the same week last year.");
+    } else if (yrMetric === "cust") { fmt = int; axis = (v) => Math.abs(v) >= 1000 ? Math.round(v / 1000) + "k" : v === 0 ? "0" : int(v); series = [{ name: "Customers", v: val((r) => r.o.c), col: YR_COL.ty, w: 3 }]; }
+    else if (yrMetric === "bask") { fmt = eur2; axis = eur2; series = [{ name: "Average basket", v: val((r) => r.o.c ? r.o.s / r.o.c : null), col: YR_COL.ty, w: 3 }]; }
+    else if (yrMetric === "share") { fmt = share; axis = share; series = [{ name: "Share of store sales", v: val((r) => r.o.x ? r.o.s / r.o.x : null), col: YR_COL.ty, w: 3 }]; }
+    else if (yrMetric === "waste") { fmt = eur; series = [{ name: "Waste", v: val((r) => r.o.w), col: YR_COL.ty, w: 3 }]; }
+    else if (yrMetric === "wastep") { fmt = share; axis = share; ref = WASTE_ALERT; series = [{ name: "Waste % of sales", v: val((r) => r.o.s ? r.o.w / r.o.s : null), col: YR_COL.ty, w: 3 }]; note = "Dashed line = the " + share(WASTE_ALERT) + " alert level."; }
+    else if (yrMetric === "uph") {
+      body.innerHTML = ""; body.appendChild(E("p", { class: "note", text: "Loading the hourly unit sales…" }));
+      const U = await yearUnits(codes, gid, rows.map((r) => r.wk));
+      if (seq !== yrSeq) return;
+      fmt = (v) => v == null ? "–" : (Math.round(v * 10) / 10).toLocaleString("en-GB"); axis = (v) => v === 0 ? "0" : int(v);
+      series = [{ name: "Units per trading hour", v: rows.map((r) => U[r.wk] ? U[r.wk].u / U[r.wk].h : null), col: YR_COL.ty, w: 3 }];
+      note = "From the hourly item files: units sold divided by hours with sales, per store. The daily sales report has no hourly € figures, so this uses units. Weeks without hourly files are blank.";
+      if (!series[0].v.some((v) => v != null)) { body.innerHTML = ""; body.appendChild(E("p", { class: "note", text: "No hourly unit sales uploaded for this view yet (Unit Sales → Upload)." })); return; }
+    }
+
+    // draw
+    const all = series.flatMap((s) => s.v).filter((v) => v != null).concat(ref != null ? [ref] : []);
+    const sc = niceScale(Math.min(0, ...all), Math.max(...all));
+    const Wd = 1100, Ht = 330, L = 70, R = 18, T = 14, Bt = 34;
+    const x = (i) => n === 1 ? (L + Wd - R) / 2 : L + i * (Wd - L - R) / (n - 1);
+    const y = (v) => T + (sc.hi - v) / (sc.hi - sc.lo) * (Ht - T - Bt);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Week by week chart");
+    svg.style.minWidth = "640px";
+    const mk = (tag, a, txt, parent) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; (parent || svg).appendChild(nd); return nd; };
+    for (let v = sc.lo; v <= sc.hi + sc.st / 2; v += sc.st) { mk("line", { x1: L, x2: Wd - R, y1: y(v), y2: y(v), stroke: "#E9EBEA" }); mk("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 12, fill: "#60727a" }, axis(v, true)); }
+    if (ref != null) mk("line", { x1: L, x2: Wd - R, y1: y(ref), y2: y(ref), stroke: YR_COL.ref, "stroke-width": 1.5, "stroke-dasharray": ref ? "4 4" : "" });
+    const every = Math.max(1, Math.ceil(n / 16));
+    rows.forEach((r, i) => { if ((n - 1 - i) % every === 0) mk("text", { x: x(i), y: Ht - 10, "text-anchor": "middle", "font-size": 12, fill: "#60727a" }, "Wk " + isoWeek(r.wk)); });
+    series.forEach((s) => {
+      let d = "", pen = false;
+      s.v.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; });
+      if (d) mk("path", { d, fill: "none", stroke: s.col, "stroke-width": s.w, "stroke-dasharray": s.dash || "", "stroke-linejoin": "round", "stroke-linecap": "round" });
+      // lone points (no neighbours) still show
+      s.v.forEach((v, i) => { if (v != null && (s.v[i - 1] == null) && (s.v[i + 1] == null)) mk("circle", { cx: x(i), cy: y(v), r: 3, fill: s.col }); });
+    });
+    const lastI = series[0].v.map((v, i) => v != null ? i : -1).filter((i) => i >= 0).pop();
+    const partial = rows[n - 1].days < 7;
+    if (lastI != null) mk("circle", { cx: x(lastI), cy: y(series[0].v[lastI]), r: 5, fill: partial && lastI === n - 1 ? "#fff" : series[0].col, stroke: series[0].col, "stroke-width": 2.5 });
+    // hover / tap
+    const guide = mk("line", { x1: 0, x2: 0, y1: T, y2: Ht - Bt, stroke: "#10252b", "stroke-opacity": 0.25, visibility: "hidden" });
+    const dots = series.map((s) => mk("circle", { r: 4.5, fill: "#fff", stroke: s.col, "stroke-width": 2.5, visibility: "hidden" }));
+    const wrap = E("div", { class: "yrwrap" });
+    const tip = E("div", { class: "yrtip", hidden: true });
+    const show = (i) => {
+      const r = rows[i]; guide.setAttribute("x1", x(i)); guide.setAttribute("x2", x(i)); guide.setAttribute("visibility", "visible");
+      series.forEach((s, k) => { const v = s.v[i]; dots[k].setAttribute("visibility", v == null ? "hidden" : "visible"); if (v != null) { dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); } });
+      tip.innerHTML = ""; tip.hidden = false;
+      tip.append(E("b", { text: "Wk " + isoWeek(r.wk) + " · " + short(r.wk) + " – " + short(addDays(r.wk, 6)) }),
+        ...(r.days && r.days < 7 ? [E("div", { class: "muted", text: r.days + " of 7 days so far" })] : []),
+        ...series.map((s) => E("div", null, [E("i", { style: "background:" + s.col }), s.name + ": ", E("b", { text: fmt(s.v[i]) })])));
+      if (yrMetric === "sales" && r.o) {
+        const a = tgOf(r.o), b = lyOf(r);
+        tip.append(E("div", { class: "muted", text: [a != null ? "vs target " + pct(a) : "", b != null ? "vs LY " + pct(b) : ""].filter(Boolean).join(" · ") }));
+      }
+      const box2 = wrap.getBoundingClientRect(), sv = svg.getBoundingClientRect();
+      const px = sv.left - box2.left + x(i) / Wd * sv.width;
+      tip.style.left = Math.min(Math.max(8, px + 14), box2.width - tip.offsetWidth - 8) + "px";
+      if (px + 14 + tip.offsetWidth > box2.width - 8) tip.style.left = Math.max(8, px - tip.offsetWidth - 14) + "px";
+    };
+    const hide = () => { tip.hidden = true; guide.setAttribute("visibility", "hidden"); dots.forEach((d) => d.setAttribute("visibility", "hidden")); };
+    const hit = mk("rect", { x: L, y: T, width: Wd - L - R, height: Ht - T - Bt, fill: "transparent" });
+    const pick = (ev) => { const sv = svg.getBoundingClientRect(), px = (ev.clientX - sv.left) / sv.width * Wd; show(Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : (px - L) / (Wd - L - R) * (n - 1))))); };
+    hit.addEventListener("mousemove", pick); hit.addEventListener("click", pick); svg.addEventListener("mouseleave", hide);
+    const prev = E("button", { class: "yrnav l", type: "button", title: "Previous store", "aria-label": "Previous store", text: "‹", onclick: () => step(-1) });
+    const next = E("button", { class: "yrnav r", type: "button", title: "Next store", "aria-label": "Next store", text: "›", onclick: () => step(1) });
+    wrap.append(E("div", { style: "overflow-x:auto" }, [svg]), tip, ...(opts.length > 1 ? [prev, next] : []));
+    body.innerHTML = "";
+    body.append(E("div", { class: "legend", style: "margin:4px 0 6px" }, series.map((s) => E("span", null, [E("i", { style: s.dash ? "background:repeating-linear-gradient(90deg," + s.col + " 0 5px,transparent 5px 9px);height:3px;vertical-align:3px" : "background:" + s.col + ";height:3px;vertical-align:3px" }), s.name]))), wrap);
+    const tail = [];
+    if (partial) tail.push("Wk " + isoWeek(rows[n - 1].wk) + " is the week so far (" + rows[n - 1].days + " of 7 days): the hollow dot.");
+    if (note) tail.push(note);
+    if (tail.length) body.appendChild(E("p", { class: "note", style: "margin:6px 0 0", text: tail.join(" ") }));
+  }
+  // units per trading hour, week by week, from the hourly unit files
+  async function yearUnits(codes, gid, wks) {
+    const out = {}, metas = await Promise.all(codes.map((c) => uMeta(gid, c)));
+    await Promise.all(codes.flatMap((c, i) => {
+      const ws = [...new Set(Object.keys(metas[i]).map(mondayOf))].filter((w) => wks.includes(w));
+      return ws.map(async (w) => {
+        const hd = await uDoc("h", gid, c, w, metas[i]); if (!hd || !hd.h) return;
+        Object.values(hd.h).forEach((arr) => { const u = sum(arr || []), h = (arr || []).filter((v) => v > 0).length; if (!h) return; const o = out[w] || (out[w] = { u: 0, h: 0 }); o.u += u; o.h += h; });
+      });
+    }));
+    return out;
+  }
 
   // ═════════ COMPARE PERIODS + REPORT ═════════
   // A = the period chosen, B = the period it's compared with. Uses everything saved: the daily sales summaries,
@@ -1722,7 +1880,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       E("div", { class: "legend", style: "margin:0 0 8px" }, [E("span", null, [E("i", { style: "background:" + COL_B }), "B · " + rangeTxt(r.B)]), E("span", null, [E("i", { style: "background:" + COL_A }), "A · " + rangeTxt(r.A)])]),
       E("div", { style: "overflow-x:auto" }, [svg]), note ? E("p", { class: "note", style: "margin:6px 0 0", text: note }) : null]);
   }
-  const eurAxis = (v, ax) => ax && Math.abs(v) >= 1000 ? "€" + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "m" : Math.round(v / 1000) + "k") : eur(v);
+  const eurAxis = (v, ax) => ax && Math.abs(v) >= 1000 ? "€" + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1).replace(".0", "") + "m" : (v % 1000 ? (v / 1000).toFixed(1) : v / 1000) + "k") : eur(v);
   const pctAxis = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toFixed(Math.abs(v) < 0.1 && v !== 0 ? 1 : 0) + "%";
   function cmpCharts(r, print) {
     const out = [], A = r.byDay.a, B = r.byDay.b, n = Math.max(A.length, B.length);
