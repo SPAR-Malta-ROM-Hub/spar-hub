@@ -56,6 +56,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .kpis.five{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media(max-width:1100px){.kpis.five{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.kpis.five{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mv-h{margin:0 0 8px;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.mv{display:grid;grid-template-columns:minmax(120px,1.2fr) 2fr 128px;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid #F0F1F1}
+.mv-n{min-width:0}.mv-n b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv-n span{display:block;font-size:12px;color:var(--muted)}
+.mv-bar{height:10px;border-radius:5px;background:#EEF0EF;overflow:hidden}.mv-bar i{display:block;height:100%;border-radius:5px}
+.mv-v{font-size:13px;font-weight:700;white-space:nowrap;text-align:right}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 </style>
@@ -579,6 +584,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   async function renderDepts(w, codes) {
     const seq = ++dpSeq;
     $("dpMain").innerHTML = ""; $("dpMain").appendChild(E("p", { class: "note", text: "Loading " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…" }));
+    const oldMv = $("dpMovers"); if (oldMv) oldMv.remove();
     $("dpMore").innerHTML = "";
     const prevW = addDays(w, -7);
     const pairs = (await Promise.all(codes.map(async (c) => ({ c, d: await getDetail(c, w), p: await getDetail(c, prevW) })))).filter((x) => x.d);
@@ -645,6 +651,23 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         (full ? "" : " " + nDays + " day" + (nDays === 1 ? "" : "s") + " so far.") + (pairs.length < codes.length ? " " + (codes.length - pairs.length) + " store(s) have no report this week." : "") + (noPrev ? " " + noPrev + " store(s) have no report for the previous week, so they're left out of “vs last wk”." : "") }),
       E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Department", "Sales", "Share", "Share LY", "Share change", "vs last wk", "vs LY", "Waste", "Waste %"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]),
       E("p", { class: "note", style: "margin:8px 0 0", text: "Total waste " + eur2(wTot) + " (" + share(total ? wTot / total : null) + " of sales) · stock adjustments " + eur2(M("stock_adjustments")) + "." }));
+
+    // Biggest movers vs last week: categories with the largest € change on the same days
+    const depName = Object.fromEntries(list.map((x) => [x.c, x.n]));
+    const movers = Object.values(cat).filter((y) => y.lw > 0 || y.sLW > 0).map((y) => ({ ...y, diff: y.sLW - y.lw, dep: depName[y.p] || "" }));
+    const ups = movers.filter((y) => y.diff > 0.5).sort((a, b) => b.diff - a.diff).slice(0, 6);
+    const downs = movers.filter((y) => y.diff < -0.5).sort((a, b) => a.diff - b.diff).slice(0, 6);
+    const maxAbs = Math.max(1, ...ups.map((y) => y.diff), ...downs.map((y) => -y.diff));
+    const moverCol = (title, rows, up) => E("div", null, [E("p", { class: "mv-h", text: title }),
+      ...(rows.length ? rows.map((y) => E("div", { class: "mv" }, [
+        E("div", { class: "mv-n" }, [E("b", { text: y.n, title: y.n }), E("span", { text: y.dep })]),
+        E("div", { class: "mv-bar" }, [E("i", { style: "width:" + Math.max(3, Math.round(Math.abs(y.diff) / maxAbs * 100)) + "%;background:" + (up ? "var(--gd)" : "var(--red)") })]),
+        E("div", { class: "mv-v " + (up ? "up" : "down"), text: (up ? "+" : "−") + eur(Math.abs(y.diff)) + " · " + (y.lw ? pct(ch(y.sLW, y.lw)) : "new") })]))
+        : [E("p", { class: "note", text: "None this week." })])]);
+    if (movers.length) $("dpMain").after(E("div", { class: "card panel", id: "dpMovers" }, [
+      E("h2", { text: "Biggest movers vs last week" }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: "Categories with the biggest change in € against the same days last week" + (noPrev ? " (stores with last week's report only)" : "") + "." }),
+      E("div", { class: "grid-2" }, [moverCol("Up", ups, true), moverCol("Down", downs, false)])]));
 
     const card = (title, rows, headers, note) => E("div", { class: "card panel" }, [E("h3", { text: title }),
       rows.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, headers.map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), E("tbody", null, rows)])]) : E("p", { class: "note", text: "Nothing this week." }),
@@ -982,6 +1005,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
 
   async function renderGroupCats(gid, g, w, codes) {
+    const oldMv = $("dpMovers"); if (oldMv) oldMv.remove();
     const D = GG[gid] || {};
     const docs = codes.map((c) => (D[c] || {})[w]).filter(Boolean);
     $("dpMore").innerHTML = ""; const box = $("dpMain"); box.innerHTML = "";
