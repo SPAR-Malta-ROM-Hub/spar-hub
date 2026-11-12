@@ -21,6 +21,8 @@
 .up{color:var(--gd)} .down{color:var(--red)}
 td.up,td.down,span.up,span.down{font-weight:700}
 tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+@media print{.tablewrap{max-height:none!important;overflow:visible}}
 tr.future td{color:#A4ADB0}
 .seg{display:inline-flex;background:#E9EBEA;border-radius:10px;padding:3px;gap:2px}
 .seg button{appearance:none;border:0;background:transparent;padding:7px 12px;border-radius:8px;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer}
@@ -67,6 +69,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .cmpk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
 @media(max-width:700px){.cmpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 #cmpType{flex-wrap:wrap}
+.cmpchart{margin-top:0}
+.cmpchart h3{margin:0 0 6px}
+#report .cmpchart{border:0;box-shadow:none;padding:0;margin:8px 0;break-inside:avoid}
+#report .grid-2{display:block}
+#report svg.chart{min-width:0!important}
 .cmpk .card{padding:14px 16px}
 .cmpk label{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .cmpk strong{display:block;font-size:24px;margin:6px 0 4px}
@@ -81,7 +88,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 #report td.num,#report th.num{text-align:right}
 @media print{
   body{background:#fff}
-  header.top,.tabs,#bar,#cmpForm,#cmpOut,.noprint,[data-pane]:not([data-pane=compare]){display:none!important}
+  header.top,.tabs,#bar,#cmpForm,#cmpOut,.noprint,#spar-toast,[data-pane]:not([data-pane=compare]){display:none!important}
   main.page{padding:0;max-width:none}
   #repBox{border:0;box-shadow:none;padding:0;margin:0}
   #report h3{break-after:avoid}
@@ -229,6 +236,23 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
 <script type="module">
   const $ = (id) => document.getElementById(id);
+
+  // ── Tables: 6 rows on show, then scroll. The header stays at the top and the total row at the bottom ──
+  const ROWS_SHOWN = 6;
+  function fitTables() {
+    document.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.querySelectorAll(":scope > tbody > tr")];
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot"));
+      if (rows.length <= ROWS_SHOWN) { w.style.maxHeight = "none"; return; }
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, ROWS_SHOWN).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0;
+  const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  addEventListener("resize", fitSoon);
   const E = SPARUI.el;
   const me = await SPAR.ready;
   const fb = await SPAR.firebase();
@@ -807,6 +831,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       E("td", { class: "num", text: eur(r.o.s) }), E("td", { class: "num", text: eur(r.o.t) }), E("td", { class: "num " + cls(vT(r.o)), text: pct(vT(r.o)) }),
       E("td", { class: "num " + cls(vLY(r.o)), text: pct(vLY(r.o)) }), E("td", { class: "num", text: int(r.o.c) }),
       E("td", { class: "num", text: r.o.c ? eur2(r.o.s / r.o.c) : "–" }), E("td", { class: "num", text: share(r.o.s ? r.o.w / r.o.s : null) })])));
+    { let T = null; rows.forEach((r) => { if (r.o && r.o.n) T = add(T, r.o); });
+      if (T) tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total · " + rows.filter((r) => r.o && r.o.n).length + " weeks" }), E("td", { class: "num", text: eur(T.s) }), E("td", { class: "num", text: eur(T.t) }),
+        E("td", { class: "num " + cls(vT(T)), text: pct(vT(T)) }), E("td", { class: "num " + cls(vLY(T)), text: pct(vLY(T)) }), E("td", { class: "num", text: int(T.c) }),
+        E("td", { class: "num", text: T.c ? eur2(T.s / T.c) : "–" }), E("td", { class: "num", text: share(T.s ? T.w / T.s : null) })])); }
     box.appendChild(E("div", { class: "tablewrap", style: "margin-top:14px" }, [E("table", null, [E("thead", null, [E("tr", null,
       ["Week", "Sales", "Target", "vs target", "vs last year", "Customers", "Basket", "Waste %"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
 
@@ -1146,6 +1174,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     rows.slice().reverse().forEach((r) => tb.appendChild(E("tr", null, [E("td", { text: "Wk " + isoWeek(r.wk) + " · " + short(r.wk) }), E("td", { class: "num", text: eur(r.o.s) }),
       E("td", { class: "num", text: tg ? eur(r.o.t) : "–" }), E("td", { class: "num " + (tg ? cls(ch(r.o.st, r.o.t)) : ""), text: tg ? pct(ch(r.o.st, r.o.t)) : "–" }),
       E("td", { class: "num " + cls(ch(r.o.s, r.ly)), text: r.ly ? pct(ch(r.o.s, r.ly)) : "–" }), E("td", { class: "num", text: share(r.o.x ? r.o.s / r.o.x : null) })])));
+    { let T = null, sL = 0, L = 0; rows.forEach((r) => { if (r.o && r.o.n) { T = gAdd(T, r.o); if (r.ly) { sL += r.o.s; L += r.ly; } } });
+      if (T) tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total · " + rows.filter((r) => r.o && r.o.n).length + " weeks" }), E("td", { class: "num", text: eur(T.s) }),
+        E("td", { class: "num", text: tg ? eur(T.t) : "–" }), E("td", { class: "num " + (tg ? cls(ch(T.st, T.t)) : ""), text: tg ? pct(ch(T.st, T.t)) : "–" }),
+        E("td", { class: "num " + cls(ch(sL, L)), text: L ? pct(ch(sL, L)) : "–" }), E("td", { class: "num", text: share(T.x ? T.s / T.x : null) })])); }
     box.appendChild(E("div", { class: "tablewrap", style: "margin-top:14px" }, [E("table", null, [E("thead", null, [E("tr", null,
       ["Week", "Sales", "Target", "vs target", "vs last year", "Share of store"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
   }
@@ -1468,6 +1500,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     let TA = null, TB = null;
     lfl.forEach((r) => { TA = gid ? gAdd(TA, r.a) : add(TA, r.a); TB = gid ? gAdd(TB, r.b) : add(TB, r.b); });
     const lflCodes = lfl.map((r) => r.c);
+    const dayFig = (d) => { let o = null; lfl.forEach((r) => { const x = wkOf(r.c, d), i = dowIdx(d); if (x && x.has[i]) o = gid ? gAdd(o, gAgg(x, [i], gid, r.c)) : add(o, agg(x, [i])); }); return o; };
+    const byDay = { a: dA.map((d) => ({ d, o: dayFig(d) })), b: dB.map((d) => ({ d, o: dayFig(d) })) };
 
     // departments / categories, waste, payments, night trade
     const det = { dep: {}, cat: {}, waste: {}, pay: {}, m: {} };
@@ -1499,7 +1533,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
     // hourly unit sales
     const U = await unitsCompare(lflCodes, gid, A, B);
-    return { A, B, gid, g, codes, rows, lfl, TA, TB, k, perDay, lenA: dA.length, lenB: dB.length, deps, cats, wastes, pay: Object.values(det.pay), m: det.m, U, notes, at: Date.now() };
+    return { A, B, gid, g, codes, rows, lfl, TA, TB, k, perDay, byDay, lenA: dA.length, lenB: dB.length, deps, cats, wastes, pay: Object.values(det.pay), m: det.m, U, notes, at: Date.now() };
   }
 
   async function unitsCompare(codes, gid, A, B) {
@@ -1566,6 +1600,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (H.waste) tiles.push(cmpTile("Waste", share(H.waste[0]), "B " + share(H.waste[1]) + " · ", chgSpan(cPts(H.waste[0], H.waste[1]), cPtsTxt(cPts(H.waste[0], H.waste[1])), -1), H.waste[0] > WASTE_ALERT ? "bad" : ""));
     else if (r.gid) tiles.push(cmpTile("Waste", "–", "Not in the daily report: will come from the Waste Tracker", ""));
     out.appendChild(E("div", { class: "cmpk" }, tiles));
+    cmpCharts(r).forEach((n) => out.appendChild(n));
 
     const table = (heads, body, foot) => E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, heads.map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), E("tbody", null, body.concat(foot ? [foot] : []))])]);
     const td = (t, c) => E("td", { class: "num " + (c || ""), text: t });
@@ -1584,7 +1619,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
             return E("tr", null, [name, td(a ? eur(a.s) : "–"), td(b ? eur(b.s) : "–"), td(a && b ? pct(c1) : a ? "A only" : b ? "B only" : "no figures", cls(c1)),
               td(a && b ? signEur(a.s - b.s * r.k) : "–"), td(a ? pct(vT(a)) : "–", a ? cls(vT(a)) : ""), td(a && b ? pct(ch(a.c, b.c * r.k)) : "–", a && b ? cls(ch(a.c, b.c * r.k)) : ""),
               td(a && b ? pct(ch(avgBasket(a), avgBasket(b))) : "–", a && b ? cls(ch(avgBasket(a), avgBasket(b))) : ""), td(a && a.s ? share(a.w / a.s) : "–", a && a.s && a.w / a.s > WASTE_ALERT ? "down" : ""), td(b && b.s ? share(b.w / b.s) : "–")]);
-          }))]));
+          }), storeTotal(r))]));
     }
 
     // departments / categories
@@ -1631,7 +1666,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       more.appendChild(E("div", { class: "card panel" }, [E("h3", { text: "Waste by department" }), wl.length ? table(["Department", "A", "B", "Change €", "% of sales A", "% B"], wl.map((x) => {
         const d = depS[x.c] || {}; const ra = d.a ? x.a / d.a : null, rb = d.b ? x.b / d.b : null;
         return E("tr", null, [E("td", { text: x.n }), td(eur2(x.a)), td(eur2(x.b)), td(signEur(x.a - x.b * r.k), cls(x.a - x.b * r.k, -1)), td(share(ra), ra > WASTE_ALERT ? "down" : ""), td(share(rb))]);
-      })) : E("p", { class: "note", text: "No waste recorded." })]));
+      }), ((wa, wb) => E("tr", { class: "tot" }, [E("td", { text: "Total" }), td(eur2(wa)), td(eur2(wb)), td(signEur(wa - wb * r.k), cls(wa - wb * r.k, -1)), td(share(totA ? wa / totA : null)), td(share(totB ? wb / totB : null))]))(sum(wl.map((x) => x.a)), sum(wl.map((x) => x.b)))) : E("p", { class: "note", text: "No waste recorded." })]));
       const pA = sum(r.pay.map((x) => x.a)), pB = sum(r.pay.map((x) => x.b));
       const payName = (k) => ((t) => t.length <= 3 ? t.toUpperCase() : t.replace(/\b\w/g, (m) => m.toUpperCase()))(k.slice(4).replace(/_/g, " "));
       const M = (k, s) => (r.m[k] || {})[s] || 0;
@@ -1645,6 +1680,68 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       out.appendChild(more);
     }
     out.appendChild(E("p", { class: "note", text: "Sales are Total inc VAT inc D030 (including tobacco). Totals count only stores with figures in both periods. Press Generate report for a written summary you can download as a PDF or copy into Claude." }));
+  }
+  function storeTotal(r) {
+    const A = r.TA, B = r.TB, td = (t, c) => E("td", { class: "num " + (c || ""), text: t });
+    const lab = E("td", { text: "Total · " + r.lfl.length + " store" + (r.lfl.length === 1 ? "" : "s") + " in both periods" });
+    const c1 = ch(A.s, B.s * r.k);
+    if (r.gid) return E("tr", { class: "tot" }, [lab, td(eur(A.s)), td(eur(B.s)), td(pct(c1), cls(c1)), td(signEur(A.s - B.s * r.k)), td(A.t ? pct(ch(A.st, A.t)) : "–", A.t ? cls(ch(A.st, A.t)) : ""), td(share(A.x ? A.s / A.x : null)), td(share(B.x ? B.s / B.x : null))]);
+    return E("tr", { class: "tot" }, [lab, td(eur(A.s)), td(eur(B.s)), td(pct(c1), cls(c1)), td(signEur(A.s - B.s * r.k)), td(pct(vT(A)), cls(vT(A))), td(pct(ch(A.c, B.c * r.k)), cls(ch(A.c, B.c * r.k))),
+      td(pct(ch(avgBasket(A), avgBasket(B))), cls(ch(avgBasket(A), avgBasket(B)))), td(share(A.s ? A.w / A.s : null)), td(share(B.s ? B.w / B.s : null))]);
+  }
+  // Grouped bars, B then A for each label (like Keith's compare charts)
+  const COL_A = "#EC1B24", COL_B = "#A9B7C2";
+  const shortStore = (n) => (n || "").replace(/^(InterSPAR|EuroSPAR|SPAR|ARD)\s+/i, "");
+  function barsAB(r, title, labels, va, vb, fmt, note, half) {
+    const n = labels.length, signed = va.concat(vb).some((v) => v < 0);
+    const vals = va.concat(vb).filter((v) => v != null && isFinite(v));
+    let hi = Math.max(0, ...vals), lo = signed ? Math.min(0, ...vals) : 0; if (hi === lo) hi = lo + 1;
+    { const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw) || raw;
+      hi = Math.ceil(hi / st) * st; lo = Math.floor(lo / st) * st; if (hi === lo) hi = lo + st; }
+    const rot = n > (half ? 6 : 12), Wd = Math.max(half ? 560 : 1100, n * 64 + 70), Ht = rot ? 290 : 260, L = 64, Bt = rot ? 74 : 30, T = 12;
+    const gw = (Wd - L - 10) / n, bw = Math.min(28, gw * 0.36);
+    const y = (v) => T + (hi - v) / (hi - lo) * (Ht - Bt - T);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", title);
+    svg.style.cssText = "width:100%;height:auto;min-width:" + (Wd > (half ? 560 : 1100) ? Wd : 0) + "px";
+    const mk = (tag, a, txt) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; svg.appendChild(nd); return nd; };
+    const nT = Math.max(2, Math.min(8, Math.round((hi - lo) / ((hi - lo) / 4)))); for (let i = 0; i <= nT; i++) { const v = lo + (hi - lo) * i / nT; mk("line", { x1: L, x2: Wd - 10, y1: y(v), y2: y(v), stroke: "#E9EBEA" }); mk("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, fmt(v, true)); }
+    if (lo < 0) mk("line", { x1: L, x2: Wd - 10, y1: y(0), y2: y(0), stroke: "#60727a", "stroke-width": 1.2 });
+    labels.forEach((lb, i) => {
+      const cx = L + (i + 0.5) * gw;
+      [[vb[i], COL_B, -1, "B"], [va[i], COL_A, 1, "A"]].forEach(([v, col, side, nm]) => {
+        if (v == null || !isFinite(v)) return;
+        const x0 = side < 0 ? cx - bw - 1 : cx + 1, y0 = Math.min(y(v), y(0)), h = Math.max(1, Math.abs(y(v) - y(0)));
+        const rc = mk("rect", { x: x0, y: y0, width: bw, height: h, rx: 3, fill: col });
+        const tt = document.createElementNS(ns, "title"); tt.textContent = lb + " · " + nm + ": " + fmt(v); rc.appendChild(tt);
+      });
+      if (rot) mk("text", { x: cx, y: Ht - Bt + 14, "text-anchor": "end", "font-size": 11, fill: "#60727a", transform: "rotate(-35 " + cx + " " + (Ht - Bt + 14) + ")" }, lb);
+      else mk("text", { x: cx, y: Ht - 10, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, lb);
+    });
+    return E("div", { class: "card panel cmpchart" }, [E("h3", { text: title }),
+      E("div", { class: "legend", style: "margin:0 0 8px" }, [E("span", null, [E("i", { style: "background:" + COL_B }), "B · " + rangeTxt(r.B)]), E("span", null, [E("i", { style: "background:" + COL_A }), "A · " + rangeTxt(r.A)])]),
+      E("div", { style: "overflow-x:auto" }, [svg]), note ? E("p", { class: "note", style: "margin:6px 0 0", text: note }) : null]);
+  }
+  const eurAxis = (v, ax) => ax && Math.abs(v) >= 1000 ? "€" + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "m" : Math.round(v / 1000) + "k") : eur(v);
+  const pctAxis = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toFixed(Math.abs(v) < 0.1 && v !== 0 ? 1 : 0) + "%";
+  function cmpCharts(r, print) {
+    const out = [], A = r.byDay.a, B = r.byDay.b, n = Math.max(A.length, B.length);
+    if (n > 1) {
+      const lab = Array.from({ length: n }, (_, i) => A[i] ? dayLabel(A[i].d).replace(/^(\w+) (\d+).*$/, "$1 $2") : "Day " + (i + 1));
+      out.push(barsAB(r, r.g ? r.g.name + " sales by day" : "Sales by day", lab, A.map((x) => x.o ? x.o.s : null).concat(Array(n - A.length).fill(null)), B.map((x) => x.o ? x.o.s : null).concat(Array(n - B.length).fill(null)), eurAxis,
+        "Day 1 of A next to day 1 of B, and so on. Labels show A's dates.", print));
+    }
+    const st = r.lfl.slice().sort((p, q) => q.a.s - p.a.s);
+    if (st.length > 1) {
+      const lab = st.map((x) => shortStore(x.name));
+      const tg = (o) => r.gid ? (o.t ? ch(o.st, o.t) : null) : (o.t ? vT(o) : null);
+      const hasT = st.some((x) => tg(x.a) != null || tg(x.b) != null), half = print || (hasT && st.length <= 8);
+      const two = E("div", { class: "grid-2" }, [barsAB(r, r.g ? r.g.name + " sales by store" : "Sales by store", lab, st.map((x) => x.a.s), st.map((x) => x.b.s), eurAxis, null, half)]);
+      if (hasT) two.appendChild(barsAB(r, "Above or below target", lab, st.map((x) => tg(x.a)), st.map((x) => tg(x.b)), pctAxis, null, half));
+      if (!half) two.style.gridTemplateColumns = "1fr";
+      out.push(two);
+    }
+    return out;
   }
   function moversOf(r) {
     const m = r.cats.map((y) => ({ ...y, diff: y.a - y.b * r.k }));
@@ -1829,6 +1926,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       if (s.bullets.length) box.appendChild(E("ul", null, s.bullets.map((b) => E("li", { text: b }))));
       if (s.tbl) box.appendChild(E("table", null, [E("thead", null, [E("tr", null, s.tbl.head.map((h, i) => E("th", { class: i && !(s.title === "Stores" && i === 1) && !(s.title.indexOf("Items") === 0 && i === 1) ? "num" : "", text: h })))]),
         E("tbody", null, s.tbl.rows.map((row) => E("tr", null, row.map((v, i) => E("td", { class: i && !(s.title === "Stores" && i === 1) && !(s.title.indexOf("Items") === 0 && i === 1) ? "num" : "", text: v })))))]));
+      if (s.title === "Headline") cmpCharts(r, true).forEach((nd) => box.appendChild(nd));
     });
     // for Claude
     const md = ["I run SPAR Malta's stores. Below is a comparison of two trading periods from our Sales Tracker (sales inc VAT including tobacco). " +

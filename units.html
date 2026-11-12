@@ -20,6 +20,8 @@
 .up{color:var(--gd)} .down{color:var(--red)}
 td.up,td.down{font-weight:700}
 tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+@media print{.tablewrap{max-height:none!important;overflow:visible}}
 .zero{color:var(--red);font-weight:700}
 .muted{color:#A4ADB0}
 .search{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -119,6 +121,23 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
 <script type="module">
   const $ = (id) => document.getElementById(id);
+
+  // ── Tables: 6 rows on show, then scroll. The header stays at the top and the total row at the bottom ──
+  const ROWS_SHOWN = 6;
+  function fitTables() {
+    document.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.querySelectorAll(":scope > tbody > tr")];
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot"));
+      if (rows.length <= ROWS_SHOWN) { w.style.maxHeight = "none"; return; }
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, ROWS_SHOWN).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0;
+  const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  addEventListener("resize", fitSoon);
   const E = SPARUI.el;
   const me = await SPAR.ready;
   const fb = await SPAR.firebase();
@@ -645,6 +664,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     for (let h = 0; h < 24; h++) { if (!C[h] && !P[h]) continue;
       tb.appendChild(E("tr", null, [E("td", { text: hh(h) + " – " + pad(h) + ":59" }), E("td", { class: "num", style: "font-weight:700", text: num(Math.round(C[h])) }), E("td", { class: "num", text: P[h] ? num(Math.round(P[h])) : "–" }),
         E("td", { class: "num " + (P[h] ? (CL[h] >= P[h] ? "up" : "down") : ""), text: P[h] ? pct(CL[h] / P[h] - 1) : "–" }), E("td", { class: "num", text: tC ? (C[h] / tC * 100).toFixed(1) + "%" : "–" })])); }
+    tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Whole day" }), E("td", { class: "num", text: num(Math.round(tC)) }), E("td", { class: "num", text: tP ? num(Math.round(tP)) : "–" }),
+      E("td", { class: "num " + (tP ? (tCL >= tP ? "up" : "down") : ""), text: tP ? pct(tCL / tP - 1) : "–" }), E("td", { class: "num", text: tC ? "100%" : "–" })]));
     box.appendChild(E("div", { class: "tablewrap", style: "margin-top:12px" }, [E("table", null, [E("thead", null, [E("tr", null, ["Hour", "Units", "Last week", "Change", "Share of the day"].map((x, i) => E("th", { class: i ? "num" : "", text: x })))]), tb])]));
 
     // Sold out early? (one store, one day)
