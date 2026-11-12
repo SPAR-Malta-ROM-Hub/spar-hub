@@ -580,66 +580,75 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const seq = ++dpSeq;
     $("dpMain").innerHTML = ""; $("dpMain").appendChild(E("p", { class: "note", text: "Loading " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…" }));
     $("dpMore").innerHTML = "";
-    const docs = (await Promise.all(codes.map((c) => getDetail(c, w)))).filter(Boolean);
+    const prevW = addDays(w, -7);
+    const pairs = (await Promise.all(codes.map(async (c) => ({ c, d: await getDetail(c, w), p: await getDetail(c, prevW) })))).filter((x) => x.d);
     if (seq !== dpSeq) return;
     $("dpMain").innerHTML = "";
-    if (!docs.length) { $("dpMain").appendChild(E("p", { class: "empty", text: "No report for this week." })); return; }
+    if (!pairs.length) { $("dpMain").appendChild(E("p", { class: "empty", text: "No report for this week." })); return; }
+    const docs = pairs.map((x) => x.d);
     const idxs = docs.map((d) => d.has.map((v, i) => v ? i : -1).filter((i) => i >= 0));
     const nDays = Math.max(...idxs.map((x) => x.length));
     const full = idxs.every((x) => x.length === 7);
     const S2 = (arr, i) => arr ? sum(idxs[i].map((j) => arr[j] || 0)) : 0;
     const M = (k) => sum(docs.map((d, i) => S2(d.m[k], i)));
-    // departments (sum across stores)
-    const dep = {}, cat = {};
-    docs.forEach((d, i) => {
-      d.depts.forEach((x) => { const o = dep[x.c] || (dep[x.c] = { c: x.c, n: x.n, s: 0, ly: 0 }); o.s += S2(x.d, i); o.ly += x.ly || 0; });
-      d.cats.forEach((x) => { const o = cat[x.p + "|" + x.c] || (cat[x.p + "|" + x.c] = { c: x.c, n: x.n, p: x.p, s: 0, ly: 0 }); o.s += S2(x.d, i); o.ly += x.ly || 0; });
-    });
-    // Tobacco & Related Products (D030) from its own blocks
-    const TK = "tobacco_related_products_incl_vat", TKY = "tobacco_related_products_prev_year_incl_vat";
     const allDays = (arr) => sum(arr || []);
-    if (docs.some((d) => d.m[TK])) {
-      const o = dep.D030 || (dep.D030 = { c: "D030", n: "Tobacco & Related Products", s: 0, ly: 0 });
-      docs.forEach((d, i) => {
-        o.s += S2(d.m[TK], i); o.ly += allDays(d.m[TKY]);
+    const TK = "tobacco_related_products_incl_vat", TKY = "tobacco_related_products_prev_year_incl_vat";
+    // Lines keyed by code. s = sales so far, ly = last year's whole week,
+    // lw = the previous week's sales on the same days, sLW = this week's sales where the previous week is there to compare
+    const dep = {}, cat = {};
+    const line = (map, key, base) => map[key] || (map[key] = { ...base, s: 0, ly: 0, lw: 0, sLW: 0 });
+    pairs.forEach(({ d, p }, i) => {
+      const prevD = p ? Object.fromEntries((p.depts || []).map((x) => [x.c, x.d])) : null;
+      const prevC = p ? Object.fromEntries((p.cats || []).map((x) => [x.p + "|" + x.c, x.d])) : null;
+      d.depts.forEach((x) => { const o = line(dep, x.c, { c: x.c, n: x.n }); const v = S2(x.d, i); o.s += v; o.ly += x.ly || 0; if (prevD) { o.lw += S2(prevD[x.c], i); o.sLW += v; } });
+      d.cats.forEach((x) => { const k = x.p + "|" + x.c, o = line(cat, k, { c: x.c, n: x.n, p: x.p }); const v = S2(x.d, i); o.s += v; o.ly += x.ly || 0; if (prevC) { o.lw += S2(prevC[k], i); o.sLW += v; } });
+      // Tobacco & Related Products (D030) comes in its own blocks
+      if (d.m[TK]) {
+        const o = line(dep, "D030", { c: "D030", n: "Tobacco & Related Products" }); const v = S2(d.m[TK], i);
+        o.s += v; o.ly += allDays(d.m[TKY]); if (p && p.m) { o.lw += S2(p.m[TK], i); o.sLW += v; }
         const lyCats = Object.fromEntries(((d.tob || {})[TKY] || []).map((y) => [y.c, allDays(y.d)]));
-        ((d.tob || {})[TK] || []).forEach((y) => { const c = cat["D030|" + y.c] || (cat["D030|" + y.c] = { c: y.c, n: y.n, p: "D030", s: 0, ly: 0 }); c.s += S2(y.d, i); c.ly += lyCats[y.c] || 0; });
-      });
-    }
-    const total = sum(Object.values(dep).map((x) => x.s));
+        const lwCats = p ? Object.fromEntries(((p.tob || {})[TK] || []).map((y) => [y.c, y.d])) : null;
+        ((d.tob || {})[TK] || []).forEach((y) => { const c = line(cat, "D030|" + y.c, { c: y.c, n: y.n, p: "D030" }); const cv = S2(y.d, i); c.s += cv; c.ly += lyCats[y.c] || 0; if (lwCats) { c.lw += S2(lwCats[y.c], i); c.sLW += cv; } });
+      }
+    });
+    // waste by department
+    const wd = {}; docs.forEach((d, i) => Object.keys(d.waste || {}).forEach((k) => { wd[k] = (wd[k] || 0) + S2(d.waste[k], i); }));
     const list = Object.values(dep).filter((x) => x.s || x.ly).sort((a, b) => b.s - a.s);
+    const total = sum(list.map((x) => x.s)), totLY = sum(list.map((x) => x.ly)), totLW = sum(list.map((x) => x.lw)), totSLW = sum(list.map((x) => x.sLW));
+    const pts = (a, b) => a == null || b == null ? null : (a - b) * 100;
+    const ptsTxt = (v) => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + " pts";
+    const lwTxt = (o) => o.lw ? pct(ch(o.sLW, o.lw)) + " (" + (o.sLW - o.lw >= 0 ? "+" : "−") + eur(Math.abs(o.sLW - o.lw)) + ")" : "–";
+    const lyCell = (o) => full ? E("td", { class: "num " + cls(ch(o.s, o.ly)), text: pct(ch(o.s, o.ly)) }) : E("td", { class: "num note", text: o.ly ? "after Sun" : "–" });
+    const row = (o, shTot, shLyTot, cls0, w) => {
+      const sh = shTot ? o.s / shTot : null, shLy = shLyTot && o.ly ? o.ly / shLyTot : null, dp = pts(sh, shLy);
+      return E("tr", { class: cls0 }, [E("td", { text: o.n }), E("td", { class: "num", text: eur(o.s) }), E("td", { class: "num", text: share(sh) }), E("td", { class: "num", text: share(shLy) }),
+        E("td", { class: "num " + (dp == null ? "" : dp > 0.05 ? "up" : dp < -0.05 ? "down" : ""), text: ptsTxt(dp) }),
+        E("td", { class: "num " + (o.lw ? cls(ch(o.sLW, o.lw)) : ""), text: lwTxt(o) }), lyCell(o),
+        E("td", { class: "num", text: w == null ? "–" : eur(w) }), E("td", { class: "num " + (w != null && o.s && w / o.s > WASTE_ALERT ? "down" : ""), text: w == null ? "–" : share(o.s ? w / o.s : null) })]);
+    };
     const tb = E("tbody");
     list.forEach((x) => {
       const cats = Object.values(cat).filter((y) => y.p === x.c && (y.s || y.ly)).sort((a, b) => b.s - a.s);
-      const tr = E("tr", { class: cats.length ? "exp" + (openDept.has(x.c) ? " open" : "") : "" }, [
-        E("td", { text: x.n }), E("td", { class: "num", text: eur(x.s) }), E("td", { class: "num", text: share(total ? x.s / total : null) }),
-        E("td", { class: "num", text: eur(x.ly) }), E("td", { class: "num " + (full ? cls(ch(x.s, x.ly)) : ""), text: full ? pct(ch(x.s, x.ly)) : "–" })]);
+      const tr = row(x, total, totLY, cats.length ? "exp" + (openDept.has(x.c) ? " open" : "") : "", wd[x.c.toLowerCase()] != null ? wd[x.c.toLowerCase()] : 0);
       if (cats.length) tr.onclick = () => { openDept.has(x.c) ? openDept.delete(x.c) : openDept.add(x.c); renderDepts(w, codes); };
       tb.appendChild(tr);
-      if (openDept.has(x.c)) cats.forEach((y) => tb.appendChild(E("tr", { class: "cat" }, [E("td", { text: y.n }), E("td", { class: "num", text: eur(y.s) }),
-        E("td", { class: "num", text: share(x.s ? y.s / x.s : null) }), E("td", { class: "num", text: eur(y.ly) }),
-        E("td", { class: "num " + (full ? cls(ch(y.s, y.ly)) : ""), text: full ? pct(ch(y.s, y.ly)) : "–" })])));
+      if (openDept.has(x.c)) cats.forEach((y) => tb.appendChild(row(y, x.s, x.ly, "cat", null)));
     });
-    tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total (inc VAT inc D030)" }), E("td", { class: "num", text: eur(total) }), E("td", { class: "num", text: "100%" }),
-      E("td", { class: "num", text: eur(sum(list.map((x) => x.ly))) }), E("td", { class: "num " + (full ? cls(ch(total, sum(list.map((x) => x.ly)))) : ""), text: full ? pct(ch(total, sum(list.map((x) => x.ly)))) : "–" })]));
-    const scopeName = codes.length === 1 ? (byCode[codes[0]] || {}).name : scope().label;
-    $("dpMain").append(E("h2", { text: "Departments · " + scopeName }),
-      E("p", { class: "note", style: "margin:-6px 0 12px", text: (full ? "Full week." : nDays + " day" + (nDays === 1 ? "" : "s") + " so far: the report only gives last year for the whole week, so “vs last year” appears once the week is complete.") + " Click a department to see its categories." + (docs.length < codes.length ? " " + (codes.length - docs.length) + " store(s) have no report this week." : "") }),
-      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Department", "Sales", "Share", "Last year (week)", "vs LY"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]));
-
-    // waste, tobacco, payments, night trade
-    const wd = {}; docs.forEach((d, i) => Object.keys(d.waste || {}).forEach((k) => { wd[k] = (wd[k] || 0) + S2(d.waste[k], i); }));
-    const wName = Object.fromEntries(list.map((x) => [x.c.toLowerCase(), x]));
-    const wRows = Object.keys(wd).filter((k) => wd[k]).sort((a, b) => wd[b] - wd[a]);
     const wTot = M("total_waste");
+    const T = { n: "Total (inc VAT inc D030)", s: total, ly: totLY, lw: totLW, sLW: totSLW };
+    const trT = row(T, total, totLY, "tot", wTot); trT.children[3].textContent = "100%"; trT.children[4].textContent = "";
+    tb.appendChild(trT);
+    const scopeName = codes.length === 1 ? (byCode[codes[0]] || {}).name : scope().label;
+    const noPrev = pairs.filter((x) => !x.p).length;
+    $("dpMain").append(E("h2", { text: "Departments · " + scopeName }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: "Click a department to see its categories. Share is the department's part of total sales; comparing it with last year's share (Share LY, from last year's full week) shows what customers are buying more or less of, and works mid-week. “vs last wk” compares the same days of the previous week's report. “vs LY” needs the full week, because the report gives last year as a weekly total. Categories show their share of their department." +
+        (full ? "" : " " + nDays + " day" + (nDays === 1 ? "" : "s") + " so far.") + (pairs.length < codes.length ? " " + (codes.length - pairs.length) + " store(s) have no report this week." : "") + (noPrev ? " " + noPrev + " store(s) have no report for the previous week, so they're left out of “vs last wk”." : "") }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Department", "Sales", "Share", "Share LY", "Share change", "vs last wk", "vs LY", "Waste", "Waste %"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]),
+      E("p", { class: "note", style: "margin:8px 0 0", text: "Total waste " + eur2(wTot) + " (" + share(total ? wTot / total : null) + " of sales) · stock adjustments " + eur2(M("stock_adjustments")) + "." }));
+
     const card = (title, rows, headers, note) => E("div", { class: "card panel" }, [E("h3", { text: title }),
       rows.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, headers.map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), E("tbody", null, rows)])]) : E("p", { class: "note", text: "Nothing this week." }),
       note ? E("p", { class: "note", style: "margin:8px 0 0", text: note }) : null]);
-    $("dpMore").appendChild(card("Waste by department", wRows.map((k) => {
-      const d = wName[k]; return E("tr", null, [E("td", { text: d ? d.n : k.toUpperCase() }), E("td", { class: "num", text: eur2(wd[k]) }),
-        E("td", { class: "num " + (d && d.s && wd[k] / d.s > WASTE_ALERT ? "down" : ""), text: share(d && d.s ? wd[k] / d.s : null) })]);
-    }).concat(wRows.length ? [E("tr", { class: "tot" }, [E("td", { text: "Total waste" }), E("td", { class: "num", text: eur2(wTot) }), E("td", { class: "num", text: share(total ? wTot / total : null) })])] : []),
-      ["Department", "Waste", "% of its sales"], "Stock adjustments this week: " + eur2(M("stock_adjustments")) + "."));
 
     const tob = M("tobacco_related_products_incl_vat"), tobLW = M("tobacco_related_products_prev_week_incl_vat"), tobLY = M("tobacco_related_products_prev_year_incl_vat");
     const pays = {}; docs.forEach((d, i) => Object.keys(d.m).filter((k) => k.indexOf("pay_") === 0).forEach((k) => { pays[k] = (pays[k] || 0) + S2(d.m[k], i); }));
