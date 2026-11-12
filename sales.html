@@ -142,6 +142,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   <!-- ═════════ TRENDS ═════════ -->
   <section data-pane="trends" hidden>
     <div class="card panel" style="margin-top:0" id="trYear"></div>
+    <div class="grid-2" id="trDaily" style="margin-top:16px"></div>
     <div class="card panel" id="trMain"></div>
     <div class="card panel" id="trDow"></div>
   </section>
@@ -1324,6 +1325,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
   async function renderYear(codes, gid) {
     const box = $("trYear"), seq = ++yrSeq;
+    $("trDaily").innerHTML = "";
     const g = gid ? groupOf(gid) || { name: gid } : null;
     box.innerHTML = "";
     const tg = gid ? hasTargets(gid) : true;
@@ -1335,6 +1337,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     box.appendChild(body);
     await loadWeeksC(codes, gid, P);
     if (seq !== yrSeq) return;
+    renderDaily(codes, gid, last);
     const wks = weeksIn(P);
     const rows = wks.map((wk) => {
       let o = null, ly = 0, lyOk = true, days = 0;
@@ -1449,6 +1452,56 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (partial) tail.push("Wk " + isoWeek(rows[n - 1].wk) + " is the week so far (" + rows[n - 1].days + " of 7 days): the hollow dot.");
     if (note) tail.push(note);
     if (tail.length) body.appendChild(E("p", { class: "note", style: "margin:6px 0 0", text: tail.join(" ") }));
+  }
+
+  // ── Last 6 weeks day by day + day-of-week pattern (like Keith's) ──
+  function renderDaily(codes, gid, last) {
+    const host = $("trDaily"); host.innerHTML = "";
+    const tg = gid ? hasTargets(gid) : true;
+    const dayFig = (d) => { let o = null; codes.forEach((c) => { const x = gid ? (((CG[gid] || {})[c] || {})[mondayOf(d)]) : ((CS[c] || {})[mondayOf(d)]); const i = dowIdx(d); if (x && x.has && x.has[i]) o = gid ? gAdd(o, gAgg(x, [i], gid, c)) : add(o, agg(x, [i])); }); return o; };
+    // 1) day by day, 42 days to the latest day with figures; 7-day average needs the 6 days before
+    const from = addDays(last, -41), F = [];
+    for (let d = addDays(from, -6); d <= last; d = addDays(d, 1)) { const o = dayFig(d); F.push({ d, s: o ? o.s : null, t: o && tg ? (o.t || null) : null }); }
+    const days = F.slice(6).map((x, k) => { const win = F.slice(k, k + 7).filter((y) => y.s != null); return { ...x, avg: win.length === 7 ? sum(win.map((y) => y.s)) / 7 : null }; });
+    const card1 = E("div", { class: "card panel", style: "margin:0" }, [E("h3", { style: "margin:0 0 4px", text: (gid ? (groupOf(gid) || {}).name + " · " : "") + "Last 6 weeks, day by day" }),
+      E("p", { class: "note", style: "margin:0 0 8px", text: "Bars are each day; the line is the 7-day average, which smooths out weekday swings so the direction is easier to see." })]);
+    const vals = days.flatMap((x) => [x.s, x.avg, x.t]).filter((v) => v != null);
+    if (!vals.length) card1.appendChild(E("p", { class: "note", text: "No daily figures in the last 6 weeks." }));
+    else {
+      const sc = niceScale(0, Math.max(...vals)), Wd = 560, Ht = 280, L = 56, R = 26, T = 10, Bt = 30, n = days.length;
+      const gw = (Wd - L - R) / n, bw = Math.max(2, gw * 0.7), x = (i) => L + (i + 0.5) * gw, y = (v) => T + (sc.hi - v) / (sc.hi - sc.lo) * (Ht - T - Bt);
+      const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Sales day by day, last 6 weeks");
+      const mk = (tag, a, txt) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; svg.appendChild(nd); return nd; };
+      for (let v = sc.lo; v <= sc.hi + sc.st / 2; v += sc.st) { mk("line", { x1: L, x2: Wd - R, y1: y(v), y2: y(v), stroke: "#E9EBEA" }); mk("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 10.5, fill: "#60727a" }, eurAxis(v, true)); }
+      days.forEach((dd, i) => {
+        if (dd.s != null) { const rc = mk("rect", { x: x(i) - bw / 2, y: y(dd.s), width: bw, height: Math.max(0, y(0) - y(dd.s)), rx: 1.5, fill: "#C3CDD3" });
+          const tt = document.createElementNS(ns, "title"); tt.textContent = dayLabel(dd.d) + ": " + eur(dd.s) + (dd.t ? " · target " + eur(dd.t) + " (" + pct(ch(dd.s, dd.t)) + ")" : "") + (dd.avg ? " · 7-day average " + eur(dd.avg) : ""); rc.appendChild(tt); }
+        if ((n - 1 - i) % 6 === 0) mk("text", { x: x(i), y: Ht - 9, "text-anchor": "middle", "font-size": 10.5, fill: "#60727a" }, dayLabel(dd.d).replace(/^(\w\w)\w*/, "$1"));
+      });
+      const line = (key, attrs) => { let d = "", pen = false; days.forEach((dd, i) => { const v = dd[key]; if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; }); if (d) mk("path", { d, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round", ...attrs }); };
+      if (tg) line("t", { stroke: "#10252b", "stroke-width": 1.6, "stroke-dasharray": "4 4" });
+      line("avg", { stroke: "#EC1B24", "stroke-width": 3 });
+      const li = days.map((dd, i) => dd.avg != null ? i : -1).filter((i) => i >= 0).pop();
+      if (li != null) mk("circle", { cx: x(li), cy: y(days[li].avg), r: 4.5, fill: "#EC1B24" });
+      card1.append(E("div", { class: "legend", style: "margin:0 0 6px" }, [E("span", null, [E("i", { style: "background:#C3CDD3" }), "Each day"]), E("span", null, [E("i", { style: "background:#EC1B24;height:3px;vertical-align:3px" }), "7-day average"]),
+        ...(tg ? [E("span", null, [E("i", { style: "background:repeating-linear-gradient(90deg,#10252b 0 4px,transparent 4px 8px);height:2px;vertical-align:3px" }), "Target"])] : [])]), svg);
+      const lastAvg = days[li], prevAvg = li >= 7 ? days[li - 7] : null;
+      if (lastAvg && prevAvg && prevAvg.avg) card1.appendChild(E("p", { class: "note", style: "margin:6px 0 0", text: "7-day average " + eur(lastAvg.avg) + " a day, " + pct(ch(lastAvg.avg, prevAvg.avg)) + " on a week earlier. Hover a bar for that day's figures." }));
+    }
+    // 2) day-of-week pattern: the last 8 full weeks against the 8 weeks before
+    const lastFull = addDays(mondayOf(addDays(last, 1)), -7);          // Monday of the latest complete week
+    const wA = Array.from({ length: 8 }, (_, k) => addDays(lastFull, -7 * k)), wB = Array.from({ length: 8 }, (_, k) => addDays(lastFull, -7 * (k + 8)));
+    const avgDow = (ws) => Array.from({ length: 7 }, (_, i) => { const v = ws.map((w) => dayFig(addDays(w, i))).filter(Boolean).map((o) => o.s); return v.length ? sum(v) / v.length : null; });
+    const a = avgDow(wA), b = avgDow(wB);
+    const r = { labA: "Last 8 full weeks (" + short(wA[7]) + " – " + short(addDays(wA[0], 6)) + ")", labB: "8 weeks before" };
+    if (a.some((v) => v != null)) {
+      const best = a.indexOf(Math.max(...a.filter((v) => v != null)));
+      const c2 = barsAB(r, (gid ? (groupOf(gid) || {}).name + " · " : "") + "Day-of-week pattern", ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], a, b, eurAxis,
+        "Average sales per weekday. Useful for rosters and ordering." + (best >= 0 ? " Busiest day lately: " + ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][best] + "." : "") + (b.every((v) => v == null) ? " The 8 weeks before aren't in the tracker yet." : ""), true);
+      c2.style.margin = "0";
+      host.append(card1, c2);
+    } else host.append(card1, E("div", { class: "card panel", style: "margin:0" }, [E("h3", { text: "Day-of-week pattern" }), E("p", { class: "note", text: "Needs at least one full week of figures." })]));
   }
   // units per trading hour, week by week, from the hourly unit files
   async function yearUnits(codes, gid, wks) {
@@ -1856,7 +1909,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     let hi = Math.max(0, ...vals), lo = signed ? Math.min(0, ...vals) : 0; if (hi === lo) hi = lo + 1;
     { const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw) || raw;
       hi = Math.ceil(hi / st) * st; lo = Math.floor(lo / st) * st; if (hi === lo) hi = lo + st; }
-    const rot = n > (half ? 6 : 12), Wd = Math.max(half ? 560 : 1100, n * 64 + 70), Ht = rot ? 290 : 260, L = 64, Bt = rot ? 74 : 30, T = 12;
+    const Wd = Math.max(half ? 560 : 1100, n * 64 + 70), rot = n * Math.max(...labels.map((l) => String(l).length)) * 6.6 > Wd - 80, Ht = rot ? 290 : 260, L = 64, Bt = rot ? 74 : 30, T = 12;
     const gw = (Wd - L - 10) / n, bw = Math.min(28, gw * 0.36);
     const y = (v) => T + (hi - v) / (hi - lo) * (Ht - Bt - T);
     const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
@@ -1877,7 +1930,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       else mk("text", { x: cx, y: Ht - 10, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, lb);
     });
     return E("div", { class: "card panel cmpchart" }, [E("h3", { text: title }),
-      E("div", { class: "legend", style: "margin:0 0 8px" }, [E("span", null, [E("i", { style: "background:" + COL_B }), "B · " + rangeTxt(r.B)]), E("span", null, [E("i", { style: "background:" + COL_A }), "A · " + rangeTxt(r.A)])]),
+      E("div", { class: "legend", style: "margin:0 0 8px" }, [E("span", null, [E("i", { style: "background:" + COL_B }), r.labB || "B · " + rangeTxt(r.B)]), E("span", null, [E("i", { style: "background:" + COL_A }), r.labA || "A · " + rangeTxt(r.A)])]),
       E("div", { style: "overflow-x:auto" }, [svg]), note ? E("p", { class: "note", style: "margin:6px 0 0", text: note }) : null]);
   }
   const eurAxis = (v, ax) => ax && Math.abs(v) >= 1000 ? "€" + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1).replace(".0", "") + "m" : (v % 1000 ? (v / 1000).toFixed(1) : v / 1000) + "k") : eur(v);
