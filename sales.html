@@ -1681,7 +1681,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     // a period still running is compared over the same number of days (e.g. this week so far vs the same days last week)
     if (cmpType !== "any") {
       let L = ""; daysIn(A).forEach((d) => { if (anyOn(d)) L = d; });
-      if (!L) return { empty: true, A, B };
+      if (!L) return { empty: true, A, B, none: "A", codes, gid, g, notes, U: await unitsCompare(codes, gid, A, B) };
       if (L < A.to) {
         const n = daysIn({ from: A.from, to: L }).length; A.to = L;
         const bTo = addDays(B.from, n - 1); if (bTo < B.to) B.to = bTo;
@@ -1689,7 +1689,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
       }
     }
     const dA = daysIn(A).filter(anyOn), dB = daysIn(B).filter(anyOn);
-    if (!dA.length || !dB.length) return { empty: true, A, B, none: !dA.length ? "A" : "B" };
+    if (!dA.length || !dB.length) return { empty: true, A, B, none: !dA.length ? "A" : "B", codes, gid, g, notes, U: await unitsCompare(codes, gid, A, B) };
     const lenA = daysIn(A).length, lenB = daysIn(B).length;
     if (dA.length < lenA) notes.push("A has no figures for " + (lenA - dA.length) + " of its " + lenA + " days.");
     if (dB.length < lenB) notes.push("B has no figures for " + (lenB - dB.length) + " of its " + lenB + " days.");
@@ -1707,7 +1707,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (oneSide.length) notes.push(oneSide.length + " store" + (oneSide.length === 1 ? " has" : "s have") + " figures for one period only and " + (oneSide.length === 1 ? "is" : "are") + " left out of the totals: " + oneSide.map((r) => r.name + " (" + (r.a ? "A" : "B") + " only)").join(", ") + ".");
     const gaps = lfl.filter((r) => r.missA || r.missB);
     if (gaps.length) notes.push("Missing days: " + gaps.slice(0, 8).map((r) => r.name + " (" + [r.missA ? r.missA + " in A" : "", r.missB ? r.missB + " in B" : ""].filter(Boolean).join(", ") + ")").join("; ") + (gaps.length > 8 ? " and " + (gaps.length - 8) + " more" : "") + ". Check the Missing weeks list for which daily emails to upload.");
-    if (!lfl.length) return { empty: true, A, B, notes, none: "both" };
+    if (!lfl.length) return { empty: true, A, B, notes, none: "both", codes, gid, g, U: await unitsCompare(codes, gid, A, B) };
     let TA = null, TB = null;
     lfl.forEach((r) => { TA = gid ? gAdd(TA, r.a) : add(TA, r.a); TB = gid ? gAdd(TB, r.b) : add(TB, r.b); });
     const lflCodes = lfl.map((r) => r.c);
@@ -1743,19 +1743,23 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const wastes = Object.values(det.waste).filter((x) => x.a || x.b).map((x) => ({ ...x, n: depName[x.c] || x.c }));
 
     // hourly unit sales
-    const U = await unitsCompare(lflCodes, gid, A, B);
+    const U = await unitsCompare(codes, gid, A, B);
     return { A, B, gid, g, codes, rows, lfl, TA, TB, k, perDay, byDay, lenA: dA.length, lenB: dB.length, deps, cats, wastes, pay: Object.values(det.pay), m: det.m, U, notes, at: Date.now() };
   }
 
   async function unitsCompare(codes, gid, A, B) {
     const metas = await Promise.all(codes.map((c) => uMeta(gid, c)));
     const inP = (P, meta) => Object.keys(meta).filter((d) => d >= P.from && d <= P.to).sort();
-    const st = codes.map((c, i) => ({ c, meta: metas[i], a: inP(A, metas[i]), b: inP(B, metas[i]) })).filter((x) => x.a.length && x.b.length);
-    const anyA = codes.some((c, i) => inP(A, metas[i]).length), anyB = codes.some((c, i) => inP(B, metas[i]).length);
-    if (!st.length) return { none: true, anyA, anyB };
+    const per = codes.map((c, i) => ({ c, meta: metas[i], a: inP(A, metas[i]), b: inP(B, metas[i]) }));
+    let st = per.filter((x) => x.a.length && x.b.length), one = null;
+    const anyA = per.some((x) => x.a.length), anyB = per.some((x) => x.b.length);
+    // hourly files for one period only: still show that period's shape of the day
+    if (!st.length && anyA !== anyB) { one = anyA ? "A" : "B"; st = per.filter((x) => x.a.length || x.b.length); }
+    const allDays = metas.flatMap((m) => Object.keys(m)).sort(), first = allDays[0], lastU = allDays[allDays.length - 1];
+    if (!st.length) { const all = metas.flatMap((m) => Object.keys(m)).sort(); return { none: true, anyA, anyB, first: all[0], last: all[all.length - 1], of: codes.length }; }
     const hA = Array(24).fill(0), hB = Array(24).fill(0); let sdA = 0, sdB = 0;
     const storeWeeks = sum(st.map((x) => new Set(x.a.concat(x.b).map(mondayOf)).size));
-    const doItems = storeWeeks <= 60;
+    const doItems = !one && storeWeeks <= 60;
     const iA = new Map(), iB = new Map();
     await Promise.all(st.flatMap((x) => [["a", x.a], ["b", x.b]].flatMap(([side, days]) => [...new Set(days.map(mondayOf))].map(async (w) => {
       const dd = days.filter((d) => mondayOf(d) === w);
@@ -1776,7 +1780,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         return { code, n: it[0] || code, D: it[1], a, b, diff: a - b * f };
       }).filter((x) => !OUT(x.D));
     }
-    return { stores: st.length, of: codes.length, hA, hB, sdA, sdB, items, doItems, storeWeeks };
+    return { stores: st.length, of: codes.length, hA, hB, sdA, sdB, items, doItems, storeWeeks, one, first, last: lastU };
   }
 
   // ── on screen ──
@@ -1799,7 +1803,11 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const out = $("cmpOut"); out.innerHTML = ""; $("repBox").hidden = true;
     $("cmpWarn").innerHTML = "";
     (r.notes || []).forEach((n) => $("cmpWarn").appendChild(E("li", { text: n })));
-    if (r.empty) { out.appendChild(E("div", { class: "card empty", text: r.none === "B" ? "There are no figures for B (" + rangeTxt(r.B) + ") in this view." : r.none === "both" ? "No store in this view has figures for both periods." : "There are no figures for A (" + rangeTxt(r.A) + ") in this view." })); return; }
+    if (r.empty) {
+      out.appendChild(E("div", { class: "card empty", text: (r.none === "B" ? "There are no sales figures for B (" + rangeTxt(r.B) + ") in this view." : r.none === "both" ? "No store in this view has sales figures for both periods." : "There are no sales figures for A (" + rangeTxt(r.A) + ") in this view.") + (r.U && !r.U.none ? " The hourly unit sales are compared below." : "") }));
+      if (r.U && !r.U.none) { out.appendChild(hoursCard(r)); itemsCard(r, out); }
+      return;
+    }
     $("cmpLabel").textContent = "A: " + rangeTxt(r.A) + "   vs   B: " + rangeTxt(r.B) + "   ·   " + scopeTxt() + (r.lfl.length < r.codes.length ? "   ·   " + r.lfl.length + " of " + r.codes.length + " stores" : "");
     const H = headline(r), gname = r.g ? r.g.name + " " : "";
     const tiles = [cmpTile(gname + "Sales", eur(H.sales[0]), "B " + eur(H.sales[1]) + " · ", chgSpan(H.sales[2], pct(H.sales[2]) + (r.perDay ? " a day" : "")), H.sales[2] < 0 ? "bad" : "good")];
@@ -1857,17 +1865,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     }
     // hours
     out.appendChild(hoursCard(r));
-    // items
-    if (r.U && r.U.items) {
-      const im = itemMovers(r);
-      const col = (title, list, up) => E("div", null, [E("p", { class: "mv-h", text: title }), ...(list.length ? list.map((y) => E("div", { class: "mv" }, [
-        E("div", { class: "mv-n" }, [E("b", { text: y.n, title: y.code + " · " + y.n }), E("span", { text: y.code })]),
-        E("div", { class: "mv-bar" }, [E("i", { style: "width:" + Math.max(3, Math.round(Math.abs(y.diff) / im.max * 100)) + "%;background:" + (up ? "var(--gd)" : "var(--red)") })]),
-        E("div", { class: "mv-v " + (up ? "up" : "down"), text: (y.diff >= 0 ? "+" : "−") + int(Math.abs(y.diff)) + " units · " + int(y.a) + " vs " + int(y.b) })])) : [E("p", { class: "note", text: "None." })])]);
-      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Items · biggest changes in units" }),
-        E("p", { class: "note", style: "margin:-6px 0 12px", text: "From the hourly unit sales, " + r.U.stores + " of " + r.U.of + " stores (those with unit sales in both periods)" + (r.U.sdA !== r.U.sdB ? "; B adjusted to A's number of store-days" : "") + "." }),
-        E("div", { class: "grid-2" }, [col("Selling more", im.ups, true), col("Selling less", im.downs, false)])]));
-    } else if (r.U && !r.U.none && !r.U.doItems) out.appendChild(E("p", { class: "note", text: "Item movers are left out for this many stores and weeks (" + r.U.storeWeeks + " store-weeks) to keep it quick. Choose fewer stores in View to see them." }));
+    itemsCard(r, out);
 
     // waste, payments, night trade (whole store only: the group copies don't carry them)
     if (!r.gid) {
@@ -1965,16 +1963,16 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
   // average units per day by hour for the view
   function hourAvg(r) {
-    const U = r.U; if (!U || U.none || !U.sdA || !U.sdB) return null;
-    const a = U.hA.map((v) => v / U.sdA * U.stores), b = U.hB.map((v) => v / U.sdB * U.stores);
+    const U = r.U; if (!U || U.none || (!U.one && (!U.sdA || !U.sdB)) || (U.one && !(U.one === "A" ? U.sdA : U.sdB))) return null;
+    const a = U.hA.map((v) => U.sdA ? v / U.sdA * U.stores : 0), b = U.hB.map((v) => U.sdB ? v / U.sdB * U.stores : 0);
     const used = a.map((v, h) => v > 0 || b[h] > 0 ? h : -1).filter((h) => h >= 0);
-    return { a, b, from: Math.min(...used), to: Math.max(...used) };
+    return { a, b, from: Math.min(...used), to: Math.max(...used), one: U.one };
   }
   function hoursCard(r) {
     const card = E("div", { class: "card panel" }, [E("h2", { text: "Time of day · units sold per hour" })]);
     const U = r.U, HA = hourAvg(r);
-    if (!HA) { card.appendChild(E("p", { class: "note", text: U && U.none ? (U.anyA || U.anyB ? "Hourly unit sales are only uploaded for " + (U.anyA ? "A" : "B") + ", so time of day can't be compared." : "No hourly unit sales uploaded for these periods yet (Unit Sales → Upload).") : "No hourly figures for these periods." })); return card; }
-    card.appendChild(E("p", { class: "note", style: "margin:-6px 0 12px", text: "Average units per day, " + U.stores + " of " + U.of + " stores (those with hourly files in both periods). Red bars = A, grey dots = B. The busiest hour in A is darker." }));
+    if (!HA) { card.appendChild(E("p", { class: "note", text: unitsMissing(U) })); return card; }
+    card.appendChild(E("p", { class: "note", style: "margin:-6px 0 12px", text: HA.one ? "Hourly unit files only cover " + HA.one + " (" + rangeTxt(HA.one === "A" ? r.A : r.B) + "), so this shows " + HA.one + " on its own: average units per day, " + U.stores + " of " + U.of + " stores. " + HA.one + " is shown as " + (HA.one === "A" ? "red bars" : "grey dots") + ". Hourly files so far cover " + short(U.first) + " – " + short(U.last) + "." : "Average units per day, " + U.stores + " of " + U.of + " stores (those with hourly files in both periods). Red bars = A, grey dots = B. The busiest hour in A is darker." }));
     const hs = []; for (let h = HA.from; h <= HA.to; h++) hs.push(h);
     const max = Math.max(1, ...hs.map((h) => Math.max(HA.a[h], HA.b[h])));
     const Wd = 720, Ht = 220, L = 46, Bt = 26, n = hs.length, bw = Math.min(26, (Wd - L - 10) / n * 0.6);
@@ -1994,6 +1992,24 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     card.appendChild(E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#EC1B24" }), "A"]), E("span", null, [E("i", { style: "background:#fff;border:2px solid #60727a;border-radius:50%" }), "B"]),
       ...parts.map((p) => E("span", { text: p.label + ": " + share(p.a) + " of units (B " + share(p.b) + ")" }))]));
     return card;
+  }
+  function itemsCard(r, out) {
+    if (r.U && r.U.items) {
+      const im = itemMovers(r);
+      const col = (title, list, up) => E("div", null, [E("p", { class: "mv-h", text: title }), ...(list.length ? list.map((y) => E("div", { class: "mv" }, [
+        E("div", { class: "mv-n" }, [E("b", { text: y.n, title: y.code + " · " + y.n }), E("span", { text: y.code })]),
+        E("div", { class: "mv-bar" }, [E("i", { style: "width:" + Math.max(3, Math.round(Math.abs(y.diff) / im.max * 100)) + "%;background:" + (up ? "var(--gd)" : "var(--red)") })]),
+        E("div", { class: "mv-v " + (up ? "up" : "down"), text: (y.diff >= 0 ? "+" : "−") + int(Math.abs(y.diff)) + " units · " + int(y.a) + " vs " + int(y.b) })])) : [E("p", { class: "note", text: "None." })])]);
+      out.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Items · biggest changes in units" }),
+        E("p", { class: "note", style: "margin:-6px 0 12px", text: "From the hourly unit sales, " + r.U.stores + " of " + r.U.of + " stores (those with unit sales in both periods)" + (r.U.sdA !== r.U.sdB ? "; B adjusted to A's number of store-days" : "") + "." }),
+        E("div", { class: "grid-2" }, [col("Selling more", im.ups, true), col("Selling less", im.downs, false)])]));
+    } else if (r.U && !r.U.none && !r.U.doItems) out.appendChild(E("p", { class: "note", text: "Item movers are left out for this many stores and weeks (" + r.U.storeWeeks + " store-weeks) to keep it quick. Choose fewer stores in View to see them." }));
+  }
+  function unitsMissing(U) {
+    if (!U || !U.none) return "No hourly figures for these periods.";
+    const cover = U.first ? " Hourly files uploaded so far for this view cover " + (U.first === U.last ? dayLabel(U.first) : short(U.first) + " – " + short(U.last) + " " + U.last.slice(0, 4)) + "." : "";
+    if (U.anyA || U.anyB) return "Hourly unit files are only uploaded for " + (U.anyA ? "A" : "B") + ", so time of day can't be compared." + cover;
+    return U.first ? "No hourly unit files for these dates." + cover + " Choose dates inside that range, or upload more in Unit Sales → Upload." : "No hourly unit files uploaded for this view yet (Unit Sales → Upload).";
   }
   function dayparts(HA) {
     const tA = sum(HA.a), tB = sum(HA.b);
@@ -2063,7 +2079,14 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 
     // time of day
     const HA = hourAvg(r);
-    if (HA) {
+    if (HA && HA.one) {
+      const side = HA.one === "A" ? HA.a : HA.b, hs = []; for (let h = HA.from; h <= HA.to; h++) hs.push(h);
+      const pk = hs.reduce((p, h) => side[h] > side[p] ? h : p, hs[0]), tot = sum(side);
+      const parts = dayparts({ a: side, b: side });
+      sec("Time of day (hourly unit sales)", ["Hourly unit files only cover " + HA.one + ", so time of day isn't compared; " + HA.one + " on its own:",
+        "Busiest hour " + hh(pk) + "; about " + int(tot) + " units a day.", parts.map((p) => p.label + " " + share(p.a)).join(", ") + " of units."],
+        { head: ["Hour", HA.one + " units/day"], rows: hs.map((h) => [hh(h), side[h] ? int(side[h]) : "0"]) });
+    } else if (HA) {
       const hs = []; for (let h = HA.from; h <= HA.to; h++) hs.push(h);
       const pk = (arr) => hs.reduce((p, h) => arr[h] > arr[p] ? h : p, hs[0]);
       const big = Math.max(...hs.map((h) => HA.a[h]));
@@ -2078,7 +2101,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         mp && Math.abs(cPts(mp.a, mp.b) || 0) >= 1 ? "The day's shape moved most " + mp.label.toLowerCase() + ": " + share(mp.a) + " of units against " + share(mp.b) + "." : "The shape of the day was much the same in both periods.",
         "Based on " + r.U.stores + " of " + r.U.of + " stores with hourly files in both periods."
       ], { head: ["Hour", "A units/day", "B units/day", "Change"], rows: hs.map((h) => [hh(h), int(HA.a[h]) === "–" ? "0" : int(HA.a[h]), int(HA.b[h]) === "–" ? "0" : int(HA.b[h]), pct(ch(HA.a[h], HA.b[h]))]) });
-    } else sec("Time of day (hourly unit sales)", [r.U && r.U.none && (r.U.anyA || r.U.anyB) ? "Hourly unit sales are only uploaded for " + (r.U.anyA ? "A" : "B") + ", so time of day isn't compared." : "No hourly unit sales uploaded for these periods."]);
+    } else sec("Time of day (hourly unit sales)", [unitsMissing(r.U)]);
 
     // items
     if (r.U && r.U.items) {
