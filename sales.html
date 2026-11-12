@@ -53,6 +53,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
 .aread input{width:18px;height:18px;accent-color:var(--gd)}
 .weekhead{margin:18px 0 8px;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .chart{width:100%;height:auto;display:block}
+.kpis.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1100px){.kpis.five{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.kpis.five{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 </style>
@@ -426,11 +429,13 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     let tot = null;
     codes.forEach((c) => { tot = add(tot, agg(S[c] && S[c][w], idxW(S[c] && S[c][w]))); });
     tot = tot || { s: 0, t: 0, lw: 0, ly: 0, c: 0, clw: 0, w: 0 };
-    $("kpis").innerHTML = "";
+    $("kpis").innerHTML = ""; $("kpis").classList.add("five");
     $("kpis").append(
       kpi("Sales week to date", eur(tot.s), subLine("vs target " + eur(tot.t), ch(tot.s, tot.t)), ch(tot.s, tot.t) < 0 ? "bad" : "good"),
       kpi("vs last year", pct(ch(tot.s, tot.ly)), ["Last year " + eur(tot.ly) + " · vs last week ", E("span", { class: cls(ch(tot.s, tot.lw)), text: pct(ch(tot.s, tot.lw)) })], cls(ch(tot.s, tot.ly)) === "down" ? "bad" : "good"),
-      kpi("Customers", int(tot.c), ["Basket " + eur2(tot.c ? tot.s / tot.c : null) + " · ", ...subLine("vs last week", ch(tot.c, tot.clw))]),
+      kpi("Customers", int(tot.c), [...subLine("vs last week", ch(tot.c, tot.clw)), " (" + int(tot.clw) + ")"]),
+      // average basket = sales ÷ customers; last week's from last week's sales and customers
+      kpi("Average basket", eur2(tot.c ? tot.s / tot.c : null), [...subLine("vs last week", tot.c && tot.clw ? ch(tot.s / tot.c, tot.lw / tot.clw) : null), " (" + eur2(tot.clw ? tot.lw / tot.clw : null) + ")"]),
       kpi("Waste", share(tot.s ? tot.w / tot.s : null), [eur(tot.w) + " of sales"], tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
     );
     const box = $("ovMain"); box.innerHTML = "";
@@ -873,7 +878,7 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     tot = tot || { s: 0, t: 0, st: 0, x: 0, w: 0, n: 0, hasW: false };
     let ly = 0; codes.forEach((c) => { const d = (D[c] || {})[w]; if (d) ly += d.ly || 0; });
     const tg = hasTargets(gid);
-    $("kpis").innerHTML = "";
+    $("kpis").innerHTML = ""; $("kpis").classList.remove("five");
     $("kpis").append(
       kpi(g.name + " sales week to date", eur(tot.s), tg ? subLine("vs target " + eur(tot.t), ch(tot.st, tot.t)) : ["No " + g.name + " targets set yet"], tg && ch(tot.st, tot.t) < 0 ? "bad" : tg ? "good" : ""),
       kpi("Share of store sales", share(tot.x ? tot.s / tot.x : null), ["Of the store's sales excluding tobacco"]),
