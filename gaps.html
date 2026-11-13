@@ -114,6 +114,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         <label>Supplier<select id="oSup"></select></label>
         <label>Department<select id="oDept"></select></label>
         <label>Lines<select id="oDisc"><option value="ord">Orderable only</option><option value="all">All</option><option value="disc">Discontinued only</option></select></label>
+        <label>Sort by<select id="oSort"><option value="lost">Most units lost</option><option value="days">Longest out</option><option value="wk">Usually sells most</option></select></label>
         <label>Out for at least<select id="oMin"><option value="0">Any time</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="28">28 days</option></select></label>
         <button class="btn secondary small" id="oXl" type="button">Download as Excel</button>
       </div>
@@ -335,6 +336,39 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     try { const qs = await fs.getDocs(supCol()); SUP = {}; qs.docs.forEach((d) => { SUP[d.id] = d.data(); }); } catch (e) { SUP = {}; }
     supLoaded = true;
   }
+  // ── Unit Sales link: how many each store usually sells, from the weekly unit totals ──
+  // Uses the 8 complete weeks before the store's latest gap check. For a line that's been out a while, only the weeks
+  // before it went out count (its sales were zero while it was out), as long as there are 2 or more of them.
+  const UNIT_WEEKS = 8;
+  const UW = {};                 // code → [{ week, days, m: Map(item → units) }] or null when unavailable
+  let unitsNote = "";
+  const mondayOf = (d) => addDays(d, -((new Date(d + "T12:00:00").getDay() + 6) % 7));
+  async function loadUnits(codes) {
+    await Promise.all(codes.map(async (c) => {
+      const st = ST[c]; if (!st || !st.date || (UW[c] && UW[c].upTo === st.date)) return;
+      const end = mondayOf(st.date), from = addDays(end, -7 * UNIT_WEEKS);
+      try {
+        const qs = await fs.getDocs(fs.query(fs.collection(db, "modules", "units", "stores", c, "wtot"), fs.where("week", ">=", from), fs.where("week", "<", end)));
+        const weeks = qs.docs.map((d) => d.data()).map((x) => {
+          const m = new Map(); (x.data || "").split("|").forEach((p) => { const i = p.lastIndexOf(":"); if (i > 0) m.set(p.slice(0, i), +p.slice(i + 1) || 0); });
+          return { week: x.week, days: (x.has || []).filter(Boolean).length || 7, m };
+        }).filter((w) => w.days);
+        UW[c] = { upTo: st.date, weeks };
+      } catch (e) { UW[c] = { upTo: st.date, weeks: [], denied: true }; }
+    }));
+    const any = codes.some((c) => UW[c] && UW[c].weeks.length);
+    unitsNote = any ? "" : codes.some((c) => UW[c] && UW[c].denied) ? "Unit sales aren't available with your access." : "No unit sales uploaded for the weeks before these checks yet, so usual sales and lost units can't be shown.";
+  }
+  function usual(c, code, since) {
+    const W = UW[c]; if (!W || !W.weeks.length) return null;
+    let ws = W.weeks.filter((w) => addDays(w.week, 6) < since), est = false;
+    if (ws.length < 2) { ws = W.weeks; est = true; }
+    const days = sum(ws.map((w) => w.days)); if (!days) return null;
+    return { wk: sum(ws.map((w) => w.m.get(code) || 0)) / days * 7, est: est && since < addDays(W.weeks[W.weeks.length - 1].week, 7) };
+  }
+  const hasUnits = (codes) => codes.some((c) => UW[c] && UW[c].weeks.length);
+  const wkCell = (o) => o.wk == null ? td("–", "num") : E("td", { class: "num", title: o.est ? "Includes weeks when the line was already out, so it may be low" : "" }, [E("b", { text: o.wk >= 10 ? int(o.wk) : (Math.round(o.wk * 10) / 10).toLocaleString("en-GB") }), o.est ? "*" : ""]);
+  const lostCell = (o) => o.lost == null ? td("–", "num") : td(int(o.lost), "num" + (o.lost >= 20 ? " down" : ""));
   const invOf = (c, code) => (INV[c] || {})[docId(code)];
   // an investigation counts for the latest listing unless it was closed before the item was listed again
   const invLive = (c, o) => { const v = invOf(c, o.code); if (!v) return null; if (v.status === "Closed" && v.closedOn && ST[c] && ST[c].date > v.closedOn) return null; return v; };
@@ -342,7 +376,10 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   // every out-of-stock line in the view, with its store and days out
   function outRows(codes) {
     const rows = [];
-    codes.forEach((c) => { const st = ST[c]; if (!st || !st.date) return; st.out.forEach((o) => rows.push({ ...o, store: c, days: diffDays(o.since, st.date), date: st.date })); });
+    codes.forEach((c) => { const st = ST[c]; if (!st || !st.date) return; st.out.forEach((o) => {
+      const days = diffDays(o.since, st.date), u = usual(c, o.code, o.since);
+      rows.push({ ...o, store: c, days, date: st.date, wk: u ? u.wk : null, est: u ? u.est : false, lost: u ? u.wk / 7 * Math.max(1, days) : null });
+    }); });
     return rows;
   }
   function sysRows(codes) {
@@ -367,6 +404,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     await loadStates(codes);
     if (tab === "overview" || tab === "system") await loadInv(codes);
     if (tab === "suppliers" || tab === "brief" || tab === "overview") await loadSup();
+    if (tab === "overview" || tab === "out" || tab === "brief" || tab === "suppliers") await loadUnits(codes);
     if (my !== seq) return;
     const withData = codes.filter((c) => ST[c] && ST[c].date);
     const latest = withData.map((c) => ST[c].date).sort().pop();
@@ -419,14 +457,27 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       E("p", { class: "note", style: "margin:-6px 0 12px", text: "Amber = no gap check uploaded today. Imports shows how many of the last 14 days have a gap check, so you can see which stores skip it." + (single() ? "" : " Click a store to open it.") }),
       table(["Store", "Last check", "No stock", "Discontinued", "New", "Back", LONG + "+ days", "With stock", "Imports, last 14 days"], rows, [2, 3, 4, 5, 6, 7, 8], foot));
     // longest gaps still orderable
-    const longest = outRows(codes).filter((o) => !o.disc).sort((a, b) => b.days - a.days).slice(0, 12);
-    $("ovLong").append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Longest gaps still orderable" }), E("button", { class: "btn secondary small", type: "button", text: "See all", onclick: () => { $("oDisc").value = "ord"; $("oMin").value = "0"; showTab("out"); } })]),
-      longest.length ? table(["Store", "Item", "Supplier", "Out for"], longest.map((o) => E("tr", null, [td(shortName(o.store)), itemCell(o), td(o.sup), E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })])])), []) : E("p", { class: "msg ok", text: "No orderable lines out of stock." }));
+    renderLongest(codes);
     // suppliers with most gaps
     $("ovSup").append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Suppliers with most gaps" }), E("button", { class: "btn secondary small", type: "button", text: "See all", onclick: () => showTab("suppliers") })]),
       supBars(outRows(codes), 10));
     // gaps per check
     renderHist(codes);
+  }
+  let ovSort = "lost";
+  function renderLongest(codes) {
+    const box = $("ovLong"); box.innerHTML = "";
+    const U = hasUnits(codes), mode = U ? ovSort : "days";
+    const ord = outRows(codes).filter((o) => !o.disc);
+    const list = ord.slice().sort((a, b) => mode === "lost" ? (b.lost || 0) - (a.lost || 0) || b.days - a.days : b.days - a.days).slice(0, 12);
+    const totLost = sum(ord.map((o) => o.lost || 0));
+    box.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: mode === "lost" ? "Gaps costing the most sales" : "Longest gaps still orderable" }),
+      E("div", { class: "row" }, [U ? E("div", { class: "seg" }, [["lost", "Most units lost"], ["days", "Longest out"]].map(([k, l]) => E("button", { type: "button", class: ovSort === k ? "on" : "", text: l, onclick: () => { ovSort = k; renderLongest(codes); } }))) : null,
+        E("button", { class: "btn secondary small", type: "button", text: "See all", onclick: () => { $("oDisc").value = "ord"; $("oMin").value = "0"; $("oSort").value = mode; showTab("out"); } })].filter(Boolean))]),
+      U ? E("p", { class: "note", style: "margin:-2px 0 10px", text: "About " + int(totLost) + " units of sales lost so far on orderable gaps (usual weekly sales from Unit Sales × days out)." }) : unitsNote ? E("p", { class: "note", style: "margin:-2px 0 10px", text: unitsNote }) : "",
+      list.length ? table(U ? ["Store", "Item", "Out for", "Usually /wk", "Units lost"] : ["Store", "Item", "Supplier", "Out for"], list.map((o) => E("tr", null, U
+        ? [td(shortName(o.store)), itemCell(o), E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })]), wkCell(o), lostCell(o)]
+        : [td(shortName(o.store)), itemCell(o), td(o.sup), E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })])])), U ? [3, 4] : []) : E("p", { class: "msg ok", text: "No orderable lines out of stock." }));
   }
   function supBars(rows, n) {
     const m = {};
@@ -470,33 +521,40 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const cur = sel.value; sel.innerHTML = ""; sel.add(new Option(allLabel, ""));
     values.forEach((v) => sel.add(new Option(v, v))); if (values.includes(cur)) sel.value = cur;
   }
+  const sorter = (k) => (a, b) => (k === "lost" ? (b.lost || 0) - (a.lost || 0) : k === "wk" ? (b.wk || 0) - (a.wk || 0) : 0) || b.days - a.days || a.desc.localeCompare(b.desc);
   function filteredOut(codes) {
     const all = outRows(codes);
     fillSelect($("oSup"), [...new Set(all.map((o) => o.sup).filter(Boolean))].sort(), "All suppliers");
     fillSelect($("oDept"), [...new Set(all.map((o) => o.dept).filter(Boolean))].sort(), "All departments");
     const q = $("oQ").value.trim().toLowerCase(), sup = $("oSup").value, dept = $("oDept").value, disc = $("oDisc").value, min = +$("oMin").value;
     return all.filter((o) => (!q || (o.desc + " " + o.code + " " + o.sup).toLowerCase().includes(q)) && (!sup || o.sup === sup) && (!dept || o.dept === dept)
-      && (disc === "all" || (disc === "disc" ? o.disc : !o.disc)) && o.days >= min).sort((a, b) => b.days - a.days || a.desc.localeCompare(b.desc));
+      && (disc === "all" || (disc === "disc" ? o.disc : !o.disc)) && o.days >= min).sort(sorter($("oSort").value));
   }
   function renderOut(codes) {
     const box = $("outList"), bk = $("backList"); box.innerHTML = ""; bk.innerHTML = "";
     if (!codes.some((c) => ST[c] && ST[c].date)) { box.appendChild(emptyMsg()); bk.hidden = true; return; }
     bk.hidden = false;
+    const U = hasUnits(codes);
+    if (!U && $("oSort").value !== "days") $("oSort").value = "days";
+    $("oSort").disabled = !U;
     const rows = filteredOut(codes);
-    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: plural(rows.length, "line") + (rows.length ? " · " + rows.filter((o) => o.days >= LONG).length + " out " + LONG + "+ days" : "") }),
-      rows.length ? table([single() ? "" : "Store", "Item", "Department", "Supplier", "Out for", "Discontinued"].filter((h, i) => i || !single()), rows.slice(0, 1500).map((o) => E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.dept), td(o.sup),
-        E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })]), td(o.disc ? "Yes" : "No", o.disc ? "" : "")].filter(Boolean))), []) : E("p", { class: "msg ok", text: "Nothing matches these filters." }));
+    const heads = [single() ? "" : "Store", "Item", "Department", "Supplier", "Out for", ...(U ? ["Usually /wk", "Units lost"] : []), "Discontinued"].filter((h, i) => i || !single());
+    const nc = U ? [heads.indexOf("Usually /wk"), heads.indexOf("Units lost")] : [];
+    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: plural(rows.length, "line") + (rows.length ? " · " + rows.filter((o) => o.days >= LONG).length + " out " + LONG + "+ days" + (U ? " · about " + int(sum(rows.map((o) => o.lost || 0))) + " units lost so far" : "") : "") }),
+      U ? E("p", { class: "note", style: "margin:-4px 0 10px", text: "Usually /wk = the store's average weekly units from Unit Sales before the line went out (* = it was already out for most of those weeks, so the figure may be low). Units lost = usual daily sales × days out. 0 means it didn't sell in those weeks." }) : unitsNote ? E("p", { class: "note", style: "margin:-4px 0 10px", text: unitsNote }) : "",
+      rows.length ? table(heads, rows.slice(0, 1500).map((o) => E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.dept), td(o.sup),
+        E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })]), ...(U ? [wkCell(o), lostCell(o)] : []), td(o.disc ? "Yes" : "No")].filter(Boolean))), nc) : E("p", { class: "msg ok", text: "Nothing matches these filters." }));
     // back on shelf
     const back = []; codes.forEach((c) => { const st = ST[c]; if (st && st.date) st.back.forEach((o) => back.push({ ...o, store: c, date: st.date })); });
     back.sort((a, b) => b.days - a.days);
     bk.append(E("h2", { text: "Back on shelf since the previous check" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Lines that were out at the previous check and aren't on the latest one." }),
       back.length ? table([single() ? "" : "Store", "Item", "Supplier", "Was out for"].filter((h, i) => i || !single()), back.slice(0, 600).map((o) => E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.sup), td(o.days + (o.days === 1 ? " day" : " days") + " (since " + short(o.since) + ")")].filter(Boolean))), []) : E("p", { class: "note", text: "None at the latest check." }));
   }
-  ["oQ", "oSup", "oDept", "oDisc", "oMin"].forEach((id) => { $(id).addEventListener(id === "oQ" ? "input" : "change", () => renderOut(scope().codes)); });
+  ["oQ", "oSup", "oDept", "oDisc", "oMin", "oSort"].forEach((id) => { $(id).addEventListener(id === "oQ" ? "input" : "change", () => renderOut(scope().codes)); });
   $("oXl").onclick = async () => {
     const rows = filteredOut(scope().codes);
-    await xl("Gaps without stock - " + scope().label + " - " + today(), [["Store", "Company", "Item code", "Description", "Department", "Category", "Supplier", "Discontinued", "Out since", "Days out", "Latest check"],
-      ...rows.map((o) => [nameOf(o.store), numOf(o.store), o.code, o.desc, o.dept, o.cat, o.sup, o.disc ? "Yes" : "No", o.since, o.days, o.date])]);
+    await xl("Gaps without stock - " + scope().label + " - " + today(), [["Store", "Company", "Item code", "Description", "Department", "Category", "Supplier", "Discontinued", "Out since", "Days out", "Usually sells a week", "Est. units lost", "Latest check"],
+      ...rows.map((o) => [nameOf(o.store), numOf(o.store), o.code, o.desc, o.dept, o.cat, o.sup, o.disc ? "Yes" : "No", o.since, o.days, o.wk == null ? "" : Math.round(o.wk * 10) / 10, o.lost == null ? "" : Math.round(o.lost), o.date])]);
   };
 
   // ═════════ STOCK ON SYSTEM ═════════
@@ -578,23 +636,24 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (!rows.length) { box.appendChild(codes.some((c) => ST[c] && ST[c].date) ? E("p", { class: "msg ok", text: "No gaps at the latest checks." }) : emptyMsg()); bars.hidden = true; return; }
     bars.hidden = false;
     const m = {};
-    rows.forEach((o) => { const s = o.sup || "Unknown"; const x = m[s] || (m[s] = { s, ord: 0, disc: 0, stores: new Set(), long: 0, l7: 0 }); o.disc ? x.disc++ : x.ord++; x.stores.add(o.store); if (!o.disc) { x.long = Math.max(x.long, o.days); if (o.days >= LONG) x.l7++; } });
-    const list = Object.values(m).sort((a, b) => b.ord - a.ord || b.disc - a.disc);
+    const U = hasUnits(codes);
+    rows.forEach((o) => { const s = o.sup || "Unknown"; const x = m[s] || (m[s] = { s, ord: 0, disc: 0, stores: new Set(), long: 0, l7: 0, lost: 0 }); o.disc ? x.disc++ : x.ord++; x.stores.add(o.store); if (!o.disc) { x.long = Math.max(x.long, o.days); if (o.days >= LONG) x.l7++; x.lost += o.lost || 0; } });
+    const list = Object.values(m).sort((a, b) => (U ? b.lost - a.lost : 0) || b.ord - a.ord || b.disc - a.disc);
     const tb = [];
     list.forEach((x) => {
       const id = supId(x.s), sn = SUP[id];
-      tb.push(E("tr", null, [E("td", null, [E("b", { text: x.s })]), td(int(x.ord), "num"), td(int(x.l7), "num" + (x.l7 ? " down" : "")), td(int(x.disc), "num"), td(int(x.stores.size), "num"), E("td", null, x.long ? [daysPill(x.long)] : ["–"]),
+      tb.push(E("tr", null, [E("td", null, [E("b", { text: x.s })]), td(int(x.ord), "num"), td(int(x.l7), "num" + (x.l7 ? " down" : "")), td(int(x.disc), "num"), td(int(x.stores.size), "num"), E("td", null, x.long ? [daysPill(x.long)] : ["–"]), ...(U ? [td(int(x.lost), "num")] : []),
         E("td", null, sn ? [short(sn.chasedOn), sn.eta ? E("span", { class: "sub2", text: "expected " + short(sn.eta) }) : null].filter(Boolean) : [E("span", { class: "note", text: "not chased" })]),
         E("td", null, [E("button", { class: "btn secondary small", type: "button", text: openSup === id ? "Close" : isHO ? "Follow up" : "Details", onclick: () => { openSup = openSup === id ? null : id; renderSuppliers(codes); } })])]));
       if (openSup === id) tb.push(supEditor(x, rows.filter((o) => (o.sup || "Unknown") === x.s), codes));
     });
     box.append(E("h2", { text: "Supplier gaps at the latest check" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Lines without stock by supplier, across the stores in this view. Head Office records when a supplier was chased and when stock is expected; everyone sees it." }),
-      table(["Supplier", "Orderable out", LONG + "+ days", "Discontinued", "Stores", "Longest", "Last chased", ""], tb, [1, 2, 3, 4]));
+      table(["Supplier", "Orderable out", LONG + "+ days", "Discontinued", "Stores", "Longest", ...(U ? ["Units lost"] : []), "Last chased", ""], tb, U ? [1, 2, 3, 4, 6] : [1, 2, 3, 4]));
     bars.append(E("h2", { text: "Suppliers with most gaps" }), supBars(rows, 15));
   }
   function supEditor(x, items, codes) {
     const id = supId(x.s), sn = SUP[id] || {};
-    const list = E("div", { class: "brief", style: "max-height:220px" }, [items.filter((o) => !o.disc).sort((a, b) => b.days - a.days).map((o) => "• " + o.desc + " (" + o.code + ") — " + shortName(o.store) + ", " + o.days + (o.days === 1 ? " day" : " days")).join("\n") || "No orderable lines."]);
+    const list = E("div", { class: "brief", style: "max-height:220px" }, [items.filter((o) => !o.disc).sort(sorter(hasUnits(codes) ? "lost" : "days")).map((o) => "• " + o.desc + " (" + o.code + ") — " + shortName(o.store) + ", " + o.days + (o.days === 1 ? " day" : " days") + (o.wk ? ", usually " + (o.wk >= 10 ? int(o.wk) : Math.round(o.wk * 10) / 10) + "/wk" : "")).join("\n") || "No orderable lines."]);
     const kids = [E("b", { text: "Orderable lines out" }), list];
     if (isHO) {
       const ch = E("input", { class: "in", type: "date", value: sn.chasedOn || today() }), eta = E("input", { class: "in", type: "date", value: sn.eta || "" });
@@ -607,7 +666,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       };
       kids.push(E("div", { class: "edgrid", style: "margin-top:8px" }, [E("label", null, ["Chased on", ch]), E("label", null, ["Stock expected", eta]), E("label", { class: "wide" }, ["Reply", reply]), E("div", null, [save])]));
     } else if (sn.chasedOn) kids.push(E("p", { class: "note", text: "Chased " + short(sn.chasedOn) + (sn.eta ? " · expected " + short(sn.eta) : "") + (sn.reply ? " · " + sn.reply : "") + " (" + (sn.byName || "") + ")" }));
-    return E("tr", { class: "ed" }, [E("td", { colspan: "8" }, kids)]);
+    return E("tr", { class: "ed" }, [E("td", { colspan: hasUnits(codes) ? "9" : "8" }, kids)]);
   }
 
   // ═════════ ACROSS STORES ═════════
@@ -650,11 +709,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
   function briefStore(c, th) {
     const st = ST[c]; if (!st || !st.date) return null;
-    const h = histOf(st, st.date), out = [...st.out.values()].map((o) => ({ ...o, days: diffDays(o.since, st.date) }));
-    const longs = out.filter((o) => !o.disc && o.days >= th).sort((a, b) => b.days - a.days);
+    const h = histOf(st, st.date), out = outRows([c]), U = hasUnits([c]);
+    const longs = out.filter((o) => !o.disc && o.days >= th).sort(sorter(U ? "lost" : "days"));
     const L = [nameOf(c) + " — gap check " + dayLabel(st.date), "",
       "• " + plural(h.n0, "line") + " without stock (" + h.nw + " new, " + h.back + " back on the shelf since the previous check)" + (h.disc ? "; " + h.disc + " of them discontinued" : "") + "."];
-    if (longs.length) { L.push("", "Orderable lines out " + th + "+ days (" + longs.length + "):"); longs.slice(0, 15).forEach((o) => L.push("  - " + o.desc + " (" + o.code + ") · " + o.sup + " · " + o.days + " days")); if (longs.length > 15) L.push("  … and " + (longs.length - 15) + " more"); L.push("  Please check the orders for these lines."); }
+    if (longs.length) { L.push("", "Orderable lines out " + th + "+ days (" + longs.length + "):"); if (U) L.push("  (biggest sellers first; about " + int(sum(longs.map((o) => o.lost || 0))) + " units of sales lost so far)"); longs.slice(0, 15).forEach((o) => L.push("  - " + o.desc + " (" + o.code + ") · " + o.sup + " · " + o.days + " days" + (o.wk ? " · usually " + (o.wk >= 10 ? int(o.wk) : Math.round(o.wk * 10) / 10) + "/wk" : ""))); if (longs.length > 15) L.push("  … and " + (longs.length - 15) + " more"); L.push("  Please check the orders for these lines."); }
     else L.push("• No orderable line out " + th + "+ days. Well done.");
     if (st.sys.length) { L.push("", "Stock on the system but not on the shelf (" + st.sys.length + "): please check the back store and refill, then record what you found in the hub:"); st.sys.slice().sort((a, b) => b.stock - a.stock).slice(0, 12).forEach((o) => L.push("  - " + o.desc + " (" + o.code + ") · system " + o.stock)); if (st.sys.length > 12) L.push("  … and " + (st.sys.length - 12) + " more"); }
     if (diffDays(st.date, today()) > 0) L.push("", "Note: the latest gap check is from " + dayLabel(st.date) + ". Please upload today's after the 1pm check.");
