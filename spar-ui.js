@@ -111,7 +111,7 @@
       { group: "Sales & stock", id: "sales", icon: "📈", name: "Sales Tracker", desc: "Daily sales by store against target and last year.", who: "all", page: "sales.html" },
       { group: "Sales & stock", id: "units", icon: "📦", name: "Unit Sales", desc: "Weekly units by item: lookup, best and worst sellers, zero-sales gaps, ordering suggestions.", who: "all", page: "units.html" },
       { group: "Sales & stock", id: "waste", icon: "🗑️", name: "Waste Tracker", desc: "Log waste by department and reason; spot the trends.", who: "all" },
-      { group: "Sales & stock", id: "gaps", icon: "🔍", name: "Gap Check Tracker", desc: "Daily gap checks — out of stock, stock on system, suppliers.", who: "all" },
+      { group: "Sales & stock", id: "gaps", icon: "🔍", name: "Gap Check Tracker", desc: "Each store uploads its daily 1pm gap check: out of stock, stock on system, suppliers, daily brief.", who: "all", page: "gaps.html" },
       { group: "Cash", id: "cash", icon: "💶", name: "Cash Sheet Analyser", desc: "Weekly cash sheets, cashier unders and overs, unders check.", who: "all" },
       { group: "Checklists", id: "sm-checklist", icon: "✅", name: "Store Manager Weekly Checklist", desc: "Daily and weekly store tasks, ticked off with notes.", who: "all" },
       { group: "Checklists", id: "rom-checklist", icon: "🧭", name: "ROM Weekly Checklist", desc: "ROM store visits and weekly tasks across your stores.", who: ["admin", "hq", "support", "rom"] },

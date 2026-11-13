@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="gaps">
+<title>Gap Check Tracker · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
+.bar label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar select{font:700 14px Arial,sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);min-width:200px;max-width:100%}
+.bar .stamp{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right}
+.kpis.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:1100px){.kpis.six{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){.kpis.six{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;font-weight:700}
+.kpi strong.warn{color:var(--amber)}
+.up{color:var(--gd)} .down{color:var(--red)}
+tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+@media print{.tablewrap{max-height:none!important;overflow:visible}}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted)}
+.sub2{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.drop{border:2px dashed #C9CDCB;border-radius:14px;padding:20px;text-align:center;background:#FBFCFB}
+.drop.drag{border-color:var(--brand);background:var(--brandsoft)}
+.seg{display:inline-flex;background:#E9EBEA;border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{appearance:none;border:0;background:transparent;padding:7px 12px;border-radius:8px;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer}
+.seg button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--ink);text-decoration:underline;cursor:pointer;text-align:left}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted)}
+.filters input,.filters select{font:14px Arial,sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.filters input[type=search]{min-width:240px}
+.days{display:inline-block;white-space:nowrap;min-width:44px;padding:3px 8px;border-radius:8px;font-weight:800;text-align:center;background:#F1F2F2}
+.days.d7{background:#FBE0E1;color:#C5121A}.days.d3{background:#FFF0D2;color:#9A6200}
+.bars{display:flex;flex-direction:column;gap:7px}
+.hb{display:grid;grid-template-columns:minmax(120px,40%) 1fr 54px;gap:10px;align-items:center;font-size:13px}
+.hb .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.hb .track{height:14px;border-radius:7px;background:#F1F2F2;overflow:hidden;display:flex}
+.hb .track i{display:block;height:100%}
+.hb .n{text-align:right;font-weight:800}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 10px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+.chart{width:100%;height:auto;display:block}
+.brief{white-space:pre-wrap;font:13px/1.5 ui-monospace,Consolas,monospace;background:#F7F8F8;border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0;max-height:320px;overflow:auto}
+.ed{background:#FBFCFB}
+.ed td{padding:12px 14px}
+.edgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end}
+@media(max-width:900px){.edgrid{grid-template-columns:1fr 1fr}}
+.edgrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--muted)}
+.edgrid .wide{grid-column:span 2}
+.steps{margin:0;padding-left:20px;line-height:1.7}
+</style>
+</head>
+<body>
+<header class="top" data-title="Gap Check Tracker"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="brief" type="button">Daily brief</button>
+    <button class="tab" data-tab="out" type="button">Out of stock</button>
+    <button class="tab" data-tab="system" type="button">Stock on system</button>
+    <button class="tab" data-tab="suppliers" type="button">Suppliers</button>
+    <button class="tab" data-tab="cross" type="button">Across stores</button>
+    <button class="tab" data-tab="uploads" type="button">Uploads</button>
+  </div>
+
+  <div class="card bar" id="bar">
+    <label>View<select id="scope"></select></label>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section data-pane="overview">
+    <div class="drop" id="drop1" style="margin-bottom:14px"><span style="font-weight:700">Drop today's gap check file here</span> <span class="note">or</span> <label class="btn small" for="file1" style="margin-left:6px">Upload gap check</label><input type="file" id="file1" accept=".xlsx,.xls" multiple hidden>
+      <div class="note" style="margin-top:6px">The Excel file downloaded after the 1pm gap check (both sheets: with stock and without stock). Several stores at once is fine.</div></div>
+    <div id="upMsg1"></div>
+    <div class="kpis six" id="kpis"></div>
+    <div class="card panel" id="ovStores"></div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card panel" style="margin:0" id="ovLong"></div>
+      <div class="card panel" style="margin:0" id="ovSup"></div>
+    </div>
+    <div class="card panel" id="ovHist"></div>
+  </section>
+
+  <!-- DAILY BRIEF -->
+  <section data-pane="brief" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Daily brief</h2>
+      <p class="note" style="margin:-6px 0 12px">Ready-to-send text built from the latest gap checks. Copy it into WhatsApp or email for the Store Managers and the supplier reps. Change the number of days to make the lists shorter or longer.</p>
+      <div class="filters"><label>List orderable lines out for at least<select id="bDays"><option value="1">1 day</option><option value="3" selected>3 days</option><option value="5">5 days</option><option value="7">7 days</option><option value="14">14 days</option></select></label></div>
+    </div>
+    <div id="briefOut"></div>
+  </section>
+
+  <!-- OUT OF STOCK -->
+  <section data-pane="out" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Gaps without stock</h2>
+      <p class="note" style="margin:-6px 0 12px">Every line on the latest gap check with no stock on the system. “Out for” counts the days since it first appeared on a check without dropping off.</p>
+      <div class="filters">
+        <label>Search<input type="search" id="oQ" placeholder="Item, code or supplier"></label>
+        <label>Supplier<select id="oSup"></select></label>
+        <label>Department<select id="oDept"></select></label>
+        <label>Lines<select id="oDisc"><option value="ord">Orderable only</option><option value="all">All</option><option value="disc">Discontinued only</option></select></label>
+        <label>Out for at least<select id="oMin"><option value="0">Any time</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="28">28 days</option></select></label>
+        <button class="btn secondary small" id="oXl" type="button">Download as Excel</button>
+      </div>
+      <div id="outList"></div>
+    </div>
+    <div class="card panel" id="backList"></div>
+  </section>
+
+  <!-- STOCK ON SYSTEM -->
+  <section data-pane="system" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Gaps with stock</h2>
+      <p class="note" style="margin:-6px 0 12px">The system shows stock but the shelf was empty at the check. The store looks for it and records what it found; Head Office or the ROM records the cause and closes it. “Times listed” shows items that keep coming back.</p>
+      <div class="filters">
+        <label>Search<input type="search" id="sQ" placeholder="Item, code or supplier"></label>
+        <label>Show<select id="sShow"><option value="open">Not closed</option><option value="all">All on the latest check</option><option value="closed">Closed</option></select></label>
+        <button class="btn secondary small" id="sXl" type="button">Download as Excel</button>
+      </div>
+      <div id="sysList"></div>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card panel" style="margin:0" id="whyBox"></div>
+      <div class="card panel" style="margin:0">
+        <h2>The daily routine</h2>
+        <ol class="steps note">
+          <li>1pm gap check: anything listed here has stock on the system but an empty shelf.</li>
+          <li>The store looks in the back store and on other shelves, refills what it finds and records the quantity found here.</li>
+          <li>Anything not found: Head Office or the ROM checks the item's movements since the last stock take and records the cause.</li>
+          <li>Close it once the stock has been adjusted. Items listed again and again show up under “Times listed”.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUPPLIERS -->
+  <section data-pane="suppliers" hidden>
+    <div class="card panel" style="margin-top:0" id="supList"></div>
+    <div class="card panel" id="supBars"></div>
+  </section>
+
+  <!-- ACROSS STORES -->
+  <section data-pane="cross" hidden>
+    <div class="card panel" style="margin-top:0" id="crossSame"></div>
+    <div class="card panel" id="crossTr"></div>
+  </section>
+
+  <!-- UPLOADS -->
+  <section data-pane="uploads" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Upload gap checks</h2>
+      <p class="note" style="margin:-6px 0 12px">Each store uploads its own gap check every day after the 1pm check. The file is matched to the store by the Company number inside it (67 = report-67) and to the day by its Date Started. Uploading the same store and day again replaces it.</p>
+      <div class="drop" id="drop2"><p style="margin:0 0 10px;font-weight:700">Drag the gap check files here</p><label class="btn" for="file2">Choose gap check files</label><input type="file" id="file2" accept=".xlsx,.xls" multiple hidden></div>
+      <div id="upMsg2" style="margin-top:12px"></div>
+    </div>
+    <div class="card panel" id="upToday"></div>
+    <div class="card panel" id="upHist"></div>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+
+  // ── Tables: 6 rows on show, then scroll. The header stays at the top and the total row at the bottom ──
+  const ROWS_SHOWN = 6;
+  function fitTables() {
+    document.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.querySelectorAll(":scope > tbody > tr")];
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot") && !r.classList.contains("ed"));
+      if (rows.length <= ROWS_SHOWN) { w.style.maxHeight = "none"; return; }
+      const ed = body.filter((r) => r.classList.contains("ed")).reduce((s, r) => s + r.offsetHeight, 0);
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, ROWS_SHOWN).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + ed + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0;
+  const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+  addEventListener("resize", fitSoon);
+
+  const me = await SPAR.ready;
+  const fb = await SPAR.firebase();
+  const { fs, db } = fb;
+  const isHO = ["admin", "hq", "support"].includes(me.role);
+  const canClose = isHO || me.role === "rom";
+
+  // ── Settings ──
+  const LONG = 7;                 // "out 7+ days"
+  const KEEP_DAYS = 120;          // how much history the store summary keeps
+  const RESULTS = ["Pending", "Found – all", "Found – part", "Not found"];
+  const CAUSES = ["Not yet investigated", "Admin / system error", "Delivery scanned wrong", "Wrong waste scan", "Till scanning error", "Suspected theft", "Supplier short delivery", "Item was misplaced", "Other"];
+
+  // ── Helpers ──
+  const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
+  const pad = (n) => (n < 10 ? "0" : "") + n;
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const today = () => iso(new Date(now()));
+  const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
+  const diffDays = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+  const short = (s) => s ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "–";
+  const dayLabel = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const int = (v) => v == null || !isFinite(v) ? "–" : Math.round(v).toLocaleString("en-GB");
+  const plural = (n, w) => int(n) + " " + w + (n === 1 ? "" : "s");
+  const sum = (a) => a.reduce((p, v) => p + (v || 0), 0);
+  const clean = (v) => v == null ? "" : String(v).replace(/[\t\r\n]+/g, " ").trim();
+  const supId = (s) => (s || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "unknown";
+  const docId = (code) => String(code).replace(/[\/.#$\[\]]/g, "_");
+
+  // ── Stores and access ──
+  const stores = me.stores.slice();
+  const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
+  const nameOf = (c) => (byCode[c] || {}).name || c;
+  const shortName = (c) => nameOf(c).replace(/^(InterSPAR|EuroSPAR|SPAR Express|SPAR Gourmet|SPAR|ARD)\s+/i, "");
+  const numOf = (c) => String((byCode[c] || {}).report || "").replace(/\D+/g, "");
+  const byNum = Object.fromEntries(me.allStores.filter((s) => s.report).map((s) => [String(s.report).replace(/\D+/g, ""), s.code]));
+  const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
+  const scopes = [];
+  if (me.seesAll && stores.length > 1) {
+    scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+    [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) => scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
+  } else if (stores.length > 1) scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+  stores.forEach((s) => scopes.push({ id: "s:" + s.code, label: s.name, codes: [s.code] }));
+  if (!scopes.length) { document.querySelector("main").innerHTML = '<p class="msg warn">You haven\'t been given a store yet. Ask a hub admin.</p>'; throw new Error("no stores"); }
+  scopes.forEach((s) => $("scope").add(new Option(s.label, s.id)));
+  try { const k = localStorage.getItem("sparGapsScope"); if (scopes.some((s) => s.id === k)) $("scope").value = k; } catch (e) {}
+  const scope = () => scopes.find((s) => s.id === $("scope").value) || scopes[0];
+  const single = () => scope().codes.length === 1;
+  const canUploadFor = (c) => stores.some((s) => s.code === c);
+
+  // ── Paths ──
+  const SP = (c, ...x) => fs.doc(db, "modules", "gaps", "stores", c, ...x);
+  const chkDoc = (c, d) => SP(c, "checks", d), stateDoc = (c) => SP(c, "state", "latest"), invDoc = (c, code) => SP(c, "inv", docId(code));
+  const chkCol = (c) => fs.collection(db, "modules", "gaps", "stores", c, "checks");
+  const invCol = (c) => fs.collection(db, "modules", "gaps", "stores", c, "inv");
+  const supDoc = (id) => fs.doc(db, "modules", "gaps", "suppliers", id);
+  const supCol = () => fs.collection(db, "modules", "gaps", "suppliers");
+
+  // ── Row encoding: one line per item, tab-separated ──
+  // without stock: code, dept, cat, supplier, description, stock, discontinued (Y/N), reason
+  // with stock:    code, dept, cat, supplier, description, system stock, discontinued, actual stock, prepared by
+  const enc = (rows) => rows.map((r) => r.map(clean).join("\t")).join("\n");
+  const dec = (s) => s ? s.split("\n").filter(Boolean).map((l) => l.split("\t")) : [];
+
+  // ═════════ THE STORE SUMMARY (state) ═════════
+  // Saved per store after every upload so the tracker reads one small document per store, not every check:
+  // out: lines without stock now, with the date each went out; sys: lines with stock but an empty shelf,
+  // with how many checks they've been on; back: back on the shelf at the latest check; hist: counts per check.
+  function freshState() { return { date: "", prev: "", dates: [], hist: {}, out: new Map(), sysh: new Map(), sys: [], back: [] }; }
+  function readState(d) {
+    const st = freshState(); if (!d) return st;
+    st.date = d.date || ""; st.prev = d.prev || ""; st.dates = d.dates || []; st.hist = d.hist || {}; st.at = d.at; st.byName = d.byName; st.file = d.file;
+    dec(d.out).forEach((r) => st.out.set(r[0], { code: r[0], since: r[1], disc: r[2] === "Y", desc: r[3], sup: r[4], dept: r[5], cat: r[6], reason: r[7] || "" }));
+    dec(d.sysh).forEach((r) => st.sysh.set(r[0], { first: r[1], times: +r[2] || 0, last: r[3] }));
+    st.sys = dec(d.sys).map((r) => ({ code: r[0], stock: +r[1] || 0, disc: r[2] === "Y", desc: r[3], sup: r[4], dept: r[5], cat: r[6], actual: r[7] || "" }));
+    st.back = dec(d.back).map((r) => ({ code: r[0], since: r[1], days: +r[2] || 0, desc: r[3], sup: r[4], dept: r[5], cat: r[6] }));
+    return st;
+  }
+  function writeState(st) {
+    return {
+      date: st.date, prev: st.prev, dates: st.dates.slice(-KEEP_DAYS), hist: Object.fromEntries(Object.entries(st.hist).filter(([k]) => st.dates.slice(-KEEP_DAYS).includes(k))),
+      out: [...st.out.values()].map((o) => [o.code, o.since, o.disc ? "Y" : "N", o.desc, o.sup, o.dept, o.cat, o.reason].map(clean).join("\t")).join("\n"),
+      sysh: [...st.sysh.entries()].map(([k, v]) => [k, v.first, v.times, v.last].join("\t")).join("\n"),
+      sys: st.sys.map((o) => [o.code, o.stock, o.disc ? "Y" : "N", o.desc, o.sup, o.dept, o.cat, o.actual].map(clean).join("\t")).join("\n"),
+      back: st.back.map((o) => [o.code, o.since, o.days, o.desc, o.sup, o.dept, o.cat].map(clean).join("\t")).join("\n"),
+      at: Date.now(), file: st.file || "", byName: st.byName || ""
+    };
+  }
+  // add one check (newer than the last) to the summary
+  function step(st, chk) {
+    const D = chk.date, prevOut = st.out, hadPrev = !!st.date;
+    const out = new Map();
+    dec(chk.ns).forEach((r) => {
+      if (out.has(r[0])) return;   // the same line can appear twice in a file
+      const p = prevOut.get(r[0]);
+      out.set(r[0], { code: r[0], since: p ? p.since : D, disc: /^y/i.test(r[6] || ""), desc: r[4], sup: r[3], dept: r[1], cat: r[2], reason: r[7] || "" });
+    });
+    const sysRows = [], seen = new Set();
+    dec(chk.ws).forEach((r) => { if (seen.has(r[0])) return; seen.add(r[0]); sysRows.push({ code: r[0], stock: +r[5] || 0, disc: /^y/i.test(r[6] || ""), desc: r[4], sup: r[3], dept: r[1], cat: r[2], actual: r[7] || "" }); });
+    const back = hadPrev ? [...prevOut.values()].filter((o) => !out.has(o.code) && !seen.has(o.code)).map((o) => ({ ...o, days: diffDays(o.since, D) })) : [];
+    sysRows.forEach((o) => { const h = st.sysh.get(o.code) || { first: D, times: 0, last: "" }; if (h.last !== D) h.times++; h.last = D; st.sysh.set(o.code, h); });
+    for (const [k, v] of st.sysh) if (diffDays(v.last, D) > 90) st.sysh.delete(k);
+    const nNew = hadPrev ? [...out.keys()].filter((k) => !prevOut.has(k)).length : 0;
+    const vals = [...out.values()];
+    const out7 = vals.filter((o) => !o.disc && diffDays(o.since, D) >= LONG).length;
+    st.prev = st.date; st.date = D; st.out = out; st.sys = sysRows; st.back = back;
+    if (!st.dates.includes(D)) st.dates.push(D);
+    st.hist[D] = [vals.length, vals.filter((o) => o.disc).length, nNew, back.length, sysRows.length, out7, chk.byName || ""].join("|");
+    st.file = chk.file; st.byName = chk.byName;
+    return st;
+  }
+  const histOf = (st, d) => { const h = (st.hist[d] || "").split("|"); return { n0: +h[0] || 0, disc: +h[1] || 0, nw: +h[2] || 0, back: +h[3] || 0, nS: +h[4] || 0, out7: +h[5] || 0, by: h[6] || "" }; };
+  async function rebuild(c) {
+    const qs = await fs.getDocs(fs.query(chkCol(c), fs.where("date", ">=", addDays(today(), -KEEP_DAYS))));
+    const checks = qs.docs.map((d) => d.data()).sort((a, b) => a.date.localeCompare(b.date));
+    let st = freshState(); checks.forEach((k) => { st = step(st, k); });
+    if (!checks.length) { await fs.deleteDoc(stateDoc(c)).catch(() => {}); return null; }
+    const w = writeState(st); await fs.setDoc(stateDoc(c), w); return w;
+  }
+
+  // ═════════ LOADING ═════════
+  const ST = {}, INV = {};
+  let SUP = {}, supLoaded = false;
+  async function loadStates(codes, force) {
+    await Promise.all(codes.map(async (c) => {
+      if (ST[c] && !force) return;
+      try { const d = await fs.getDoc(stateDoc(c)); ST[c] = readState(d.exists() ? d.data() : null); } catch (e) { ST[c] = freshState(); }
+    }));
+  }
+  async function loadInv(codes, force) {
+    const from = addDays(today(), -90);
+    await Promise.all(codes.map(async (c) => {
+      if (INV[c] && !force) return;
+      try { const qs = await fs.getDocs(fs.query(invCol(c), fs.where("opened", ">=", from))); INV[c] = {}; qs.docs.forEach((d) => { INV[c][d.id] = d.data(); }); } catch (e) { INV[c] = {}; }
+    }));
+  }
+  async function loadSup(force) {
+    if (supLoaded && !force) return;
+    try { const qs = await fs.getDocs(supCol()); SUP = {}; qs.docs.forEach((d) => { SUP[d.id] = d.data(); }); } catch (e) { SUP = {}; }
+    supLoaded = true;
+  }
+  const invOf = (c, code) => (INV[c] || {})[docId(code)];
+  // an investigation counts for the latest listing unless it was closed before the item was listed again
+  const invLive = (c, o) => { const v = invOf(c, o.code); if (!v) return null; if (v.status === "Closed" && v.closedOn && ST[c] && ST[c].date > v.closedOn) return null; return v; };
+
+  // every out-of-stock line in the view, with its store and days out
+  function outRows(codes) {
+    const rows = [];
+    codes.forEach((c) => { const st = ST[c]; if (!st || !st.date) return; st.out.forEach((o) => rows.push({ ...o, store: c, days: diffDays(o.since, st.date), date: st.date })); });
+    return rows;
+  }
+  function sysRows(codes) {
+    const rows = [];
+    codes.forEach((c) => { const st = ST[c]; if (!st || !st.date) return; st.sys.forEach((o) => { const h = st.sysh.get(o.code) || {}; rows.push({ ...o, store: c, times: h.times || 1, first: h.first || st.date, date: st.date, inv: invLive(c, o) }); }); });
+    return rows;
+  }
+
+  // ═════════ TABS ═════════
+  let tab = "overview";
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+    render();
+  }
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
+
+  let seq = 0;
+  async function render() {
+    const my = ++seq, codes = scope().codes;
+    await loadStates(codes);
+    if (tab === "overview" || tab === "system") await loadInv(codes);
+    if (tab === "suppliers" || tab === "brief" || tab === "overview") await loadSup();
+    if (my !== seq) return;
+    const withData = codes.filter((c) => ST[c] && ST[c].date);
+    const latest = withData.map((c) => ST[c].date).sort().pop();
+    $("stamp").textContent = latest ? (single() ? "Latest check " + dayLabel(latest) : withData.length + " of " + codes.length + " stores have uploaded · latest " + dayLabel(latest)) : "No gap checks uploaded yet";
+    if (tab === "overview") return renderOverview(codes);
+    if (tab === "brief") return renderBrief(codes);
+    if (tab === "out") return renderOut(codes);
+    if (tab === "system") return renderSystem(codes);
+    if (tab === "suppliers") return renderSuppliers(codes);
+    if (tab === "cross") return renderCross(codes);
+    if (tab === "uploads") return renderUploads(codes);
+  }
+  const emptyMsg = () => E("p", { class: "empty", text: "No gap checks uploaded for this view yet. Drop the day's gap check file on the Overview or Uploads tab." });
+  const table = (heads, rows, numCols, foot) => E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, heads.map((h, i) => E("th", { class: (numCols || []).includes(i) ? "num" : "", text: h })))]), E("tbody", null, rows.concat(foot ? [foot] : []))])]);
+  const td = (t, c) => E("td", { class: c || "", text: t });
+  const daysPill = (n) => E("span", { class: "days" + (n >= LONG ? " d7" : n >= 3 ? " d3" : ""), text: n + (n === 1 ? " day" : " days") });
+  const itemCell = (o) => E("td", null, [E("b", { text: o.desc || o.code }), E("span", { class: "sub2" }, [E("span", { class: "code", text: o.code }), o.cat ? " · " + o.cat : ""])]);
+  const freshPill = (d) => { if (!d) return E("span", { class: "pill grey", text: "never" }); const n = diffDays(d, today()); return E("span", { class: "pill" + (n <= 0 ? "" : " warn"), text: n <= 0 ? "today" : n === 1 ? "1d ago" : n + "d ago" }); };
+
+  // ═════════ OVERVIEW ═════════
+  function renderOverview(codes) {
+    const withData = codes.filter((c) => ST[c] && ST[c].date);
+    const k = $("kpis"); k.innerHTML = "";
+    ["ovStores", "ovLong", "ovSup", "ovHist"].forEach((id) => $(id).innerHTML = "");
+    if (!withData.length) { $("ovStores").appendChild(emptyMsg()); $("ovLong").parentElement.hidden = true; $("ovHist").hidden = true; return; }
+    $("ovLong").parentElement.hidden = false; $("ovHist").hidden = false;
+    const H = withData.map((c) => histOf(ST[c], ST[c].date));
+    const tot = (f) => sum(H.map((h) => h[f]));
+    const openInv = sum(withData.map((c) => sysRows([c]).filter((o) => o.inv && o.inv.status !== "Closed").length));
+    const kpi = (label, val, sub, cls) => E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: cls || "", text: int(val) }), E("span", { class: "sub", text: sub })]);
+    k.append(kpi("Gaps, no stock", tot("n0"), plural(tot("disc"), "discontinued line")),
+      kpi("New since last check", tot("nw"), "went to 0 stock"),
+      kpi("Back on shelf", tot("back"), "were out at the previous check", "good"),
+      kpi("Out " + LONG + "+ days", tot("out7"), "still orderable, not discontinued", tot("out7") ? "bad" : ""),
+      kpi("Gaps with stock", tot("nS"), "system shows stock, shelf empty", tot("nS") ? "warn" : ""),
+      kpi("Open investigations", openInv, "stock not found on the shelf yet"));
+    // stores at their latest check
+    const t = today(), from14 = addDays(t, -13);
+    const rows = codes.slice().sort((a, b) => (ST[b] && ST[b].date ? 1 : 0) - (ST[a] && ST[a].date ? 1 : 0) || nameOf(a).localeCompare(nameOf(b))).map((c) => {
+      const st = ST[c] || freshState(), h = st.date ? histOf(st, st.date) : null;
+      const imp = st.dates.filter((d) => d >= from14 && d <= t).length;
+      return E("tr", null, [E("td", null, [single() ? E("b", { text: nameOf(c) }) : E("button", { class: "linkbtn", type: "button", text: nameOf(c), onclick: () => { $("scope").value = "s:" + c; $("scope").onchange(); } }), E("span", { class: "sub2", text: numOf(c) ? "Company " + numOf(c) : "" })]),
+        E("td", null, st.date ? [short(st.date) + " ", freshPill(st.date)] : [freshPill(null)]),
+        td(h ? int(h.n0) : "–", "num"), td(h ? int(h.disc) : "–", "num"), td(h ? int(h.nw) : "–", "num"), td(h ? int(h.back) : "–", "num up"),
+        td(h ? int(h.out7) : "–", "num" + (h && h.out7 ? " down" : "")), td(h ? int(h.nS) : "–", "num"),
+        E("td", { class: "num" }, [E("span", { class: "pill" + (imp >= 12 ? "" : imp >= 8 ? " warn" : " red"), text: imp + "/14" })])]);
+    });
+    const foot = withData.length > 1 ? E("tr", { class: "tot" }, [td("Total · " + withData.length + " stores"), td(""), td(int(tot("n0")), "num"), td(int(tot("disc")), "num"), td(int(tot("nw")), "num"), td(int(tot("back")), "num"), td(int(tot("out7")), "num"), td(int(tot("nS")), "num"), td("")]) : null;
+    $("ovStores").append(E("h2", { text: "Stores at their latest check" }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: "Amber = no gap check uploaded today. Imports shows how many of the last 14 days have a gap check, so you can see which stores skip it." + (single() ? "" : " Click a store to open it.") }),
+      table(["Store", "Last check", "No stock", "Discontinued", "New", "Back", LONG + "+ days", "With stock", "Imports, last 14 days"], rows, [2, 3, 4, 5, 6, 7, 8], foot));
+    // longest gaps still orderable
+    const longest = outRows(codes).filter((o) => !o.disc).sort((a, b) => b.days - a.days).slice(0, 12);
+    $("ovLong").append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Longest gaps still orderable" }), E("button", { class: "btn secondary small", type: "button", text: "See all", onclick: () => { $("oDisc").value = "ord"; $("oMin").value = "0"; showTab("out"); } })]),
+      longest.length ? table(["Store", "Item", "Supplier", "Out for"], longest.map((o) => E("tr", null, [td(shortName(o.store)), itemCell(o), td(o.sup), E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })])])), []) : E("p", { class: "msg ok", text: "No orderable lines out of stock." }));
+    // suppliers with most gaps
+    $("ovSup").append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Suppliers with most gaps" }), E("button", { class: "btn secondary small", type: "button", text: "See all", onclick: () => showTab("suppliers") })]),
+      supBars(outRows(codes), 10));
+    // gaps per check
+    renderHist(codes);
+  }
+  function supBars(rows, n) {
+    const m = {};
+    rows.forEach((o) => { const s = o.sup || "Unknown"; const x = m[s] || (m[s] = { s, ord: 0, disc: 0 }); o.disc ? x.disc++ : x.ord++; });
+    const list = Object.values(m).sort((a, b) => (b.ord + b.disc) - (a.ord + a.disc)).slice(0, n);
+    if (!list.length) return E("p", { class: "note", text: "No gaps." });
+    const max = Math.max(...list.map((x) => x.ord + x.disc));
+    return E("div", null, [E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#EC1B24" }), "Orderable"]), E("span", null, [E("i", { style: "background:#A9B7C2" }), "Discontinued"])]),
+      E("div", { class: "bars" }, list.map((x) => E("div", { class: "hb", title: x.s + ": " + x.ord + " orderable, " + x.disc + " discontinued" }, [E("span", { class: "t", text: x.s }),
+        E("span", { class: "track" }, [E("i", { style: "width:" + (x.ord / max * 100) + "%;background:#EC1B24" }), E("i", { style: "width:" + (x.disc / max * 100) + "%;background:#A9B7C2" })]), E("span", { class: "n", text: int(x.ord + x.disc) })])))]);
+  }
+  function renderHist(codes) {
+    const box = $("ovHist"); box.innerHTML = "";
+    const t = today(), days = []; for (let i = 29; i >= 0; i--) days.push(addDays(t, -i));
+    const per = days.map((d) => { let n0 = 0, nS = 0, k = 0; codes.forEach((c) => { const st = ST[c]; if (st && st.hist[d]) { const h = histOf(st, d); n0 += h.n0; nS += h.nS; k++; } }); return { d, n0, nS, k }; });
+    if (!per.some((p) => p.k)) { box.hidden = true; return; }
+    const avg = !single();
+    const val = (p, f) => p.k ? (avg ? p[f] / p.k : p[f]) : null;
+    const max = Math.max(1, ...per.map((p) => Math.max(val(p, "n0") || 0, val(p, "nS") || 0)));
+    const Wd = 1100, Ht = 240, L = 46, R = 10, T = 10, B = 28, n = per.length, gw = (Wd - L - R) / n, bw = gw * 0.6;
+    const x = (i) => L + (i + 0.5) * gw, y = (v) => T + (1 - v / max) * (Ht - T - B);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Gaps per check, last 30 days");
+    const mk = (tag, a, txt) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; svg.appendChild(nd); return nd; };
+    [0, 0.5, 1].forEach((f) => { mk("line", { x1: L, x2: Wd - R, y1: y(max * f), y2: y(max * f), stroke: "#E9EBEA" }); mk("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, int(max * f)); });
+    let path = "", pen = false;
+    per.forEach((p, i) => {
+      const v = val(p, "n0");
+      if (v != null) { const r = mk("rect", { x: x(i) - bw / 2, y: y(v), width: bw, height: Math.max(0, y(0) - y(v)), rx: 2, fill: "#EC1B24", "fill-opacity": 0.8 }); const tt = document.createElementNS(ns, "title"); tt.textContent = dayLabel(p.d) + ": " + int(v) + " without stock, " + int(val(p, "nS")) + " with stock" + (avg ? " (average of " + p.k + " stores)" : ""); r.appendChild(tt); }
+      const s = val(p, "nS"); if (s == null) { pen = false; } else { path += (pen ? "L" : "M") + x(i) + " " + y(s); pen = true; }
+      if (s != null) mk("circle", { cx: x(i), cy: y(s), r: 3.5, fill: "#10252b" });
+      if (i % 3 === (n - 1) % 3) mk("text", { x: x(i), y: Ht - 8, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, short(p.d));
+    });
+    if (path) mk("path", { d: path, fill: "none", stroke: "#10252b", "stroke-width": 2.5, "stroke-linejoin": "round" });
+    box.append(E("h2", { text: "Gaps per check · last 30 days" }), E("p", { class: "note", style: "margin:-6px 0 8px", text: avg ? "Average per store that uploaded that day, so missing uploads don't pull the figure down. Hover a bar for the figures." : "Hover a bar for the figures." }),
+      E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:#EC1B24" }), "Gaps without stock"]), E("span", null, [E("i", { style: "background:#10252b;height:3px;vertical-align:3px" }), "Gaps with stock"])]), svg);
+  }
+
+  // ═════════ OUT OF STOCK ═════════
+  function fillSelect(sel, values, allLabel) {
+    const cur = sel.value; sel.innerHTML = ""; sel.add(new Option(allLabel, ""));
+    values.forEach((v) => sel.add(new Option(v, v))); if (values.includes(cur)) sel.value = cur;
+  }
+  function filteredOut(codes) {
+    const all = outRows(codes);
+    fillSelect($("oSup"), [...new Set(all.map((o) => o.sup).filter(Boolean))].sort(), "All suppliers");
+    fillSelect($("oDept"), [...new Set(all.map((o) => o.dept).filter(Boolean))].sort(), "All departments");
+    const q = $("oQ").value.trim().toLowerCase(), sup = $("oSup").value, dept = $("oDept").value, disc = $("oDisc").value, min = +$("oMin").value;
+    return all.filter((o) => (!q || (o.desc + " " + o.code + " " + o.sup).toLowerCase().includes(q)) && (!sup || o.sup === sup) && (!dept || o.dept === dept)
+      && (disc === "all" || (disc === "disc" ? o.disc : !o.disc)) && o.days >= min).sort((a, b) => b.days - a.days || a.desc.localeCompare(b.desc));
+  }
+  function renderOut(codes) {
+    const box = $("outList"), bk = $("backList"); box.innerHTML = ""; bk.innerHTML = "";
+    if (!codes.some((c) => ST[c] && ST[c].date)) { box.appendChild(emptyMsg()); bk.hidden = true; return; }
+    bk.hidden = false;
+    const rows = filteredOut(codes);
+    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: plural(rows.length, "line") + (rows.length ? " · " + rows.filter((o) => o.days >= LONG).length + " out " + LONG + "+ days" : "") }),
+      rows.length ? table([single() ? "" : "Store", "Item", "Department", "Supplier", "Out for", "Discontinued"].filter((h, i) => i || !single()), rows.slice(0, 1500).map((o) => E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.dept), td(o.sup),
+        E("td", null, [daysPill(o.days), E("span", { class: "sub2", text: "since " + short(o.since) })]), td(o.disc ? "Yes" : "No", o.disc ? "" : "")].filter(Boolean))), []) : E("p", { class: "msg ok", text: "Nothing matches these filters." }));
+    // back on shelf
+    const back = []; codes.forEach((c) => { const st = ST[c]; if (st && st.date) st.back.forEach((o) => back.push({ ...o, store: c, date: st.date })); });
+    back.sort((a, b) => b.days - a.days);
+    bk.append(E("h2", { text: "Back on shelf since the previous check" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Lines that were out at the previous check and aren't on the latest one." }),
+      back.length ? table([single() ? "" : "Store", "Item", "Supplier", "Was out for"].filter((h, i) => i || !single()), back.slice(0, 600).map((o) => E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.sup), td(o.days + (o.days === 1 ? " day" : " days") + " (since " + short(o.since) + ")")].filter(Boolean))), []) : E("p", { class: "note", text: "None at the latest check." }));
+  }
+  ["oQ", "oSup", "oDept", "oDisc", "oMin"].forEach((id) => { $(id).addEventListener(id === "oQ" ? "input" : "change", () => renderOut(scope().codes)); });
+  $("oXl").onclick = async () => {
+    const rows = filteredOut(scope().codes);
+    await xl("Gaps without stock - " + scope().label + " - " + today(), [["Store", "Company", "Item code", "Description", "Department", "Category", "Supplier", "Discontinued", "Out since", "Days out", "Latest check"],
+      ...rows.map((o) => [nameOf(o.store), numOf(o.store), o.code, o.desc, o.dept, o.cat, o.sup, o.disc ? "Yes" : "No", o.since, o.days, o.date])]);
+  };
+
+  // ═════════ STOCK ON SYSTEM ═════════
+  let openEd = null;
+  function filteredSys(codes) {
+    const q = $("sQ").value.trim().toLowerCase(), show = $("sShow").value;
+    return sysRows(codes).filter((o) => (!q || (o.desc + " " + o.code + " " + o.sup).toLowerCase().includes(q))
+      && (show === "all" || (show === "closed" ? o.inv && o.inv.status === "Closed" : !(o.inv && o.inv.status === "Closed"))))
+      .sort((a, b) => b.times - a.times || b.stock - a.stock);
+  }
+  function renderSystem(codes) {
+    const box = $("sysList"); box.innerHTML = "";
+    if (!codes.some((c) => ST[c] && ST[c].date)) { box.appendChild(emptyMsg()); $("whyBox").innerHTML = ""; return; }
+    const rows = filteredSys(codes);
+    const tb = [];
+    rows.slice(0, 800).forEach((o) => {
+      const v = o.inv, key = o.store + "|" + o.code;
+      const status = v ? (v.status === "Closed" ? E("span", { class: "pill grey", text: "Closed" }) : E("span", { class: "pill warn", text: v.result && v.result !== "Pending" ? v.result : "Open" })) : E("span", { class: "pill red", text: "To check" });
+      const tr = E("tr", null, [single() ? null : td(shortName(o.store)), itemCell(o), td(o.sup), td(int(o.stock), "num"), E("td", { class: "num" }, [E("span", { class: "days" + (o.times >= 5 ? " d7" : o.times >= 3 ? " d3" : ""), text: o.times + "×" })]),
+        td(short(o.first)), E("td", null, [status, v && v.qty !== "" && v.qty != null ? E("span", { class: "sub2", text: v.qty + " found" + (v.cause && v.cause !== CAUSES[0] ? " · " + v.cause : "") }) : v && v.cause && v.cause !== CAUSES[0] ? E("span", { class: "sub2", text: v.cause }) : null]),
+        E("td", null, [E("button", { class: "btn secondary small", type: "button", text: openEd === key ? "Close" : v ? "Update" : "Record", onclick: () => { openEd = openEd === key ? null : key; renderSystem(codes); } })])].filter(Boolean));
+      tb.push(tr);
+      if (openEd === key) tb.push(editorRow(o, single() ? 7 : 8, codes));
+    });
+    box.append(E("p", { style: "margin:0 0 8px;font-weight:700", text: plural(rows.length, "line") + " · " + sysRows(codes).filter((o) => !o.inv).length + " not checked yet" }),
+      rows.length ? table([single() ? "" : "Store", "Item", "Supplier", "System stock", "Times listed", "First listed", "Status", ""].filter((h, i) => i || !single()), tb, [single() ? 2 : 3, single() ? 3 : 4]) : E("p", { class: "msg ok", text: "Nothing to show." }));
+    renderWhy(codes);
+  }
+  function editorRow(o, span, codes) {
+    const v = o.inv || {};
+    const res = E("select", { class: "in" }, RESULTS.map((r) => E("option", { value: r, text: r })));
+    res.value = v.result || "Pending";
+    const qty = E("input", { class: "in", type: "number", min: "0", step: "1", placeholder: "Units", value: v.qty != null ? v.qty : "" });
+    const cause = E("select", { class: "in" }, CAUSES.map((r) => E("option", { value: r, text: r }))); cause.value = v.cause || CAUSES[0]; cause.disabled = !canClose;
+    const notes = E("input", { class: "in", type: "text", placeholder: "What was found, where, what was adjusted…", value: v.notes || "" });
+    const close = E("input", { type: "checkbox" }); close.checked = v.status === "Closed"; close.disabled = !canClose;
+    const save = E("button", { class: "btn small", type: "button", text: "Save" });
+    save.onclick = async () => {
+      save.disabled = true;
+      const data = { code: o.code, desc: o.desc, sup: o.sup, stock: o.stock, opened: v.opened || ST[o.store].date, result: res.value, qty: qty.value === "" ? "" : +qty.value, notes: notes.value.trim(),
+        status: close.checked ? "Closed" : "Open", by: me.email, byName: me.name, at: Date.now() };
+      if (canClose) data.cause = cause.value; else if (v.cause) data.cause = v.cause;
+      if (close.checked && v.status !== "Closed") { data.closedOn = today(); data.closedBy = me.name; }
+      if (!close.checked) { data.closedOn = ""; }
+      try { await fs.setDoc(invDoc(o.store, o.code), data); INV[o.store] = INV[o.store] || {}; INV[o.store][docId(o.code)] = data; openEd = null; SPARUI.toast("Saved"); renderSystem(codes); }
+      catch (e) { save.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+    };
+    return E("tr", { class: "ed" }, [E("td", { colspan: String(span) }, [E("div", { class: "edgrid" }, [
+      E("label", null, ["Result", res]), E("label", null, ["Quantity found", qty]), E("label", null, ["Cause" + (canClose ? "" : " (Head Office / ROM)"), cause]),
+      E("label", { class: "wide" }, ["Notes", notes]),
+      E("label", { style: "flex-direction:row;align-items:center;gap:8px;color:var(--ink)" }, [close, "Closed (stock adjusted)" + (canClose ? "" : " · Head Office / ROM")]),
+      E("div", null, [save]),
+      E("span", { class: "note", style: "grid-column:span 3", text: v.at ? "Last saved by " + (v.byName || "") + " " + SPARUI.fmtDateTime(v.at) + (v.closedBy ? " · closed by " + v.closedBy + " " + short(v.closedOn) : "") : "System stock at the check: " + o.stock + (o.actual ? " · actual stock noted: " + o.actual : "") })])])]);
+  }
+  function renderWhy(codes) {
+    const box = $("whyBox"); box.innerHTML = "";
+    const causes = {}; let units = 0;
+    codes.forEach((c) => Object.values(INV[c] || {}).forEach((v) => {
+      if (!v.cause || v.cause === CAUSES[0]) return;
+      const u = Math.max(0, (+v.stock || 0) - (+v.qty || 0)); const x = causes[v.cause] || (causes[v.cause] = { n: 0, u: 0 }); x.n++; x.u += u; units += u;
+    }));
+    const list = Object.entries(causes).sort((a, b) => b[1].n - a[1].n), max = Math.max(1, ...list.map((x) => x[1].n));
+    box.append(E("h2", { text: "Why stock went missing" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "From the investigations with a cause recorded (last 90 days). Units = system stock minus quantity found." }),
+      list.length ? E("div", { class: "bars" }, list.map(([k, x]) => E("div", { class: "hb" }, [E("span", { class: "t", text: k }), E("span", { class: "track" }, [E("i", { style: "width:" + (x.n / max * 100) + "%;background:#EC1B24" })]), E("span", { class: "n", text: x.n + " · " + int(x.u) + "u" })]))) : E("p", { class: "note", text: "No causes recorded yet. Open a line above and record what the item's history showed." }),
+      list.length ? E("p", { class: "note", style: "margin:10px 0 0", text: int(units) + " units unaccounted for in total." }) : "");
+  }
+  ["sQ", "sShow"].forEach((id) => $(id).addEventListener(id === "sQ" ? "input" : "change", () => renderSystem(scope().codes)));
+  $("sXl").onclick = async () => {
+    const rows = filteredSys(scope().codes);
+    await xl("Gaps with stock - " + scope().label + " - " + today(), [["Store", "Item code", "Description", "Supplier", "System stock", "Times listed", "First listed", "Result", "Quantity found", "Cause", "Status", "Notes"],
+      ...rows.map((o) => [nameOf(o.store), o.code, o.desc, o.sup, o.stock, o.times, o.first, o.inv ? o.inv.result : "Not checked", o.inv ? o.inv.qty : "", o.inv ? o.inv.cause || "" : "", o.inv ? o.inv.status : "", o.inv ? o.inv.notes || "" : ""])]);
+  };
+
+  // ═════════ SUPPLIERS ═════════
+  let openSup = null;
+  function renderSuppliers(codes) {
+    const box = $("supList"), bars = $("supBars"); box.innerHTML = ""; bars.innerHTML = "";
+    const rows = outRows(codes);
+    if (!rows.length) { box.appendChild(codes.some((c) => ST[c] && ST[c].date) ? E("p", { class: "msg ok", text: "No gaps at the latest checks." }) : emptyMsg()); bars.hidden = true; return; }
+    bars.hidden = false;
+    const m = {};
+    rows.forEach((o) => { const s = o.sup || "Unknown"; const x = m[s] || (m[s] = { s, ord: 0, disc: 0, stores: new Set(), long: 0, l7: 0 }); o.disc ? x.disc++ : x.ord++; x.stores.add(o.store); if (!o.disc) { x.long = Math.max(x.long, o.days); if (o.days >= LONG) x.l7++; } });
+    const list = Object.values(m).sort((a, b) => b.ord - a.ord || b.disc - a.disc);
+    const tb = [];
+    list.forEach((x) => {
+      const id = supId(x.s), sn = SUP[id];
+      tb.push(E("tr", null, [E("td", null, [E("b", { text: x.s })]), td(int(x.ord), "num"), td(int(x.l7), "num" + (x.l7 ? " down" : "")), td(int(x.disc), "num"), td(int(x.stores.size), "num"), E("td", null, x.long ? [daysPill(x.long)] : ["–"]),
+        E("td", null, sn ? [short(sn.chasedOn), sn.eta ? E("span", { class: "sub2", text: "expected " + short(sn.eta) }) : null].filter(Boolean) : [E("span", { class: "note", text: "not chased" })]),
+        E("td", null, [E("button", { class: "btn secondary small", type: "button", text: openSup === id ? "Close" : isHO ? "Follow up" : "Details", onclick: () => { openSup = openSup === id ? null : id; renderSuppliers(codes); } })])]));
+      if (openSup === id) tb.push(supEditor(x, rows.filter((o) => (o.sup || "Unknown") === x.s), codes));
+    });
+    box.append(E("h2", { text: "Supplier gaps at the latest check" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Lines without stock by supplier, across the stores in this view. Head Office records when a supplier was chased and when stock is expected; everyone sees it." }),
+      table(["Supplier", "Orderable out", LONG + "+ days", "Discontinued", "Stores", "Longest", "Last chased", ""], tb, [1, 2, 3, 4]));
+    bars.append(E("h2", { text: "Suppliers with most gaps" }), supBars(rows, 15));
+  }
+  function supEditor(x, items, codes) {
+    const id = supId(x.s), sn = SUP[id] || {};
+    const list = E("div", { class: "brief", style: "max-height:220px" }, [items.filter((o) => !o.disc).sort((a, b) => b.days - a.days).map((o) => "• " + o.desc + " (" + o.code + ") — " + shortName(o.store) + ", " + o.days + (o.days === 1 ? " day" : " days")).join("\n") || "No orderable lines."]);
+    const kids = [E("b", { text: "Orderable lines out" }), list];
+    if (isHO) {
+      const ch = E("input", { class: "in", type: "date", value: sn.chasedOn || today() }), eta = E("input", { class: "in", type: "date", value: sn.eta || "" });
+      const reply = E("input", { class: "in", type: "text", placeholder: "What the rep said", value: sn.reply || "" });
+      const save = E("button", { class: "btn small", type: "button", text: "Save follow-up" });
+      save.onclick = async () => {
+        save.disabled = true;
+        const data = { sup: x.s, chasedOn: ch.value, eta: eta.value, reply: reply.value.trim(), by: me.email, byName: me.name, at: Date.now() };
+        try { await fs.setDoc(supDoc(id), data); SUP[id] = data; openSup = null; SPARUI.toast("Saved"); renderSuppliers(codes); } catch (e) { save.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      kids.push(E("div", { class: "edgrid", style: "margin-top:8px" }, [E("label", null, ["Chased on", ch]), E("label", null, ["Stock expected", eta]), E("label", { class: "wide" }, ["Reply", reply]), E("div", null, [save])]));
+    } else if (sn.chasedOn) kids.push(E("p", { class: "note", text: "Chased " + short(sn.chasedOn) + (sn.eta ? " · expected " + short(sn.eta) : "") + (sn.reply ? " · " + sn.reply : "") + " (" + (sn.byName || "") + ")" }));
+    return E("tr", { class: "ed" }, [E("td", { colspan: "8" }, kids)]);
+  }
+
+  // ═════════ ACROSS STORES ═════════
+  function renderCross(codes) {
+    const a = $("crossSame"), b = $("crossTr"); a.innerHTML = ""; b.innerHTML = "";
+    // compare against every store you can see, using checks from the last 3 days
+    const all = stores.map((s) => s.code);
+    return loadStates(all).then(() => {
+      const t = today(), recent = all.filter((c) => ST[c] && ST[c].date && diffDays(ST[c].date, t) <= 3);
+      if (!recent.length) { a.appendChild(emptyMsg()); b.hidden = true; return; }
+      b.hidden = false;
+      const view = new Set(codes), m = {};
+      recent.forEach((c) => ST[c].out.forEach((o) => { if (o.disc) return; const x = m[o.code] || (m[o.code] = { ...o, stores: [] }); x.stores.push({ c, days: diffDays(o.since, ST[c].date) }); }));
+      const multi = Object.values(m).filter((x) => x.stores.length >= 2 && x.stores.some((s) => view.has(s.c))).sort((p, q) => q.stores.length - p.stores.length || Math.max(...q.stores.map((s) => s.days)) - Math.max(...p.stores.map((s) => s.days)));
+      a.append(E("h2", { text: "Same item out in two or more stores" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Orderable lines without stock in several stores at once (checks from the last 3 days, " + recent.length + " stores). Usually a supplier or warehouse problem rather than a store one." }),
+        multi.length ? table(["Item", "Supplier", "Stores", "Out in"], multi.slice(0, 300).map((x) => E("tr", null, [itemCell(x), td(x.sup), td(x.stores.map((s) => shortName(s.c) + " (" + s.days + "d)").join(", ")), td(int(x.stores.length), "num")])), [3])
+          : E("p", { class: "msg ok", text: "No item is out in more than one store." }));
+      // transfer ideas
+      b.append(E("h2", { text: "Transfer ideas" + (single() ? " for " + nameOf(codes[0]) : "") }));
+      if (!single()) { b.appendChild(E("p", { class: "note", text: "Choose one store in View to see the lines it is out of that other stores don't have on their gap lists." })); return; }
+      const c0 = codes[0], st = ST[c0];
+      if (!st || !st.date) { b.appendChild(E("p", { class: "note", text: "No gap check for this store yet." })); return; }
+      const others = recent.filter((c) => c !== c0);
+      const ideas = [...st.out.values()].filter((o) => !o.disc).map((o) => ({ ...o, days: diffDays(o.since, st.date), from: others.filter((c) => !ST[c].out.has(o.code) && !ST[c].sys.some((x) => x.code === o.code)) }))
+        .filter((o) => o.from.length && o.days >= 1).sort((p, q) => q.days - p.days);
+      b.append(E("p", { class: "note", style: "margin:-6px 0 12px", text: "Lines out at " + nameOf(c0) + " that aren't on the latest gap list of these stores. Not being on a gap list doesn't prove the stock is there (the store may not range the line), so phone first." }),
+        ideas.length ? table(["Item", "Supplier", "Out for", "Try"], ideas.slice(0, 200).map((o) => E("tr", null, [itemCell(o), td(o.sup), E("td", null, [daysPill(o.days)]), td(o.from.slice(0, 6).map(shortName).join(", ") + (o.from.length > 6 ? " +" + (o.from.length - 6) : ""))])), [])
+          : E("p", { class: "note", text: "No transfer ideas: other stores have the same lines on their gap lists, or no other store has a recent check." }));
+    });
+  }
+
+  // ═════════ DAILY BRIEF ═════════
+  function briefBox(title, sub, text) {
+    const pre = E("div", { class: "brief", text });
+    const copy = E("button", { class: "btn secondary small", type: "button", text: "Copy", onclick: async () => {
+      let ok = false; try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { const ta = E("textarea", { style: "position:fixed;left:-9999px" }); ta.value = text; document.body.appendChild(ta); ta.select(); try { ok = document.execCommand("copy"); } catch (e2) {} ta.remove(); }
+      SPARUI.toast(ok ? "Copied" : "Couldn't copy, select the text instead", ok ? "ok" : "err");
+    } });
+    return E("div", { class: "card panel", style: "margin:0" }, [E("div", { class: "row", style: "justify-content:space-between" }, [E("div", null, [E("h3", { style: "margin:0", text: title }), sub ? E("span", { class: "note", text: sub }) : null]), copy]), pre]);
+  }
+  function briefStore(c, th) {
+    const st = ST[c]; if (!st || !st.date) return null;
+    const h = histOf(st, st.date), out = [...st.out.values()].map((o) => ({ ...o, days: diffDays(o.since, st.date) }));
+    const longs = out.filter((o) => !o.disc && o.days >= th).sort((a, b) => b.days - a.days);
+    const L = [nameOf(c) + " — gap check " + dayLabel(st.date), "",
+      "• " + plural(h.n0, "line") + " without stock (" + h.nw + " new, " + h.back + " back on the shelf since the previous check)" + (h.disc ? "; " + h.disc + " of them discontinued" : "") + "."];
+    if (longs.length) { L.push("", "Orderable lines out " + th + "+ days (" + longs.length + "):"); longs.slice(0, 15).forEach((o) => L.push("  - " + o.desc + " (" + o.code + ") · " + o.sup + " · " + o.days + " days")); if (longs.length > 15) L.push("  … and " + (longs.length - 15) + " more"); L.push("  Please check the orders for these lines."); }
+    else L.push("• No orderable line out " + th + "+ days. Well done.");
+    if (st.sys.length) { L.push("", "Stock on the system but not on the shelf (" + st.sys.length + "): please check the back store and refill, then record what you found in the hub:"); st.sys.slice().sort((a, b) => b.stock - a.stock).slice(0, 12).forEach((o) => L.push("  - " + o.desc + " (" + o.code + ") · system " + o.stock)); if (st.sys.length > 12) L.push("  … and " + (st.sys.length - 12) + " more"); }
+    if (diffDays(st.date, today()) > 0) L.push("", "Note: the latest gap check is from " + dayLabel(st.date) + ". Please upload today's after the 1pm check.");
+    return L.join("\n");
+  }
+  function renderBrief(codes) {
+    const box = $("briefOut"); box.innerHTML = "";
+    const th = +$("bDays").value, withData = codes.filter((c) => ST[c] && ST[c].date);
+    if (!withData.length) { box.appendChild(emptyMsg()); return; }
+    box.append(E("h2", { style: "margin:18px 0 10px", text: "For Store Managers" }), E("div", { class: "grid-2" }, withData.map((c) => briefBox(nameOf(c), "Latest check " + short(ST[c].date), briefStore(c, th)))));
+    const m = {};
+    outRows(withData).filter((o) => !o.disc && o.days >= th).forEach((o) => { const s = o.sup || "Unknown"; (m[s] = m[s] || []).push(o); });
+    const sups = Object.entries(m).sort((a, b) => b[1].length - a[1].length);
+    box.append(E("h2", { style: "margin:22px 0 10px", text: "For suppliers" }));
+    if (!sups.length) { box.appendChild(E("p", { class: "note", text: "No orderable lines out " + th + "+ days." })); return; }
+    box.appendChild(E("div", { class: "grid-2" }, sups.map(([s, items]) => {
+      const byItem = {}; items.forEach((o) => { const x = byItem[o.code] || (byItem[o.code] = { desc: o.desc, code: o.code, st: [] }); x.st.push(shortName(o.store) + " " + o.days + "d"); });
+      const lines = Object.values(byItem).sort((a, b) => b.st.length - a.st.length);
+      const text = ["Hello,", "", "These lines from " + s + " are out of stock in our stores and have been for " + th + "+ days:", ...lines.slice(0, 30).map((x) => "- " + x.desc + " (" + x.code + "): " + x.st.join(", ")), lines.length > 30 ? "… and " + (lines.length - 30) + " more" : "", "", "Please let us know about availability and the next delivery date.", "Thank you,", me.name || "SPAR Malta"].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
+      const sn = SUP[supId(s)];
+      return briefBox(s, plural(lines.length, "line") + (sn && sn.chasedOn ? " · last chased " + short(sn.chasedOn) : ""), text);
+    })));
+  }
+  $("bDays").onchange = () => renderBrief(scope().codes);
+
+  // ═════════ UPLOADS ═════════
+  function renderUploads(codes) {
+    const a = $("upToday"), b = $("upHist"); a.innerHTML = ""; b.innerHTML = "";
+    const t = today();
+    const rows = codes.slice().sort((x, y) => nameOf(x).localeCompare(nameOf(y))).map((c) => {
+      const st = ST[c] || freshState(), has = st.dates.includes(t);
+      const miss = []; for (let i = 1; i <= 13; i++) { const d = addDays(t, -i); if (!st.dates.includes(d)) miss.push(d); }
+      return E("tr", null, [E("td", null, [E("b", { text: nameOf(c) }), E("span", { class: "sub2", text: numOf(c) ? "Company " + numOf(c) : "" })]),
+        E("td", null, [has ? E("span", { class: "pill", text: "Uploaded" }) : E("span", { class: "pill warn", text: "Not yet" })]),
+        E("td", null, st.date ? [short(st.date) + " ", freshPill(st.date)] : ["–"]),
+        td(st.dates.length ? (miss.length ? miss.slice(0, 7).map(short).join(", ") + (miss.length > 7 ? " +" + (miss.length - 7) : "") : "None") : "No checks yet"),
+        E("td", null, isHO && st.date ? [E("button", { class: "btn secondary small", type: "button", text: "Rebuild", title: "Recalculate this store's days out and counts from its saved checks", onclick: async (ev) => { ev.target.disabled = true; try { await rebuild(c); await loadStates([c], true); SPARUI.toast("Rebuilt"); render(); } catch (e) { ev.target.disabled = false; SPARUI.toast("Couldn't rebuild: " + (e.code || e.message), "err"); } } })] : [])]);
+    });
+    const done = codes.filter((c) => ST[c] && ST[c].dates.includes(t)).length;
+    a.append(E("h2", { text: "Today's gap checks · " + dayLabel(t) }), E("p", { class: "note", style: "margin:-6px 0 12px", text: done + " of " + codes.length + " stores have uploaded today. Days missed in the last 2 weeks are listed so they can be uploaded." }),
+      table(["Store", "Today", "Latest check", "Missed (last 14 days)", ""], rows, []));
+    // imported checks
+    const list = [];
+    codes.forEach((c) => { const st = ST[c]; if (st) st.dates.slice(-30).forEach((d) => list.push({ c, d, h: histOf(st, d) })); });
+    list.sort((x, y) => y.d.localeCompare(x.d) || nameOf(x.c).localeCompare(nameOf(y.c)));
+    b.append(E("h2", { text: "Imported checks" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "The last 30 checks per store. " + (isHO ? "Delete a check uploaded by mistake; the store's figures are then recalculated." : "") }),
+      list.length ? table(["Date", "Store", "Without stock", "New", "Back", "With stock", "Uploaded by", ""], list.slice(0, 400).map((x) => E("tr", null, [td(dayLabel(x.d)), td(nameOf(x.c)), td(int(x.h.n0), "num"), td(int(x.h.nw), "num"), td(int(x.h.back), "num"), td(int(x.h.nS), "num"), td(x.h.by || "–"),
+        E("td", null, isHO ? [E("button", { class: "btn danger small", type: "button", text: "Delete", onclick: async (ev) => {
+          if (!confirm("Delete the gap check for " + nameOf(x.c) + " on " + dayLabel(x.d) + "?")) return;
+          ev.target.disabled = true;
+          try { await fs.deleteDoc(chkDoc(x.c, x.d)); await rebuild(x.c); await loadStates([x.c], true); SPARUI.toast("Deleted"); render(); } catch (e) { ev.target.disabled = false; SPARUI.toast("Couldn't delete: " + (e.code || e.message), "err"); }
+        } })] : [])])), [2, 3, 4, 5]) : E("p", { class: "note", text: "Nothing uploaded yet." }));
+  }
+
+  // ── Reading the gap check Excel ──
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("Couldn't load the Excel reader.")); document.head.appendChild(s); });
+  }
+  async function xl(name, rows) {
+    const X = await loadXLSX(), wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), "Sheet1");
+    X.writeFile(wb, "SPAR " + name.replace(/[\\/:*?"<>|]+/g, "-") + ".xlsx");
+  }
+  const MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+  function toISO(v, X) {
+    if (v == null || v === "") return null;
+    if (typeof v === "number") { const p = X.SSF.parse_date_code(v); return p ? p.y + "-" + pad(p.m) + "-" + pad(p.d) : null; }
+    if (v instanceof Date) return iso(v);
+    const s = String(v).trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+    m = s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,4})[-\/ ](\d{2,4})/); if (m && MON[m[2].toLowerCase()]) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + pad(MON[m[2].toLowerCase()]) + "-" + pad(+m[1]);
+    m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); if (m) return m[3] + "-" + pad(+m[2]) + "-" + pad(+m[1]);
+    return null;
+  }
+  async function parseFile(file) {
+    const X = await loadXLSX();
+    const wb = X.read(await file.arrayBuffer(), { type: "array" });
+    let company = null, date = null; const ns = [], ws = [];
+    wb.SheetNames.forEach((name) => {
+      const rows = X.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+      const kind = /without/i.test(name) || /without/i.test(String((rows[0] || [])[0] || "")) ? "ns" : /with/i.test(name) || /with stock/i.test(String((rows[0] || [])[0] || "")) ? "ws" : null;
+      let h = -1;
+      rows.slice(0, 20).forEach((r, i) => {
+        const a = String(r[0] == null ? "" : r[0]).trim().toLowerCase();
+        if (a === "company" && r[1] != null && !company) company = String(r[1]).trim().replace(/\.0$/, "");
+        if (a.startsWith("date") && r[1] != null && !date) date = toISO(r[1], X);
+        if (h < 0 && a === "item code") h = i;
+      });
+      if (h < 0 || !kind) return;
+      const head = rows[h].map((x) => String(x == null ? "" : x).trim().toLowerCase());
+      const col = (...names) => head.findIndex((x) => names.some((n) => x === n || x.startsWith(n)));
+      const c = { code: col("item code"), dept: col("department"), cat: col("category"), sup: col("supplier"), desc: col("item description", "description"), stock: col("total stock", "stock"),
+        disc: col("discontinued"), extra: kind === "ns" ? col("reason") : col("actual stock"), prep: col("prepared by") };
+      rows.slice(h + 1).forEach((r) => {
+        const code = clean(r[c.code]); if (!code || /^total/i.test(code)) return;
+        const g = (k) => c[k] >= 0 ? r[c[k]] : "";
+        const row = [code, g("dept"), g("cat"), g("sup"), g("desc"), g("stock") === "" || g("stock") == null ? "" : +g("stock"), /^y/i.test(String(g("disc") || "")) ? "Y" : "N", g("extra") == null ? "" : g("extra")];
+        if (kind === "ws") row.push(g("prep") == null ? "" : g("prep"));
+        (kind === "ns" ? ns : ws).push(row);
+      });
+    });
+    const code = byNum[company] || (byCode[company] ? company : null);
+    return { file: file.name, company, date, code, ns, ws };
+  }
+
+  // ── Upload flow (Overview drop zone and Uploads tab) ──
+  let pending = [];
+  async function takeFiles(files, msgId) {
+    const box = $(msgId); box.innerHTML = "";
+    if (!files.length) return;
+    box.appendChild(E("p", { class: "note", text: "Reading " + plural(files.length, "file") + "…" }));
+    pending = [];
+    for (const f of files) {
+      try { pending.push(await parseFile(f)); } catch (e) { pending.push({ file: f.name, err: "Couldn't read this file: " + (e.message || e) }); }
+    }
+    const t = today();
+    pending.forEach((p) => {
+      if (p.err) return;
+      if (!p.ns.length && !p.ws.length) p.err = "This doesn't look like a gap check file (no “Item Code” rows on the With Stock / Without Stock sheets).";
+      else if (!p.company) p.err = "No Company number found in the file.";
+      else if (!p.code) p.err = "Company " + p.company + " doesn't match a store in the hub (check the store's report number in Manage access).";
+      else if (!p.date) p.err = "No Date Started found in the file.";
+      else if (p.date > t) p.err = "The check is dated " + dayLabel(p.date) + ", which is in the future.";
+      else if (!canUploadFor(p.code)) p.err = nameOf(p.code) + " isn't one of your stores.";
+    });
+    // one file per store and day: the last one wins
+    const seen = {}; pending.forEach((p, i) => { if (p.err) return; const k = p.code + "|" + p.date; if (seen[k] != null) pending[seen[k]].err = "Another file for the same store and day is in this upload."; seen[k] = i; });
+    await loadStates([...new Set(pending.filter((p) => !p.err).map((p) => p.code))]);
+    box.innerHTML = "";
+    const ok = pending.filter((p) => !p.err);
+    const tb = pending.map((p) => E("tr", null, [td(p.file), td(p.code ? nameOf(p.code) : p.company ? "Company " + p.company : "–"), td(p.date ? dayLabel(p.date) : "–"),
+      td(p.err ? "–" : int(p.ns.length), "num"), td(p.err ? "–" : int(p.ws.length), "num"),
+      E("td", null, [p.err ? E("span", { class: "pill red", text: p.err }) : ST[p.code] && ST[p.code].dates.includes(p.date) ? E("span", { class: "pill warn", text: "Replaces the check already saved for that day" }) : E("span", { class: "pill", text: "Ready" })])]));
+    const save = E("button", { class: "btn", type: "button", text: "Save " + plural(ok.length, "gap check") });
+    save.disabled = !ok.length;
+    save.onclick = async () => { save.disabled = true; await saveAll(ok, box); };
+    box.append(table(["File", "Store", "Date started", "Without stock", "With stock", ""], tb, [3, 4]), E("div", { class: "row", style: "margin-top:10px" }, [save, E("button", { class: "btn secondary", type: "button", text: "Cancel", onclick: () => { box.innerHTML = ""; pending = []; } })]));
+  }
+  async function saveAll(list, box) {
+    const msg = E("p", { class: "note", text: "Saving…" }); box.appendChild(msg);
+    let done = 0; const errs = [];
+    // one store at a time per store (each check builds on the store's previous one), stores in parallel
+    const byStore = {}; list.forEach((p) => (byStore[p.code] = byStore[p.code] || []).push(p));
+    await Promise.all(Object.entries(byStore).map(async ([code, items]) => {
+      items.sort((a, b) => a.date.localeCompare(b.date));
+      for (const p of items) {
+        try { await saveCheck(p); done++; msg.textContent = "Saved " + done + " of " + list.length + "…"; }
+        catch (e) { errs.push(nameOf(code) + " " + short(p.date) + ": " + (e.code === "permission-denied" ? "you don't have access to this store" : e.code || e.message)); }
+      }
+    }));
+    box.innerHTML = "";
+    box.appendChild(E("p", { class: "msg " + (errs.length ? "warn" : "ok"), text: "Saved " + plural(done, "gap check") + "." + (errs.length ? " Not saved: " + errs.join("; ") : "") }));
+    pending = [];
+    await loadStates(Object.keys(byStore), true);
+    await loadInv(Object.keys(byStore), true);
+    render();
+  }
+  async function saveCheck(p) {
+    const chk = { date: p.date, code: p.code, company: p.company, file: p.file, ns: enc(p.ns), ws: enc(p.ws), n0: p.ns.length, nS: p.ws.length, by: me.email, byName: me.name, at: Date.now() };
+    await fs.setDoc(chkDoc(p.code, p.date), chk);
+    // the summary: add this check on top if it's the newest, otherwise recalculate from the saved checks
+    let st = null;
+    try { const d = await fs.getDoc(stateDoc(p.code)); st = readState(d.exists() ? d.data() : null); } catch (e) { st = freshState(); }
+    if (!st.date || p.date > st.date) { step(st, chk); await fs.setDoc(stateDoc(p.code), writeState(st)); }
+    else await rebuild(p.code);
+  }
+  function wireDrop(dropId, inputId, msgId) {
+    const d = $(dropId), inp = $(inputId);
+    inp.onchange = () => { takeFiles([...inp.files], msgId); inp.value = ""; };
+    ["dragenter", "dragover"].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.remove("drag"); }));
+    d.addEventListener("drop", (e) => takeFiles([...e.dataTransfer.files].filter((f) => /\.xlsx?$/i.test(f.name)), msgId));
+  }
+  wireDrop("drop1", "file1", "upMsg1");
+  wireDrop("drop2", "file2", "upMsg2");
+
+  // ═════════ START ═════════
+  $("scope").onchange = () => { try { localStorage.setItem("sparGapsScope", $("scope").value); } catch (e) {} openEd = null; openSup = null; render(); };
+  render();
+</script>
+</body>
+</html>
