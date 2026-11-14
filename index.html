@@ -41,7 +41,7 @@
     var first = (me.name || "").split(" ")[0];
     document.getElementById("hi").textContent = "Hello " + first;
     var isDept = me.role === "dept";
-    document.getElementById("sub").textContent = isDept ? "You post DAP tasks for " + (me.dept || "your department") + " and see the stores' answers." + (me.cashAccess ? " You also see the stores' cash sheets." : "") : me.seesAll
+    document.getElementById("sub").textContent = isDept ? "You post DAP tasks for " + (me.dept || "your department") + " and see the stores' answers." + (me.cashAccess ? " You also see the stores' cash sheets and safe counts." : "") : me.seesAll
       ? "You can see all " + me.stores.length + " stores."
       : me.stores.length === 1 ? "Your store: " + me.stores[0].name
       : me.stores.length + " stores: " + me.stores.map(function (s) { return s.name; }).join(", ");

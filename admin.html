@@ -86,14 +86,14 @@ tr.inactive td{color:var(--muted)}
             <div class="storeboxes" id="pGroups" style="margin-left:26px"></div>
           </div>
           <div class="f" id="pCashWrap" hidden>
-            <label class="checkline" style="font-weight:400"><input type="checkbox" id="pCash"> <b>Accounts team</b>: also sees the Cash Sheet Analyser for every store (read only). Nobody else outside the stores and ROMs sees it.</label>
+            <label class="checkline" style="font-weight:400"><input type="checkbox" id="pCash"> <b>Accounts team</b>: also sees the Cash Sheet Analyser and Safe Count for every store (read only). Nobody else outside the stores and ROMs sees them.</label>
           </div>
           <div class="row" style="margin-top:6px">
             <button class="btn" id="pSave" type="submit">Add person</button>
             <button class="btn secondary" id="pCancel" type="button" hidden>Cancel</button>
           </div>
         </form>
-        <p class="roles"><b>Store Manager</b> — their own store. <b>ROM</b> — their stores. <b>Support</b> — all stores. <b>Head Office</b> — all stores, posts DAPs and sets up modules. <b>Admin</b> — everything, plus this page. <b>Department</b> — only posts DAP tasks for their department (e.g. Accounts, Maintenance); tick <b>Accounts team</b> for the accounts people so they also see the cash sheets.</p>
+        <p class="roles"><b>Store Manager</b> — their own store. <b>ROM</b> — their stores. <b>Support</b> — all stores. <b>Head Office</b> — all stores, posts DAPs and sets up modules. <b>Admin</b> — everything, plus this page. <b>Department</b> — only posts DAP tasks for their department (e.g. Accounts, Maintenance); tick <b>Accounts team</b> for the accounts people so they also see the cash sheets and safe counts (read only).</p>
       </div>
 
       <div class="card panel">
@@ -368,7 +368,7 @@ tr.inactive td{color:var(--muted)}
         m.role === "dept" ? "DAP tasks for " + (m.dept || "?")
         : ["admin", "hq", "support"].includes(m.role) ? "All stores"
         : (m.stores || []).length ? m.stores.map(storeName).join(", ") : "⚠ No store assigned" });
-      if (m.cashAccess) stTd.appendChild(E("div", { class: "note", text: "Accounts team: sees the Cash Sheet Analyser" }));
+      if (m.cashAccess) stTd.appendChild(E("div", { class: "note", text: "Accounts team: sees the Cash Sheet Analyser and Safe Count" }));
       if ((m.salesGroups || []).length) stTd.appendChild(E("div", { class: "note", text: "Sales: " + m.salesGroups.map((g) => (salesGroups.find((x) => x.id === g) || { name: g }).name).join(", ") + " only" }));
       const acts = E("div", { class: "acts" });
       acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }));
