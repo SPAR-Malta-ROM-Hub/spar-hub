@@ -340,10 +340,11 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     right.appendChild(E("h3", { text: "Money in and out since the previous count" }));
     const mv = [];
     if (s.cit) mv.push(E("tr", null, [td("CIT delivery" + (k.citRc ? " · receipt " + k.citRc : "")), td("+" + eur(s.cit), "num")]));
-    (k.ins || []).forEach((x) => mv.push(E("tr", null, [td("Received in from " + nameOf(x.store) + (x.mgr ? " · " + x.mgr : "")), td("+" + eur(Number(x.amt) || 0), "num")])));
-    (k.deps || []).forEach((x) => mv.push(E("tr", null, [td("Deposited · bag " + x.bag), td("−" + eur(Number(x.amt) || 0), "num")])));
-    (k.outs || []).forEach((x) => mv.push(E("tr", null, [td("Transferred out to " + nameOf(x.store) + (x.mgr ? " · " + x.mgr : "")), td("−" + eur(Number(x.amt) || 0), "num")])));
-    (k.exps || []).forEach((x) => mv.push(E("tr", null, [td("Expense · " + (x.what || "–") + (x.mgr ? " · " + x.mgr : "")), td("−" + eur(Number(x.amt) || 0), "num")])));
+    const mvRow = (what, why, sign, a) => E("tr", null, [E("td", null, [document.createTextNode(what), why ? E("span", { class: "sub2", text: "Reason: " + why }) : null].filter(Boolean)), td(sign + eur(Number(a) || 0), "num")]);
+    (k.ins || []).forEach((x) => mv.push(mvRow("Received in from " + nameOf(x.store) + (x.mgr ? " · " + x.mgr : ""), x.why, "+", x.amt)));
+    (k.deps || []).forEach((x) => mv.push(mvRow("Deposited · bag " + x.bag, x.why, "−", x.amt)));
+    (k.outs || []).forEach((x) => mv.push(mvRow("Transferred out to " + nameOf(x.store) + (x.mgr ? " · " + x.mgr : ""), x.why, "−", x.amt)));
+    (k.exps || []).forEach((x) => mv.push(mvRow("Expense" + (x.rc ? " · receipt " + x.rc : "") + (x.mgr ? " · " + x.mgr : ""), x.what, "−", x.amt)));
     if (!mv.length) mv.push(E("tr", null, [E("td", { colspan: "2", class: "note", text: "No money in or out." })]));
     mv.push(E("tr", { class: "tot" }, [td("Net movement"), td(sEur(s.moves), "num")]));
     right.appendChild(table(["", "Amount"], mv, [1], false));
@@ -521,17 +522,21 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     }
     card.appendChild(lister("Money deposited from the safe (attach the deposit slip)", "deps", [
       { h: "Bag no.", make: (r) => txt(r.bag, (v) => r.bag = v.toUpperCase().replace(/\s+/g, "")) },
-      { h: "Amount €", make: (r) => inp(r.amt, (v) => r.amt = v, { placeholder: "0.00" }) }], "Nothing deposited from the safe since the previous count. (The Monday deposit goes here too, with its safe bag number.)"));
+      { h: "Amount €", make: (r) => inp(r.amt, (v) => r.amt = v, { placeholder: "0.00" }) },
+      { h: "Reason", make: (r) => txt(r.why, (v) => r.why = v, { placeholder: "e.g. Monday deposit, excess notes" }) }], "Nothing deposited from the safe since the previous count. (The Monday deposit goes here too, with its safe bag number.)"));
     card.appendChild(lister("Money transferred OUT to another shop", "outs", [
       { h: "Shop", make: (r) => storeSel(r.store, (v) => r.store = v) },
       { h: "Amount €", make: (r) => inp(r.amt, (v) => r.amt = v, { placeholder: "0.00" }) },
+      { h: "Reason", make: (r) => txt(r.why, (v) => r.why = v, { placeholder: "e.g. short of change" }) },
       { h: "Manager's name", make: (r) => txt(r.mgr, (v) => r.mgr = v) }], "No money sent to another shop."));
     card.appendChild(lister("Money received IN from another shop", "ins", [
       { h: "Shop", make: (r) => storeSel(r.store, (v) => r.store = v) },
       { h: "Amount €", make: (r) => inp(r.amt, (v) => r.amt = v, { placeholder: "0.00" }) },
+      { h: "Reason", make: (r) => txt(r.why, (v) => r.why = v, { placeholder: "e.g. €2 coins for the weekend" }) },
       { h: "Manager's name", make: (r) => txt(r.mgr, (v) => r.mgr = v) }], "No money received from another shop."));
     card.appendChild(lister("Expenses (attach the receipt)", "exps", [
-      { h: "What for / receipt", make: (r) => txt(r.what, (v) => r.what = v) },
+      { h: "Reason (what for)", make: (r) => txt(r.what, (v) => r.what = v, { placeholder: "e.g. window cleaner" }) },
+      { h: "Receipt no.", make: (r) => txt(r.rc, (v) => r.rc = v) },
       { h: "Amount €", make: (r) => inp(r.amt, (v) => r.amt = v, { placeholder: "0.00" }) },
       { h: "Manager's name", make: (r) => txt(r.mgr, (v) => r.mgr = v) }], "No expenses paid from the safe."));
 
@@ -632,9 +637,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     if (amt(F.cit) < 0 || amt(F.loose) < 0 || amt(F.extra) < 0) e.push("Amounts can't be negative.");
     if (amt(F.cit) > 0 && !String(F.citRc || "").trim()) e.push("Write the CIT receipt number for the money delivered.");
     K.DENOMS.forEach((d) => { const v = F.qty[d.k]; if (v !== "" && v != null && (!/^\d+$/.test(String(v).trim()))) e.push(d.label + ": the number of " + (d.note ? "notes" : "bags") + " must be a whole number."); });
-    F.deps.forEach((x, i) => { if (!String(x.bag || "").trim() || !(amt(x.amt) > 0)) e.push("Money deposited, line " + (i + 1) + ": bag number and amount are needed."); });
-    ["outs", "ins"].forEach((k) => F[k].forEach((x, i) => { if (!x.store || !(amt(x.amt) > 0) || !String(x.mgr || "").trim()) e.push((k === "outs" ? "Money transferred out" : "Money received in") + ", line " + (i + 1) + ": shop, amount and the manager's name are needed."); }));
-    F.exps.forEach((x, i) => { if (!String(x.what || "").trim() || !(amt(x.amt) > 0) || !String(x.mgr || "").trim()) e.push("Expense, line " + (i + 1) + ": what it was for, the amount and the manager's name are needed."); });
+    F.deps.forEach((x, i) => { if (!String(x.bag || "").trim() || !(amt(x.amt) > 0) || !String(x.why || "").trim()) e.push("Money deposited, line " + (i + 1) + ": bag number, amount and the reason are needed."); });
+    ["outs", "ins"].forEach((k) => F[k].forEach((x, i) => { if (!x.store || !(amt(x.amt) > 0) || !String(x.why || "").trim() || !String(x.mgr || "").trim()) e.push((k === "outs" ? "Money transferred out" : "Money received in") + ", line " + (i + 1) + ": shop, amount, the reason and the manager's name are needed."); }));
+    F.exps.forEach((x, i) => { if (!String(x.what || "").trim() || !String(x.rc || "").trim() || !(amt(x.amt) > 0) || !String(x.mgr || "").trim()) e.push("Expense, line " + (i + 1) + ": the reason, the receipt number, the amount and the manager's name are needed."); });
     const keys = {}; F.bags.concat(F.deps).forEach((b) => { const k = K.bagKey(b.bag); if (!k) return; if (keys[k]) e.push("Bag " + b.bag + " is listed twice."); keys[k] = true; });
     F.bags.forEach((b) => { if (!b.st) e.push("Bag " + b.bag + ": choose in the safe, collected or not found."); else if (b.st === "out" && !String(b.rc || "").trim()) e.push("Bag " + b.bag + ": write the CIT receipt number."); });
     const s = K.sums(F);
@@ -661,10 +666,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     const bags = F.bags.map((b) => ({ bag: String(b.bag).toUpperCase(), date: b.date || "", amt: b.amt == null || b.amt === "" ? null : n2(b.amt), st: b.st, on: b.st === "out" ? (b.on || today()) : "", rc: b.st === "out" ? String(b.rc || "").trim() : "", src: b.src || "count" })).concat(floats);
     const body = {
       qty, loose: n2(F.loose), sub: s.sub, extra: n2(F.extra), total: s.total, cit: n2(F.cit), citRc: String(F.citRc || "").trim(),
-      deps: F.deps.map((x) => ({ bag: String(x.bag).toUpperCase().replace(/\s+/g, ""), amt: n2(x.amt) })),
-      outs: F.outs.map((x) => ({ store: x.store, amt: n2(x.amt), mgr: String(x.mgr).trim() })),
-      ins: F.ins.map((x) => ({ store: x.store, amt: n2(x.amt), mgr: String(x.mgr).trim() })),
-      exps: F.exps.map((x) => ({ what: String(x.what).trim(), amt: n2(x.amt), mgr: String(x.mgr).trim() })),
+      deps: F.deps.map((x) => ({ bag: String(x.bag).toUpperCase().replace(/\s+/g, ""), amt: n2(x.amt), why: String(x.why || "").trim() })),
+      outs: F.outs.map((x) => ({ store: x.store, amt: n2(x.amt), why: String(x.why || "").trim(), mgr: String(x.mgr).trim() })),
+      ins: F.ins.map((x) => ({ store: x.store, amt: n2(x.amt), why: String(x.why || "").trim(), mgr: String(x.mgr).trim() })),
+      exps: F.exps.map((x) => ({ what: String(x.what).trim(), rc: String(x.rc || "").trim(), amt: n2(x.amt), mgr: String(x.mgr).trim() })),
       bags, bagsIn: bags.filter((b) => b.st === "in").length,
       prevId: prevRow && prevRow.c ? prevRow.c.id || "" : "", prevTotal: prevRow ? prevRow.total : null, expected: exp, diff,
       nameA: String(F.nameA).trim(), nameB: String(F.nameB).trim(), note: String(F.note || "").trim()
