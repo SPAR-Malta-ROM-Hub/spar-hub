@@ -129,3 +129,20 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .linklike{background:none;border:0;color:var(--brandd);font:700 13.5px Arial,sans-serif;cursor:pointer;padding:8px 0}
 
 @media print{header.top .userbox,.no-print{display:none!important}body{background:#fff}.card{box-shadow:none}}
+
+/* Shared uploader (all upload boxes across the hub) */
+.upl{margin:0 0 18px}
+.upl-h{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:17px;font-weight:700;cursor:pointer;user-select:none;background:none;border:0;padding:0;color:var(--ink);font-family:inherit;text-align:left}
+.upl-h .upl-arrow{font-size:12px;color:var(--muted);transition:transform .15s}
+.upl.closed .upl-arrow{transform:rotate(-90deg)}
+.upl.closed .upl-body{display:none}
+.upl-box{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#fff}
+.upl-box.drag{border-color:var(--gd);background:var(--goodsoft)}
+.upl-box input[type=file]{font:14px Arial,sans-serif;max-width:100%}
+.upl-status{margin:10px 0 12px;color:var(--muted);font-size:13px}
+.upl-status b{color:var(--ink)}
+.upl-btn{appearance:none;background:var(--gd);color:#fff;border:0;border-radius:8px;padding:11px 18px;font:700 14px Arial,sans-serif;cursor:pointer}
+.upl-btn:hover{background:#005c31}
+.upl-btn:disabled{background:#9DB8A9;cursor:not-allowed}
+.upl-out:empty{display:none}
+.upl-out{margin-top:14px}

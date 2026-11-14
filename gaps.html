@@ -82,9 +82,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
   <!-- OVERVIEW -->
   <section data-pane="overview">
-    <div class="drop" id="drop1" style="margin-bottom:14px"><span style="font-weight:700">Drop today's gap check file here</span> <span class="note">or</span> <label class="btn small" for="file1" style="margin-left:6px">Upload gap check</label><input type="file" id="file1" accept=".xlsx,.xls" multiple hidden>
-      <div class="note" style="margin-top:6px">The Excel file downloaded after the 1pm gap check (both sheets: with stock and without stock). Several stores at once is fine.</div></div>
-    <div id="upMsg1"></div>
+    <div class="card panel" style="margin:0 0 16px"><div id="up1"></div><div id="upMsg1"></div></div>
     <div class="kpis six" id="kpis"></div>
     <div class="card panel" id="ovStores"></div>
     <div class="grid-2" style="margin-top:16px">
@@ -164,10 +162,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   <!-- UPLOADS -->
   <section data-pane="uploads" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Upload gap checks</h2>
-      <p class="note" style="margin:-6px 0 12px">Each store uploads its own gap check every day after the 1pm check. The file is matched to the store by the Company number inside it (67 = report-67) and to the day by its Date Started. Uploading the same store and day again replaces it.</p>
-      <div class="drop" id="drop2"><p style="margin:0 0 10px;font-weight:700">Drag the gap check files here</p><label class="btn" for="file2">Choose gap check files</label><input type="file" id="file2" accept=".xlsx,.xls" multiple hidden></div>
-      <div id="upMsg2" style="margin-top:12px"></div>
+      <div id="up2"></div>
+      <div id="upMsg2"></div>
     </div>
     <div class="card panel" id="upToday"></div>
     <div class="card panel" id="upHist"></div>
@@ -822,7 +818,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
   // ── Upload flow (Overview drop zone and Uploads tab) ──
   let pending = [];
-  async function takeFiles(files, msgId) {
+  async function takeFiles(files, msgId, auto) {
     const box = $(msgId); box.innerHTML = "";
     if (!files.length) return;
     box.appendChild(E("p", { class: "note", text: "Reading " + plural(files.length, "file") + "…" }));
@@ -845,6 +841,14 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     await loadStates([...new Set(pending.filter((p) => !p.err).map((p) => p.code))]);
     box.innerHTML = "";
     const ok = pending.filter((p) => !p.err);
+    if (auto) {
+      const bad = pending.filter((p) => p.err);
+      if (ok.length) await saveAll(ok, box);
+      if (bad.length) box.append(E("p", { class: "note", style: "margin:10px 0 6px;font-weight:700", text: plural(bad.length, "file") + " not saved:" }),
+        table(["File", "Store", "Date started", "Why"], bad.map((p) => E("tr", null, [td(p.file), td(p.code ? nameOf(p.code) : p.company ? "Company " + p.company : "–"), td(p.date ? dayLabel(p.date) : "–"), E("td", null, [E("span", { class: "pill red", text: p.err })])])), []));
+      pending = [];
+      return;
+    }
     const tb = pending.map((p) => E("tr", null, [td(p.file), td(p.code ? nameOf(p.code) : p.company ? "Company " + p.company : "–"), td(p.date ? dayLabel(p.date) : "–"),
       td(p.err ? "–" : int(p.ns.length), "num"), td(p.err ? "–" : int(p.ws.length), "num"),
       E("td", null, [p.err ? E("span", { class: "pill red", text: p.err }) : ST[p.code] && ST[p.code].dates.includes(p.date) ? E("span", { class: "pill warn", text: "Replaces the check already saved for that day" }) : E("span", { class: "pill", text: "Ready" })])]));
@@ -881,15 +885,10 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (!st.date || p.date > st.date) { step(st, chk); await fs.setDoc(stateDoc(p.code), writeState(st)); }
     else await rebuild(p.code);
   }
-  function wireDrop(dropId, inputId, msgId) {
-    const d = $(dropId), inp = $(inputId);
-    inp.onchange = () => { takeFiles([...inp.files], msgId); inp.value = ""; };
-    ["dragenter", "dragover"].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.add("drag"); }));
-    ["dragleave", "drop"].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.remove("drag"); }));
-    d.addEventListener("drop", (e) => takeFiles([...e.dataTransfer.files].filter((f) => /\.xlsx?$/i.test(f.name)), msgId));
-  }
-  wireDrop("drop1", "file1", "upMsg1");
-  wireDrop("drop2", "file2", "upMsg2");
+  SPARUI.uploader("up1", { title: "Upload Today's Gap Checks", noun: "gap check files", button: "Upload Selected Gap Check Files", accept: ".xlsx,.xls", id: "file1",
+    onUpload: (files) => takeFiles(files, "upMsg1", true) });
+  SPARUI.uploader("up2", { title: "Upload Gap Checks", noun: "gap check files", button: "Upload Selected Gap Check Files", accept: ".xlsx,.xls", id: "file2",
+    onUpload: (files) => takeFiles(files, "upMsg2", true) });
 
   // ═════════ START ═════════
   $("scope").onchange = () => { try { localStorage.setItem("sparGapsScope", $("scope").value); } catch (e) {} openEd = null; openSup = null; render(); };

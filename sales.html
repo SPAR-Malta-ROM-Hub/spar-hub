@@ -234,9 +234,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         <label class="note" style="display:flex;gap:6px;align-items:center;font-weight:700">Year <select class="in" id="tgYear" style="width:auto;padding:7px 9px"></select></label>
         <button class="btn small" id="tgSave" type="button">Save targets</button>
         <button class="btn secondary small" id="tgDown" type="button">Download as Excel</button>
-        <label class="btn secondary small" for="tgFile">Upload Excel</label><input type="file" id="tgFile" accept=".xlsx,.xls" hidden>
         <span class="note" id="tgMsg"></span>
       </div>
+      <div id="tgUp"></div>
       <div class="tablewrap" id="tgGrid"></div>
     </div>
     <div class="card panel">
@@ -255,14 +255,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   <!-- ═════════ UPLOAD ═════════ -->
   <section data-pane="upload" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Upload the daily reports</h2>
-      <p class="note" style="margin:-6px 0 14px">Drop in the report files that arrive by email each morning (report-51.xlsx, report-52.xlsx …), as many stores at once as you like. Each file is matched to its store by its report number, and the store name inside it is checked. Uploading the same week again replaces it with the newer figures.</p>
-      <div class="drop" id="drop">
-        <p style="margin:0 0 10px;font-weight:700">Drag the report files here</p>
-        <label class="btn" for="file">Choose report files</label>
-        <input type="file" id="file" accept=".xlsx,.xls" multiple hidden>
-      </div>
-      <div id="preview" style="margin-top:14px"></div>
+      <div id="upHost"></div>
+      <div id="preview"></div>
     </div>
   </section>
 </main>
@@ -1319,8 +1313,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), "Targets");
     X.writeFile(wb, "SPAR " + (g.name || "group") + " targets " + y + ".xlsx");
   };
-  $("tgFile").onchange = async () => {
-    const f = $("tgFile").files[0]; $("tgFile").value = ""; if (!f) return;
+  SPARUI.uploader("tgUp", { title: "Upload Targets from Excel", noun: "target files", button: "Upload Selected Target Files", accept: ".xlsx,.xls", id: "tgFile", open: false,
+    onUpload: async (files) => { for (const f of files) await readTargets(f); } });
+  async function readTargets(f) {
     try {
       const X = await loadXLSX(), wb = X.read(await f.arrayBuffer(), { type: "array" });
       const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
@@ -1331,9 +1326,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
         const code = String(r[0] || "").trim().toUpperCase(); if (!byCode[code]) return;
         mi.forEach((ci, i) => { if (ci < 0) return; const v = nv(r[ci]); (tgData[code] = tgData[code] || {})[y + "-" + pad(i + 1)] = v > 0 ? v : 0; if (v > 0) n++; });
       });
-      drawTargets(); $("tgMsg").textContent = n + " targets read from the file. Check them, then press Save targets.";
-    } catch (e) { $("tgMsg").textContent = "Couldn't read that file: " + (e.message || e); }
-  };
+      drawTargets(); $("tgMsg").textContent = n + " targets read from " + f.name + ". Check them, then press Save targets.";
+    } catch (e) { $("tgMsg").textContent = "Couldn't read " + f.name + ": " + (e.message || e); }
+  }
 
   let grEdit = [];
   function renderGroupList() {
@@ -2465,11 +2460,12 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
 
   function renderUpload() {}
-  const drop = $("drop");
-  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
-  drop.addEventListener("drop", (e) => { const f = [...((e.dataTransfer && e.dataTransfer.files) || [])]; if (f.length) readFiles(f); });
-  $("file").onchange = () => { const f = [...$("file").files]; $("file").value = ""; readFiles(f); };
+  SPARUI.uploader("upHost", { title: "Upload Daily Sales Reports", noun: "sales files", button: "Upload Selected Sales Files", accept: ".xlsx,.xls", id: "file",
+    onUpload: async (files) => {
+      await readFiles(files);
+      const ok = pending.filter((x) => x.p && !x.done);
+      if (ok.length && ok.every((x) => x.code && !x.check)) await savePending();
+    } });
 
   async function readFiles(files) {
     const pv = $("preview"); pv.innerHTML = ""; pv.appendChild(E("p", { class: "note", text: "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…" }));

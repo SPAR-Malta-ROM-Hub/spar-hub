@@ -100,16 +100,14 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
   <section data-pane="upload" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Upload hourly item sales</h2>
-      <p class="note" style="margin:-6px 0 12px">Drop in the daily hourly item sales files (report-hourly_itemsales-51.xlsx …): any number of stores and days at once. Each file is matched to its store by the outlet number inside it (51 = report-51). Uploading the same store and day again replaces it. Weeks run Monday to Sunday, like the Sales Tracker.</p>
-      <div class="drop" id="drop"><p style="margin:0 0 10px;font-weight:700">Drag the hourly files here</p><label class="btn" for="file">Choose hourly files</label><input type="file" id="file" accept=".xlsx,.xls" multiple hidden></div>
-      <div id="preview" style="margin-top:14px"></div>
+      <div id="upHost"></div>
+      <div id="preview"></div>
     </div>
     <div class="card panel">
       <h2>Item list</h2>
       <p class="note" id="itemInfo" style="margin:-6px 0 12px">Loading…</p>
-      <div class="row"><label class="btn secondary" for="itemFile">Upload item list (Excel)</label><input type="file" id="itemFile" accept=".xlsx,.xls" hidden>
-        <button class="btn secondary" id="rebuild" type="button">Rebuild weeks &amp; group copies</button><span class="note" id="itemMsg"></span></div>
+      <div id="itemUp"></div>
+      <div class="row"><button class="btn secondary" id="rebuild" type="button">Rebuild weeks &amp; group copies</button><span class="note" id="itemMsg"></span></div>
       <p class="note" style="margin:10px 0 0">The item list needs columns Item Code, Description, Department, Category, Group and Case Size (the “Item Mapping” export). Refresh it when new lines are added. After changing category groups in the Sales Tracker, press <b>Rebuild weeks &amp; group copies</b> so the F&amp;V, Deli and other teams' copies match.</p>
     </div>
     <div class="card panel">
@@ -755,11 +753,12 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     return s ? s.code : "";
   }
   let pending = [];
-  const drop = $("drop");
-  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
-  drop.addEventListener("drop", (e) => { const f = [...((e.dataTransfer && e.dataTransfer.files) || [])]; if (f.length) readFiles(f); });
-  $("file").onchange = () => { const f = [...$("file").files]; $("file").value = ""; readFiles(f); };
+  SPARUI.uploader("upHost", { title: "Upload Hourly Item Sales", noun: "hourly sales files", button: "Upload Selected Hourly Files", accept: ".xlsx,.xls", id: "file",
+    onUpload: async (files) => {
+      await readFiles(files);
+      const ok = pending.filter((x) => x.p && !x.done);
+      if (ok.length && ok.every((x) => x.code)) await savePending();
+    } });
   async function readFiles(files) {
     const pv = $("preview"); pv.innerHTML = ""; pv.appendChild(E("p", { class: "note", text: "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…" }));
     if (!ITEMS.size) { pv.innerHTML = ""; pv.appendChild(E("p", { class: "msg err", text: "Upload the item list first (below), so items can be sorted into departments and category groups." })); return; }
@@ -856,8 +855,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
 
   // item list upload: packed into bundles of 4,000 items (one text field each)
-  $("itemFile").onchange = async () => {
-    const f = $("itemFile").files[0]; $("itemFile").value = ""; if (!f) return;
+  SPARUI.uploader("itemUp", { title: "Upload Item List", noun: "item list", button: "Upload Item List", accept: ".xlsx,.xls", id: "itemFile", multiple: false,
+    onUpload: async (files) => { if (files[0]) await uploadItems(files[0]); } });
+  async function uploadItems(f) {
     const msg = $("itemMsg"); msg.textContent = "Reading " + f.name + "…";
     try {
       const X = await loadXLSX(), wb = X.read(await f.arrayBuffer(), { type: "array" });
@@ -887,7 +887,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       msg.textContent = "✓ " + keepRows.length.toLocaleString("en-GB") + " items saved (lines marked DO NOT USE left out).";
       buildFilter(); renderUpload();
     } catch (e) { msg.textContent = "Couldn't read that file: " + (e.message || e); }
-  };
+  }
   $("rebuild").onclick = async () => {
     if (!confirm("Rebuild every store's weeks, totals and category group copies from the days already uploaded? This can take a few minutes.")) return;
     const btn = $("rebuild"); btn.disabled = true; let n = 0;

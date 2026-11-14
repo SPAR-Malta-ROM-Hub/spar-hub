@@ -122,13 +122,12 @@ tr.inactive td{color:var(--muted)}
         <div class="row" style="justify-content:space-between;margin-bottom:6px">
           <h2 style="margin:0" id="sFormTitle">Add a store</h2>
           <div class="row">
-            <button class="btn small" id="xlUpBtn" type="button">Upload store list (Excel)</button>
             <button class="btn secondary small" id="xlDownBtn" type="button">Download as Excel</button>
             <button class="btn secondary small" id="seedBtn" type="button">Load SPAR store list</button>
-            <input type="file" id="xlFile" accept=".xlsx,.xls,.csv" hidden>
           </div>
         </div>
         <p class="note" style="margin:0 0 14px"><b>Upload store list</b> takes the same Excel layout as the F&amp;V Dashboard's Store Mapping (Report File, Store Code, Store Name, Active, ROM, Store Manager, ROM Email, SM Email, Store Email, Delivery Schedule) plus optional <b>Store Phone</b>, <b>ROM Phone</b> and <b>SM Phone</b> columns. Stores in the file are added or updated; stores not in the file are left as they are. <b>Download as Excel</b> gives you the current list in that layout to edit. <b>Load SPAR store list</b> adds the 28 stores from the F&amp;V Dashboard.</p>
+        <div id="xlUp"></div>
         <div id="xlPreview" hidden style="margin:0 0 16px">
           <div id="xlSummary"></div>
           <div class="tablewrap" style="max-height:300px"><table><thead><tr><th>Change</th><th>Code</th><th>Store</th><th>ROM</th><th>Store Manager</th><th>Active</th></tr></thead><tbody id="xlRows"></tbody></table></div>
@@ -168,11 +167,10 @@ tr.inactive td{color:var(--muted)}
     <section data-pane="import" hidden>
       <div class="card panel">
         <h2>Import saved data</h2>
-        <p class="note">For data exported from the claude.ai versions of Keith's tools. Paste the export file's contents (or choose the file) and press Import. Records with the same name are overwritten.</p>
+        <div id="impUp"></div>
         <div id="impMsg" role="status" aria-live="polite"></div>
         <textarea class="in code" id="impText" spellcheck="false" placeholder='[{"tool":"shop-tracker","docs":{"months/2026-10":{...}}}]'></textarea>
         <div class="row" style="margin-top:10px">
-          <input type="file" id="impFile" accept=".json,application/json" style="max-width:100%">
           <button class="btn" id="impBtn" type="button">Import</button>
         </div>
       </div>
@@ -562,10 +560,9 @@ tr.inactive td{color:var(--muted)}
   const norm = (h) => String(h || "").toLowerCase().replace(/[^a-z]/g, "");
   let xlPending = [];
 
-  $("xlUpBtn").onclick = () => { $("xlFile").value = ""; $("xlFile").click(); };
-  $("xlFile").onchange = async () => {
-    const f = $("xlFile").files[0];
-    if (!f) return;
+  SPARUI.uploader("xlUp", { title: "Upload Store List (Excel)", noun: "store list", button: "Upload Store List", accept: ".xlsx,.xls,.csv", id: "xlFile", multiple: false, open: false,
+    onUpload: async (files) => { if (files[0]) await readStoreList(files[0]); } });
+  async function readStoreList(f) {
     say("sMsg", "Reading " + f.name + "…", "warn");
     try {
       const X = await loadXLSX();
@@ -648,10 +645,19 @@ tr.inactive td{color:var(--muted)}
       X.utils.book_append_sheet(wb, ws, "Store Mapping");
       X.writeFile(wb, "SPAR_Hub_Store_List.xlsx");
     } catch (e) { say("sMsg", e.message || String(e), "err"); }
-  };
+  }
 
   // ═════════ IMPORT (earlier tools) ═════════
-  $("impFile").onchange = async () => { const f = $("impFile").files[0]; if (f) $("impText").value = await f.text(); };
+  SPARUI.uploader("impUp", { title: "Upload Export Files", noun: "export files", button: "Upload Selected Export Files", accept: ".json,application/json", id: "impFile",
+    onUpload: async (files) => {
+      const packs = [];
+      for (const f of files) {
+        let j; try { j = JSON.parse(await f.text()); } catch (e) { say("impMsg", f.name + " isn't valid JSON.", "err"); return; }
+        (Array.isArray(j) ? j : [j]).forEach((x) => packs.push(x));
+      }
+      $("impText").value = JSON.stringify(packs);
+      await runImport();
+    } });
   function toFsPath(tool, path) {
     const s = path.replace(/^\/+|\/+$/g, "").split("/");
     if (s.some((x) => !x)) throw new Error("Bad path: " + path);
@@ -659,7 +665,8 @@ tr.inactive td{color:var(--muted)}
     if (s[0] === "data" && s[1] === "users") throw new Error("Private per-person data can't be imported for someone else: " + path);
     return ["apps", tool, ...s];
   }
-  $("impBtn").onclick = async () => {
+  $("impBtn").onclick = () => runImport();
+  async function runImport() {
     let payload;
     try { payload = JSON.parse($("impText").value); } catch (e) { say("impMsg", "That isn't valid JSON.", "err"); return; }
     const packs = Array.isArray(payload) ? payload : [payload];
@@ -683,7 +690,7 @@ tr.inactive td{color:var(--muted)}
       say("impMsg", `Imported ${n} record${n === 1 ? "" : "s"}.`);
     } catch (e) { say("impMsg", "Import stopped: " + (e.code || e.message), "err"); }
     $("impBtn").disabled = false;
-  };
+  }
 
   resetForm();
 </script>

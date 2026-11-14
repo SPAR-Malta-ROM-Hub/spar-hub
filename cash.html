@@ -100,10 +100,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   <section data-pane="issues" hidden><div class="card panel" style="margin-top:0" id="issBody"></div></section>
   <section data-pane="upload" hidden>
     <div class="card panel" style="margin-top:0">
-      <h2>Upload the cash sheet</h2>
-      <p class="note" style="margin:-6px 0 12px">The store uploads its Cash Report workbook from the store PC every day once the closes are in (the whole file: every week sheet is read). The store comes from the file name, e.g. “Cash Report 2026 - ANG”. Each store can only upload and see its own sheet; the ROM sees their stores.</p>
-      <div class="drop" id="drop"><p style="margin:0 0 10px;font-weight:700">Drag the Cash Report here</p><label class="btn" for="file">Choose the Cash Report</label><input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden></div>
-      <div id="upMsg" style="margin-top:12px"></div>
+      <div id="upHost"></div>
+      <div id="upMsg"></div>
     </div>
     <div class="card panel" id="upHist"></div>
   </section>
@@ -657,9 +655,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     box.append(E("h2", { text: "Recent uploads" }), list.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["When", "Store", "File", "Latest close", "Uploaded by", "Saved to Drive"].map((h) => E("th", { text: h })))]),
       E("tbody", null, list.slice(0, 60).map((u) => E("tr", null, [E("td", { text: SPARUI.fmtDateTime(u.at) }), E("td", { text: nameOf(u.c) }), E("td", { text: u.file }), E("td", { text: u.latest ? dayShort(u.latest) : "–" }), E("td", { text: u.byName || "" }), E("td", { text: u.drive ? "Yes" : "No" })])))])]) : E("p", { class: "note", text: "Nothing uploaded yet." }));
   }
-  let pending = null;
-  async function takeFile(file) {
-    const box = $("upMsg"); box.innerHTML = ""; pending = null;
+  async function takeFiles(files) {
+    const host = $("upMsg"); host.innerHTML = "";
+    for (const f of files) { const box = E("div", { style: "margin-top:10px" }); host.appendChild(box); await takeFile(f, box, true); }
+  }
+  async function takeFile(file, box, auto) {
     if (!file) return;
     box.appendChild(E("p", { class: "note", text: "Reading " + file.name + "…" }));
     let p, A;
@@ -677,9 +677,10 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     let warn = "";
     if (code && mine.includes(code) && !canUpload(code)) { box.appendChild(E("p", { class: "msg err", text: "The accounts team can look at the cash sheets but not upload them." })); return; }
     if (code && !mine.includes(code)) { box.appendChild(E("p", { class: "msg err", text: "This file is for " + nameOf(code) + " (" + code + "), which isn't one of your stores. You can only upload your own store's cash sheet." })); return; }
-    if (!code) { code = single() ? scope().codes[0] : mine[0]; warn = "The file name doesn't say which store it is (it should end “- " + code + "”). Check the store below."; }
+    if (!code) { code = single() ? scope().codes[0] : mine[0]; warn = file.name + ": the file name doesn't say which store it is (it should end with the store code, like “- ANG”). Choose the store below."; }
     pick.value = code; pick.disabled = !!(p.code && byCode[p.code]);
     A = C.analyse(p);
+    if (auto && !warn) { box.appendChild(E("p", { class: "note", text: file.name + " · " + nameOf(code) })); await save(code, file, p, A, box); return; }
     // keep the last 26 weeks
     const cut = addDays(mondayOf(A.latest), -7 * (KEEP_WEEKS - 1));
     const opened = [A.flags, A.missing, A.bags, A.issues].map((l) => l.filter((i) => i.action && (!i.date || i.date >= cut)).length);
@@ -742,14 +743,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         changedSigned.map((w) => "<li>" + esc(wkLabel(w, { weeks })) + " was signed off and emailed to accounts, and has changed. It needs signing off again.</li>").join("") + "</ul>"));
       await loadStore(code, true);
       box.innerHTML = "";
-      box.appendChild(E("p", { class: "msg ok", text: "Saved and checked up to " + dayShort(A.latest) + "." + (newAct.length && prev ? " " + plural(newAct.length, "new issue") + " (the ROM is emailed)." : "") + (changedReviewed.length ? " " + plural(changedReviewed.length, "reviewed day") + " changed and need reviewing again." : "") + (drive ? "" : window.SPAR_UPLOAD_URL ? " (A copy of the file couldn't be saved to Drive; the sign-off email will have the summary only.)" : "") }));
+      box.appendChild(E("p", { class: "msg ok", text: nameOf(code) + " (" + file.name + "): saved and checked up to " + dayShort(A.latest) + "." + (newAct.length && prev ? " " + plural(newAct.length, "new issue") + " (the ROM is emailed)." : "") + (changedReviewed.length ? " " + plural(changedReviewed.length, "reviewed day") + " changed and need reviewing again." : "") + (drive ? "" : window.SPAR_UPLOAD_URL ? " (A copy of the file couldn't be saved to Drive; the sign-off email will have the summary only.)" : "") }));
       $("scope").value = "s:" + code; render();
     } catch (e) { msg.className = "msg err"; msg.textContent = "Couldn't save: " + (e.code === "permission-denied" ? "you don't have access to this store." : e.code || e.message); }
   }
-  $("file").onchange = () => { takeFile($("file").files[0]); $("file").value = ""; };
-  ["dragenter", "dragover"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("drag"); }));
-  $("drop").addEventListener("drop", (e) => takeFile([...e.dataTransfer.files].find((f) => /\.xls[xm]?$/i.test(f.name))));
+  if (!accountsOnly) SPARUI.uploader("upHost", { title: "Upload Cash Sheets", noun: "cash sheets", button: "Upload Selected Cash Sheets", accept: ".xlsx,.xlsm,.xls", id: "file", onUpload: takeFiles });
 
   render();
 </script>

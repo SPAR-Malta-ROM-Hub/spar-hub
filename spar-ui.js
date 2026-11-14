@@ -103,8 +103,71 @@
     return wrap;
   }
 
+  /* Shared uploader: heading ▼, bordered box with a file input (drag and drop too),
+     "No … selected" line and a green Upload button. onUpload(files, out) does the work.
+     SPARUI.uploader(host, {title, noun:"sales files", button:"Upload Selected Sales Files",
+                            accept:".xlsx,.xls", multiple:true, open:true, onUpload}) */
+  function uploader(host, o) {
+    if (typeof host === "string") host = document.getElementById(host);
+    o = o || {};
+    var multiple = o.multiple !== false, noun = o.noun || (multiple ? "files" : "file");
+    var files = [];
+    var input = el("input", { type: "file" });
+    if (o.accept) input.accept = o.accept;
+    if (multiple) input.multiple = true;
+    if (o.id) input.id = o.id;
+    var status = el("div", { class: "upl-status" });
+    var btn = el("button", { class: "upl-btn", type: "button", text: o.button || "Upload" });
+    var out = el("div", { class: "upl-out" });
+    var box = el("div", { class: "upl-box" }, [input]);
+    var body = el("div", { class: "upl-body" }, [box, status, btn, out]);
+    var wrap = el("div", { class: "upl" + (o.open === false ? " closed" : "") });
+    if (o.title) {
+      var h = el("button", { class: "upl-h", type: "button" }, [el("span", { text: o.title }), el("span", { class: "upl-arrow", text: "▼" })]);
+      h.addEventListener("click", function () { wrap.classList.toggle("closed"); });
+      wrap.appendChild(h);
+    }
+    wrap.appendChild(body);
+    function show() {
+      status.textContent = "";
+      if (!files.length) { status.textContent = "No " + noun + " selected"; btn.disabled = true; return; }
+      var names = files.map(function (f) { return f.name; });
+      status.appendChild(el("b", { text: files.length + " " + (files.length === 1 ? noun.replace(/s$/, "") : noun) + " selected: " }));
+      status.appendChild(document.createTextNode(names.length > 6 ? names.slice(0, 6).join(", ") + " and " + (names.length - 6) + " more" : names.join(", ")));
+      btn.disabled = false;
+    }
+    function okType(f) {
+      if (!o.accept) return true;
+      var n = f.name.toLowerCase();
+      return o.accept.split(",").some(function (a) { a = a.trim().toLowerCase(); return a.charAt(0) === "." ? n.slice(-a.length) === a : true; });
+    }
+    input.addEventListener("change", function () { files = Array.prototype.slice.call(input.files || []); show(); });
+    ["dragenter", "dragover"].forEach(function (t) { box.addEventListener(t, function (e) { e.preventDefault(); box.classList.add("drag"); }); });
+    ["dragleave", "drop"].forEach(function (t) { box.addEventListener(t, function (e) { e.preventDefault(); box.classList.remove("drag"); }); });
+    box.addEventListener("drop", function (e) {
+      var f = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []).filter(okType);
+      if (!f.length) return;
+      files = multiple ? files.concat(f) : f.slice(0, 1);
+      try { input.value = ""; } catch (x) {}
+      show();
+    });
+    btn.addEventListener("click", function () {
+      if (!files.length || !o.onUpload) return;
+      var list = files.slice(), label = btn.textContent;
+      btn.disabled = true; btn.textContent = "Uploading…";
+      Promise.resolve().then(function () { return o.onUpload(list, out); }).catch(function (e) {
+        out.textContent = ""; out.appendChild(el("p", { class: "msg err", text: (e && e.message) || "Upload failed." }));
+      }).then(function () {
+        btn.textContent = label; files = []; try { input.value = ""; } catch (x) {} show();
+      });
+    });
+    show();
+    host.appendChild(wrap);
+    return { el: wrap, out: out, input: input, clear: function () { files = []; try { input.value = ""; } catch (x) {} show(); } };
+  }
+
   window.SPARUI = {
-    el: el, isoDate: isoDate, fmtDate: fmtDate, fmtDateTime: fmtDateTime, uid: uid, toast: toast,
+    el: el, isoDate: isoDate, fmtDate: fmtDate, fmtDateTime: fmtDateTime, uid: uid, toast: toast, uploader: uploader,
     // The modules list, used by the hub. "page" set = built; otherwise "coming soon".
     // who: which roles see the tile.
     MODULES: [
