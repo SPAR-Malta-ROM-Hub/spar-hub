@@ -12,6 +12,7 @@
 <script src="spar-runtime.js"></script>
 <script src="spar-ui.js"></script>
 <script src="safe-logic.js"></script>
+<script src="coins-logic.js"></script>
 <link rel="stylesheet" href="spar.css">
 <style>
 .bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
@@ -197,16 +198,18 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
   async function loadStore(c, force) {
     if (D[c] && !force) return;
     const cut = new Date(addDays(today(), -WINDOW) + "T00:00:00");
-    const [a, b, cs, n] = await Promise.all([
+    const [a, b, cs, n, co] = await Promise.all([
       fs.getDocs(fs.query(CC(c, "counts"), fs.where("at", ">=", cut), fs.orderBy("at"))).catch((e) => { console.warn(e); return null; }),
       fs.getDocs(fs.query(CC(c, "counts"), fs.where("at", "<", cut), fs.orderBy("at", "desc"), fs.limit(1))).catch(() => null),
       fs.getDoc(fs.doc(db, "modules", "cash", "stores", c, "state", "latest")).catch(() => null),
-      fs.getDocs(CC(c, "notes")).catch(() => null)]);
+      fs.getDocs(CC(c, "notes")).catch(() => null),
+      fs.getDocs(fs.query(fs.collection(db, "modules", "coins", "stores", c, "orders"), fs.where("at", ">=", cut))).catch(() => null)]);
     const counts = a ? a.docs.map((d) => Object.assign({}, d.data(), { id: d.id })) : [];
     const before = b && b.docs[0] ? Object.assign({}, b.docs[0].data(), { id: b.docs[0].id }) : null;
     const st = cs && cs.exists() ? cs.data() : null;
     D[c] = { counts, before, cashBags: st ? st.bagList || [] : [], cashLatest: st ? st.latest || "" : "", notes: {}, err: !a };
     if (n) n.docs.forEach((d) => { D[c].notes[d.id] = d.data(); });
+    D[c].coinOrders = co ? co.docs.map((d) => Object.assign({}, d.data(), { id: d.id, total: CoinCheck.total(d.data().qty) })) : [];
     compute(c);
   }
   function compute(c) {
@@ -217,6 +220,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     x.track = K.bagTrack(x.rows, x.cashBags.filter((b) => b.date >= start), { today: today() });
     x.flags = K.flags(c, x.rows, x.track, { today: today(), sheetLatest: x.cashLatest, from: addDays(today(), -WINDOW) });
     x.last = x.rows.length ? x.rows[x.rows.length - 1] : null;
+    // coin orders still to arrive (the CIT delivery on a count is matched to them)
+    const dels = x.rows.filter((r) => r.s.cit > 0).map((r) => ({ id: r.id, at: r.at, day: r.day, cit: r.s.cit, rc: r.c.citRc || "" }));
+    x.coinsDue = CoinCheck.match(x.coinOrders || [], dels, now()).orders.filter((o) => ["sent", "late", "waiting"].includes(o.st));
   }
   function allFlags(codes) {
     const seq = Object.fromEntries(codes.filter((c) => D[c]).map((c) => [c, D[c].rows]));
@@ -490,10 +496,14 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
       E("div", { class: "note", style: "align-self:end;margin-bottom:12px" }, [E("b", { text: "Previous count: " }), document.createTextNode(prevRow ? when(prevRow.at) + " · " + typeName(prevRow.c.type) + " · grand total " + eur(prevRow.total) : "none yet: this is the first count, so there's nothing to compare it with.")])]));
     card.appendChild(sec1);
 
-    // 2. CIT delivery
+    // 2. CIT delivery (the coin order arriving)
+    const due = fix ? [] : (D[c].coinsDue || []);
     card.appendChild(E("div", { class: "sec" }, [E("h3", { text: "Money delivery CIT (check the value on the yellow slip)" }),
+      due.length ? E("div", { class: "note2", style: "background:#FFF6E3;margin:0 0 10px" }, [E("b", { text: "Coin order" + (due.length > 1 ? "s" : "") + " on the way" }),
+        ...due.map((o) => E("div", { text: eur(o.total) + " ordered for 9:00 " + dayShort(o.day) + " · expected " + dayShort(o.exp) + (o.st === "late" ? " · LATE" : "") })),
+        E("div", { class: "sub2", text: "If it has arrived, enter the yellow slip value: it's matched to the order on the Coin Order page." })]) : null,
       E("div", { class: "grid3" }, [E("label", { class: "f" }, [E("span", { text: "Amount delivered €" }), inp(F.cit, (v) => F.cit = v, { class: "in", placeholder: "0.00" })]),
-        E("label", { class: "f" }, [E("span", { text: "Receipt no." }), txt(F.citRc, (v) => F.citRc = v, { class: "in" })])])]));
+        E("label", { class: "f" }, [E("span", { text: "Receipt no." }), txt(F.citRc, (v) => F.citRc = v, { class: "in" })])])].filter(Boolean)));
 
     // 3. money in the safe
     const totCells = {};

@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="coins">
+<title>Coin Order · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<script src="safe-logic.js"></script>
+<script src="coins-logic.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
+.bar label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar select{font:700 14px Arial,sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);min-width:200px;max-width:100%}
+.bar .stamp{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right}
+.kpi .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;font-weight:700}
+.kpi.red{background:#FDECEC;border-color:#F6C9CB}.kpi.red strong{color:#C5121A}
+.kpi.amber{background:#FFF6E3;border-color:#F3DDA9}.kpi.amber strong{color:#9A6200}
+.kpi.green strong{color:var(--gd)}
+.down{color:var(--red)}
+tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{background:#FFF8E6}
+.sub2{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.rowx{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:0 0 12px}
+.seg{display:inline-flex;background:#E9EBEA;border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{appearance:none;border:0;background:transparent;padding:7px 12px;border-radius:8px;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer}
+.seg button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:#D9DCDB;font-size:11.5px;line-height:18px;text-align:center}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase;white-space:nowrap}
+.tag.r{background:#FBE0E1;color:#C5121A}.tag.g{background:#DDF1E4;color:#00703C}.tag.a{background:#FFF0D2;color:#9A6200}.tag.b{background:#E2ECFA;color:#1F4E9A}.tag.n{background:#EEF0EF;color:#55656b}
+.it{display:grid;grid-template-columns:1fr auto;gap:4px 14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.it .h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.it .h b{font-size:15px}
+.it .t{font-size:14px;line-height:1.45;margin-top:2px}
+.it .c{font-size:12.5px;color:var(--muted)}
+.it .amt{text-align:right;font-weight:800;font-size:16px;white-space:nowrap}
+.it .res{grid-column:1 / -1;margin-top:6px}
+.it.done{opacity:.72}
+.note2{background:#F7F8F8;border-radius:9px;padding:8px 10px;font-size:13px;margin-top:6px}
+.note2 b{font-size:12px}
+.form2{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-top:8px}
+@media(max-width:700px){.form2{grid-template-columns:1fr}}
+.gt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:6px 0 4px}
+@media(max-width:800px){.gt{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.gt div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}
+.gt label{display:block;font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.gt strong{display:block;font-size:22px;margin-top:4px;font-variant-numeric:tabular-nums}
+.gt small{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.gt .big{background:#10252b;color:#fff;border-color:#10252b}.gt .big label,.gt .big small{color:#C9D3D6}
+.gt .ok{background:#EAF6EE;border-color:#BFE3CB}.gt .ok strong{color:var(--gd)}
+.gt .bad{background:#FDECEC;border-color:#F6C9CB}.gt .bad strong{color:#C5121A}
+.capbar{height:10px;border-radius:5px;background:#EEF0EF;overflow:hidden;display:flex;margin:10px 0 2px}
+.capbar i{display:block;height:100%}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.order td input{width:100%;min-width:70px;padding:7px 8px;border:1px solid #E7C64A;border-radius:7px;font:700 14px Arial,sans-serif;text-align:right;background:#FFFBE0}
+.order td input:focus{outline:2px solid var(--brand);border-color:var(--brand)}
+.confirm{border:2px solid var(--ink);border-radius:12px;padding:14px 16px;margin-top:14px;background:#FFFDF6}
+.errs{margin:12px 0 0;padding:10px 14px 10px 30px;border-radius:9px;background:#FDECEC;color:#8C0F15;font-size:13.5px}
+.dl{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13px;padding:6px 12px;border-radius:999px;background:#FFF0D2;color:#9A6200}
+.dl.late{background:#EEF0EF;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top" data-title="Coin Order"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="order" type="button" id="tabOrder">New order</button>
+    <button class="tab" data-tab="orders" type="button">Orders</button>
+    <button class="tab" data-tab="flags" type="button">Flags <span class="count" id="nFlags" hidden></span></button>
+  </div>
+  <div class="card bar">
+    <label>View<select id="scope"></select></label>
+    <div class="stamp" id="stamp"></div>
+  </div>
+  <section data-pane="overview"><div id="ovBody"></div></section>
+  <section data-pane="order" hidden><div id="orderBody"></div></section>
+  <section data-pane="orders" hidden><div id="ordersBody"></div></section>
+  <section data-pane="flags" hidden><div class="card panel" style="margin-top:0"><div class="rowx"><div class="seg" id="fSeg"></div></div><div id="flagList"></div></div></section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+  const K = window.SafeCheck, Q = window.CoinCheck;
+
+  function fitTables() {
+    document.querySelectorAll(".tablewrap.fit").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.tBodies].flatMap((b) => [...b.rows]);
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot"));
+      if (rows.length <= 6) { w.style.maxHeight = "none"; return; }
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, 6).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0; const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+
+  // ── Who can do what ──
+  //  · the store (store PC login), its Store Manager or its ROM confirms the order; one order per store per 9am order;
+  //  · confirmed orders are emailed to Sales Support, the Store Manager and the ROM; at 9am all of that morning's
+  //    orders go to Sales Support in one email (the Apps Script does both);
+  //  · it can be cancelled until 9am of its order day; after that it's with Sales Support;
+  //  · the accounts team sees every store, read only; Head Office and Support don't see the module.
+  const me = await SPAR.ready;
+  const accountsOnly = me.cashAccess && ["dept", "hq", "support"].includes(me.role);
+  if (!(["admin", "rom", "sm"].includes(me.role) || accountsOnly)) {
+    document.querySelector("main").innerHTML = '<div class="card panel"><h2>Coin Order</h2><p class="note">This module is for the stores, their Store Managers and ROMs, and the accounts team. Ask a hub admin if you need access.</p></div>';
+    throw new Error("no coins access");
+  }
+  const { fs, db } = await SPAR.firebase();
+  const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
+  const nameOf = (c) => (byCode[c] || {}).name || c;
+  const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
+  const emailsOf = (s) => String(s || "").toLowerCase().split(/[,;\s]+/).filter((x) => x.includes("@"));
+  const isStoreLogin = (c) => emailsOf((byCode[c] || {}).storeEmail).includes(String(me.email || "").toLowerCase());
+  const canOrder = () => !accountsOnly && ["sm", "rom", "admin"].includes(me.role);
+
+  const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
+  const today = () => Q.isoOf(now());
+  const { r2, ms } = Q;
+  const WINDOW = 60;
+  const money = (v) => Math.abs(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const eur = (v) => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + "€" + money(v);
+  const sEur = (v) => v == null || !isFinite(v) ? "–" : (v > 0.004 ? "+" : v < -0.004 ? "−" : "") + "€" + money(v);
+  const dayShort = (s) => s ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "";
+  const hm = (t) => { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const when = (t) => t ? dayShort(Q.isoOf(t)) + " " + hm(t) : "–";
+  const int = (n) => Math.round(n || 0).toLocaleString("en-GB");
+  const plural = (n, w) => int(n) + " " + w + (n === 1 ? "" : "s");
+  const docId = (s) => String(s).replace(/[\/.#$\[\]]/g, "_").slice(0, 400);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const left = (t) => { const m = Math.max(0, Math.round((t - now()) / 60000)); return m >= 1440 ? Math.floor(m / 1440) + " d " + Math.floor((m % 1440) / 60) + " h" : m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min"; };
+  const td = (t, cls) => E("td", cls ? { class: cls, text: t } : { text: t });
+  const table = (heads, rows, numCols, fit) => E("div", { class: "tablewrap" + (fit === false ? "" : " fit") }, [E("table", null, [
+    E("thead", null, [E("tr", null, heads.map((h, i) => E("th", (numCols || []).includes(i) ? { class: "num", text: h } : { text: h })))]),
+    E("tbody", null, rows)])]);
+  const ST = { waiting: ["Waiting for 9am", "b"], sent: ["With Sales Support", "n"], late: ["Not arrived", "r"], arrived: ["Arrived", "g"], differs: ["Arrived, amount differs", "r"], cancelled: ["Cancelled", "n"] };
+
+  // ── Stores in view ──
+  const stores = accountsOnly ? me.allStores.filter((s) => s.active !== false) : me.stores.slice();
+  const scopes = [];
+  if ((me.seesAll || accountsOnly) && stores.length > 1) {
+    scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+    [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) => scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
+  } else if (stores.length > 1) scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+  stores.forEach((s) => scopes.push({ id: "s:" + s.code, label: s.name, codes: [s.code] }));
+  if (!scopes.length) { document.querySelector("main").innerHTML = '<p class="msg warn">You haven\'t been given a store yet. Ask a hub admin.</p>'; throw new Error("no stores"); }
+  scopes.forEach((s) => $("scope").add(new Option(s.label, s.id)));
+  try { const k = localStorage.getItem("sparCoinScope"); if (scopes.some((s) => s.id === k)) $("scope").value = k; } catch (e) {}
+  const scope = () => scopes.find((s) => s.id === $("scope").value) || scopes[0];
+  const single = () => scope().codes.length === 1;
+  if (!canOrder()) $("tabOrder").hidden = true;
+
+  // ── Paths ──
+  const OP = (c, ...x) => fs.doc(db, "modules", "coins", "stores", c, ...x);
+  const OC = (c, ...x) => fs.collection(db, "modules", "coins", "stores", c, ...x);
+  const fromServer = (ref) => (fs.getDocFromServer ? fs.getDocFromServer(ref) : fs.getDoc(ref));
+
+  // ═════════ LOADING ═════════
+  const D = {};
+  async function loadStore(c, force) {
+    if (D[c] && !force) return;
+    const cut = new Date(Q.addDays(today(), -WINDOW) + "T00:00:00");
+    const SC = fs.collection(db, "modules", "safe", "stores", c, "counts");
+    const [o, s, last, n] = await Promise.all([
+      fs.getDocs(fs.query(OC(c, "orders"), fs.where("at", ">=", cut))).catch((e) => { console.warn(e); return null; }),
+      fs.getDocs(fs.query(SC, fs.where("at", ">=", cut), fs.orderBy("at"))).catch(() => null),
+      fs.getDocs(fs.query(SC, fs.orderBy("at", "desc"), fs.limit(1))).catch(() => null),
+      fs.getDocs(OC(c, "notes")).catch(() => null)]);
+    const orders = o ? o.docs.map((d) => Object.assign({}, d.data(), { id: d.id })) : [];
+    orders.forEach((x) => { x.total = Q.total(x.qty); });     // always from the packs ordered, never a typed total
+    const rows = K.sequence(s ? s.docs.map((d) => Object.assign({}, d.data(), { id: d.id })) : []);
+    const lastC = last && last.docs[0] ? Object.assign({}, last.docs[0].data(), { id: last.docs[0].id }) : null;
+    D[c] = { orders, rows, last: lastC ? { at: ms(lastC.at), total: K.sums(lastC).total } : null, notes: {} };
+    if (n) n.docs.forEach((d) => { D[c].notes[d.id] = d.data(); });
+    compute(c);
+  }
+  function compute(c) {
+    const x = D[c];
+    const dels = x.rows.filter((r) => r.s.cit > 0).map((r) => ({ id: r.id, at: r.at, day: r.day, cit: r.s.cit, rc: r.c.citRc || "" }));
+    x.m = Q.match(x.orders, dels, now());
+    x.onWay = Q.onWay(x.m);
+    x.flags = Q.flags(c, x.m);
+    x.round = x.m.orders.find((o) => o.day === Q.roundOf(now()) && o.st !== "cancelled") || null;
+  }
+  function allFlags(codes) {
+    const list = codes.flatMap((c) => D[c].flags);
+    list.forEach((f) => { f.note = D[f.store].notes[docId(f.id)] || null; f.open = !(f.note && f.note.resolved); });
+    return list;
+  }
+
+  // ═════════ TABS ═════════
+  let tab = "overview";
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+    render();
+  }
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
+  $("scope").onchange = () => { try { localStorage.setItem("sparCoinScope", $("scope").value); } catch (e) {} openId = null; render(); };
+  let seq = 0;
+  async function render() {
+    const my = ++seq, codes = scope().codes;
+    await Promise.all(codes.map((c) => loadStore(c)));
+    if (my !== seq) return;
+    const fl = allFlags(codes);
+    const nAct = fl.filter((f) => f.open && f.level === "act").length;
+    const el = $("nFlags"); el.hidden = !fl.filter((f) => f.open).length; el.textContent = nAct || fl.filter((f) => f.open).length; el.style.background = nAct ? "" : "#9AA5A9";
+    const rd = Q.roundOf(now());
+    $("stamp").textContent = "Next order to Sales Support: 9:00 " + dayShort(rd) + " (in " + left(Q.deadline(rd)) + ")";
+    if (tab === "overview") return renderOverview(codes, fl);
+    if (tab === "order") return renderOrder(codes);
+    if (tab === "orders") return renderOrders(codes);
+    if (tab === "flags") return renderFlags(fl);
+  }
+  const needOne = (box, txt) => { box.innerHTML = ""; box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("p", { class: "note", text: txt || "Choose one store in View to do this." })])); };
+  const goStore = (c) => { const s = scopes.find((x) => x.id === "s:" + c); if (s) { $("scope").value = s.id; try { localStorage.setItem("sparCoinScope", s.id); } catch (e) {} } };
+  const room = (c, exceptId) => { const x = D[c]; return r2(Q.CAP - (x.last ? x.last.total : 0) - Q.onWay(x.m, exceptId)); };
+
+  // ═════════ OVERVIEW ═════════
+  function kpi(label, val, sub, cls) { return E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function capPanel(c, extra) {
+    const x = D[c], safe = x.last ? x.last.total : 0, way = Q.onWay(x.m, extra && extra.exceptId), add = extra ? extra.add : 0, tot = r2(safe + way + add), over = tot > Q.CAP + 0.005;
+    const pct = (v) => Math.max(0, Math.min(100, v / Math.max(Q.CAP, tot) * 100)) + "%";
+    return E("div", null, [
+      E("div", { class: "gt" }, [
+        E("div", null, [E("label", { text: "Safe at last count" }), E("strong", { text: x.last ? eur(safe) : "–" }), E("small", { text: x.last ? when(x.last.at) : "No safe count yet" })]),
+        E("div", null, [E("label", { text: "Coins on the way" }), E("strong", { text: eur(way) }), E("small", { text: "ordered, not yet delivered" })]),
+        E("div", null, [E("label", { text: extra ? "This order" : "Room for an order" }), E("strong", { text: extra ? eur(add) : eur(Math.max(0, r2(Q.CAP - safe - way))) }), E("small", { text: extra ? "wrap packs × bag value" : "before the €" + int(Q.CAP) + " limit" })]),
+        E("div", { class: over ? "bad" : "ok" }, [E("label", { text: "Total of €" + int(Q.CAP) }), E("strong", { text: eur(tot) }), E("small", { text: over ? "over the limit by " + eur(r2(tot - Q.CAP)) : eur(r2(Q.CAP - tot)) + " to spare" })])]),
+      E("div", { class: "capbar" }, [E("i", { style: "width:" + pct(safe) + ";background:#10252b" }), E("i", { style: "width:" + pct(way) + ";background:#E7C64A" }), E("i", { style: "width:" + pct(add) + ";background:" + (over ? "#C5121A" : "#00703C") })]),
+      E("div", { class: "legend" }, [E("span", { style: "--c:#10252b", text: "Safe" }), E("span", { style: "--c:#E7C64A", text: "On the way" }), extra ? E("span", { style: "--c:#00703C", text: "This order" }) : null, E("span", { text: "Limit €" + int(Q.CAP) })].filter(Boolean))]);
+  }
+  function renderOverview(codes, fl) {
+    const box = $("ovBody"); box.innerHTML = "";
+    const rd = Q.roundOf(now()), act = fl.filter((f) => f.open && f.level === "act");
+    if (single()) {
+      const c = codes[0], x = D[c];
+      const card = E("div", { class: "card panel", style: "margin-top:0" }, [E("div", { class: "rowx" }, [E("h2", { text: "Coin change" }),
+        x.round ? E("span", { class: "dl", text: "Ordered " + eur(x.round.total) + " for 9:00 " + dayShort(rd) }) : canOrder() ? E("button", { class: "btn small", type: "button", text: "New order", onclick: () => showTab("order") }) : null].filter(Boolean)), capPanel(c)]);
+      box.appendChild(card);
+      const way = x.m.orders.filter((o) => ["waiting", "sent", "late"].includes(o.st));
+      box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Coins on the way" }), way.length ? table(["Order day", "Total", "Expected", "Status"], way.map((o) => E("tr", null, [td(dayShort(o.day)), td(eur(o.total), "num"), td(dayShort(o.exp)), E("td", null, [E("span", { class: "tag " + ST[o.st][1], text: ST[o.st][0] })])])), [1]) : E("p", { class: "empty", text: "Nothing on the way." })]));
+      if (act.length) box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Act now" }), ...act.map(itemCard)]));
+      return;
+    }
+    const ordered = codes.filter((c) => D[c].round), totRound = r2(ordered.reduce((s, c) => s + D[c].round.total, 0));
+    const way = r2(codes.reduce((s, c) => s + D[c].onWay, 0)), late = codes.flatMap((c) => D[c].m.orders.filter((o) => o.st === "late"));
+    box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
+      kpi("Orders for 9:00 " + dayShort(rd), ordered.length + " of " + codes.length, "stores · " + eur(totRound), ""),
+      kpi("Coins on the way", eur(way), "ordered, not yet delivered", ""),
+      kpi("Not arrived", int(late.length), "past the " + Q.LEAD_DAYS + "-day delivery", late.length ? "red" : "green"),
+      kpi("Act now", int(act.length), "late or not matching", act.length ? "red" : "green")]));
+    const rows = codes.map((c) => {
+      const x = D[c], f = fl.filter((y) => y.store === c && y.open), lastDel = x.m.orders.filter((o) => o.arr).map((o) => o.arr).sort((a, b) => b.at - a.at)[0];
+      const tr = E("tr", { class: "click" }, [E("td", null, [E("b", { text: nameOf(c) }), E("span", { class: "sub2", text: romOf(c) })]),
+        td(x.round ? eur(x.round.total) : "–", "num"), td(x.last ? eur(x.last.total) : "–", "num"), td(eur(x.onWay), "num"),
+        E("td", { class: "num " + (x.last && room(c) < 0 ? "down" : ""), text: x.last ? eur(room(c)) : "No safe count" }), td(lastDel ? dayShort(lastDel.day) + " · " + eur(lastDel.cit) : "–"),
+        E("td", null, [f.filter((y) => y.level === "act").length ? E("span", { class: "tag r", text: f.filter((y) => y.level === "act").length + " act now" }) : null, " ", f.filter((y) => y.level === "watch").length ? E("span", { class: "tag a", text: f.filter((y) => y.level === "watch").length + " watch" }) : null].filter(Boolean))]);
+      tr.onclick = () => { goStore(c); render(); };
+      return tr;
+    });
+    rows.push(E("tr", { class: "tot" }, [td(plural(codes.length, "store")), td(eur(totRound), "num"), td(""), td(eur(way), "num"), td(""), td(""), td("")]));
+    box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("h2", { text: "Stores" }), E("p", { class: "note", style: "margin:-4px 0 10px", text: "Click a store to open it." }),
+      table(["Store", "Order for 9:00 " + dayShort(rd), "Safe at last count", "On the way", "Room left", "Last delivery", "Flags"], rows, [1, 2, 3, 4])]));
+  }
+
+  // ═════════ NEW ORDER ═════════
+  function renderOrder(codes) {
+    const box = $("orderBody"); box.innerHTML = "";
+    if (!canOrder()) return needOne(box, "Orders are placed by the store, the Store Manager or the ROM.");
+    if (!single()) return needOne(box, "Choose one store in View to order its coins.");
+    const c = codes[0], x = D[c], rd = Q.roundOf(now()), dl = Q.deadline(rd);
+    if (x.round) {
+      const o = x.round;
+      const card = E("div", { class: "card panel", style: "margin-top:0" }, [E("div", { class: "rowx" }, [E("h2", { text: "Order for 9:00 " + dayShort(rd) }), E("span", { class: "dl", text: "Goes to Sales Support in " + left(dl) })]),
+        E("p", { class: "msg ok", text: "This store's order is in: " + eur(o.total) + ", confirmed " + when(ms(o.at)) + " by " + (o.byName || o.by) + ". Coins expected around " + dayShort(o.exp) + "." }), orderTable(o.qty)]);
+      card.appendChild(E("div", { class: "row", style: "margin-top:12px" }, [E("button", { class: "btn danger small", type: "button", text: "Cancel this order", onclick: (e) => cancelBox(c, o, card, e.target) })]));
+      card.appendChild(E("p", { class: "note", text: "Need to change it? Cancel it and order again before 9:00." }));
+      box.appendChild(card); return;
+    }
+    const qty = {};
+    const card = E("div", { class: "card panel order", style: "margin-top:0" });
+    card.appendChild(E("div", { class: "rowx" }, [E("div", null, [E("h2", { text: "New coin order" }), E("span", { class: "sub2", text: nameOf(c) + " · goes to Sales Support at 9:00 " + dayShort(rd) + " · coins expected around " + dayShort(Q.expected(rd)) })]),
+      E("span", { class: "dl", text: "Deadline 9:00 " + dayShort(rd) + " · " + left(dl) + " left" })]));
+    const capBox = E("div"); card.appendChild(capBox);
+    const cells = {}, totCell = td("€0.00", "num");
+    const rows = Q.DENOMS.map((d) => {
+      cells[d.k] = td("€0.00", "num");
+      const i = E("input", { type: "text", inputmode: "numeric", placeholder: "0", "aria-label": "Wrap packs of " + d.label, autocomplete: "off" });
+      i.oninput = () => { qty[d.k] = i.value; update(); };
+      return E("tr", null, [td(d.label), td(eur(d.roll), "num"), td(eur(d.bag), "num"), E("td", null, [i]), cells[d.k]]);
+    });
+    rows.push(E("tr", { class: "tot" }, [td("Total"), td(""), td(""), td(""), totCell]));
+    card.appendChild(E("h3", { style: "margin:18px 0 10px", text: "Coins to order" }));
+    card.appendChild(table(["Denomination", "Single roll value", "Bag value", "Quantity wrap pack required", "Total value"], rows, [1, 2, 4], false));
+    const note = E("textarea", { class: "in", style: "min-height:60px;margin-top:12px", placeholder: "Note for Sales Support (optional)" });
+    card.appendChild(note);
+    const errs = E("ul", { class: "errs" }); errs.hidden = true;
+    const conf = E("div");
+    const btn = E("button", { class: "btn", type: "button", text: "Confirm the order" });
+    card.appendChild(errs); card.appendChild(E("div", { class: "row", style: "margin-top:12px" }, [btn])); card.appendChild(conf);
+    function update() {
+      const tot = Q.total(qty);
+      Q.DENOMS.forEach((d) => { cells[d.k].textContent = eur(Math.max(0, Math.round(Number(qty[d.k]) || 0)) * d.bag); });
+      totCell.textContent = eur(tot);
+      capBox.innerHTML = ""; capBox.appendChild(capPanel(c, { add: tot }));
+    }
+    btn.onclick = () => {
+      const e = [], tot = Q.total(qty), rm = room(c);
+      Q.DENOMS.forEach((d) => { const v = String(qty[d.k] == null ? "" : qty[d.k]).trim(); if (v && !/^\d+$/.test(v)) e.push(d.label + ": the number of wrap packs must be a whole number."); });
+      if (tot <= 0) e.push("Fill in at least one wrap pack.");
+      if (tot > rm + 0.005) e.push("This order (" + eur(tot) + ") would take the store over the €" + int(Q.CAP) + " limit: there's room for " + eur(Math.max(0, rm)) + " (safe at the last count + coins already on the way).");
+      if (!D[c].last) e.push("Count the safe first: the order is checked against the money in the safe.");
+      errs.innerHTML = ""; errs.hidden = !e.length; e.forEach((t) => errs.appendChild(E("li", { text: t }))); conf.innerHTML = "";
+      if (e.length) return;
+      const go = E("button", { class: "btn good", type: "button", text: "Yes, confirm the order" });
+      conf.appendChild(E("div", { class: "confirm" }, [E("b", { text: "Confirm " + eur(tot) + " of coins?" }),
+        E("p", { style: "margin:6px 0", text: "It goes in the 9:00 order of " + dayShort(Q.roundOf(now())) + ". Sales Support, the Store Manager and the ROM are emailed now; the coins should arrive around " + dayShort(Q.expected(Q.roundOf(now()))) + "." }),
+        E("div", { class: "row" }, [go, E("button", { class: "btn secondary", type: "button", text: "Go back", onclick: () => conf.innerHTML = "" })])]));
+      go.onclick = () => place(c, qty, note.value.trim(), go);
+    };
+    update();
+    box.appendChild(card);
+  }
+  function orderTable(qty) {
+    const rows = Q.DENOMS.filter((d) => Number(qty[d.k]) > 0).map((d) => E("tr", null, [td(d.label), td(eur(d.bag), "num"), td(int(qty[d.k]), "num"), td(eur(Number(qty[d.k]) * d.bag), "num")]));
+    rows.push(E("tr", { class: "tot" }, [td("Total"), td(""), td(""), td(eur(Q.total(qty)), "num")]));
+    return table(["Denomination", "Bag value", "Wrap packs", "Total value"], rows, [1, 2, 3], false);
+  }
+  function emailHtml(c, o, title, lead) {
+    const rows = Q.DENOMS.filter((d) => Number(o.qty[d.k]) > 0).map((d) => '<tr><td style="padding:6px 12px;border-bottom:1px solid #eee">' + d.label + '</td><td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right">' + int(o.qty[d.k]) + '</td><td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right">' + eur(Number(o.qty[d.k]) * d.bag) + "</td></tr>").join("");
+    return '<div style="font:14px Arial,sans-serif;color:#10252b"><h2 style="margin:0 0 6px">' + esc(title) + '</h2><p style="margin:0 0 10px">' + esc(lead) + "</p>" +
+      '<table style="border-collapse:collapse;font:14px Arial,sans-serif"><tr style="background:#F1F2F2"><th style="padding:6px 12px;text-align:left">Denomination</th><th style="padding:6px 12px;text-align:right">Wrap packs</th><th style="padding:6px 12px;text-align:right">Total value</th></tr>' + rows +
+      '<tr><td style="padding:8px 12px;font-weight:bold">Total</td><td></td><td style="padding:8px 12px;text-align:right;font-weight:bold">' + eur(Q.total(o.qty)) + "</td></tr></table>" +
+      (o.note ? '<p style="margin:10px 0 0"><b>Note:</b> ' + esc(o.note) + "</p>" : "") + "</div>";
+  }
+  async function place(c, qtyIn, note, btn) {
+    btn.disabled = true;
+    const qty = {}; Q.DENOMS.forEach((d) => { qty[d.k] = Math.max(0, Math.round(Number(qtyIn[d.k]) || 0)); });
+    const t = now(), day = Q.roundOf(t), tot = Q.total(qty), x = D[c];
+    try {
+      const id = SPARUI.uid(), b = fs.writeBatch(db);
+      const o = { code: c, day, qty, total: tot, safe: x.last ? x.last.total : 0, safeAt: x.last ? x.last.at : 0, onWay: Q.onWay(x.m), cap: Q.CAP, note,
+        by: me.email, byName: me.name, role: me.role, at: fs.serverTimestamp(), dueAt: Q.deadline(day), status: "confirmed" };
+      b.set(OP(c, "orders", id), o);
+      b.set(fs.doc(db, "modules", "coins", "outbox", id), { code: c, kind: "order", orderId: id, day, qty, total: tot, by: me.email, byName: me.name, at: fs.serverTimestamp(),
+        subject: "SPAR Coin Order · " + nameOf(c) + " · " + eur(tot) + " · for 9:00 " + dayShort(day),
+        html: emailHtml(c, o, "Coin order · " + nameOf(c), "Confirmed by " + me.name + " for the 9:00 order of " + dayShort(day) + ". Expected in store around " + dayShort(Q.expected(day)) + ".") });
+      await b.commit();
+      SPARUI.toast("Order confirmed");
+      await loadStore(c, true); openId = c + "/" + id; showTab("orders");
+    } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't confirm: " + (e.code || e.message), "err"); }
+  }
+  function cancelBox(c, o, card, btn) {
+    btn.disabled = true;
+    const why = E("input", { class: "in", type: "text", placeholder: "Why is it cancelled?" });
+    const go = E("button", { class: "btn danger small", type: "button", text: "Cancel the order" });
+    const box = E("div", { class: "confirm" }, [E("b", { text: "Cancel the order of " + eur(o.total) + "?" }), E("p", { class: "note", style: "margin:4px 0 8px", text: "Sales Support, the Store Manager and the ROM are told." }), why,
+      E("div", { class: "row", style: "margin-top:8px" }, [go, E("button", { class: "btn secondary small", type: "button", text: "Keep it", onclick: () => { box.remove(); btn.disabled = false; } })])]);
+    go.onclick = async () => {
+      if (!why.value.trim()) { SPARUI.toast("Give the reason", "err"); return; }
+      if (now() >= Q.deadline(o.day)) { SPARUI.toast("It's past 9:00: the order is already with Sales Support. Call them.", "err"); return; }
+      go.disabled = true;
+      try {
+        const ref = OP(c, "orders", o.id), cur = await fromServer(ref);
+        if (!cur.exists() || cur.data().status !== "confirmed") throw new Error("It's already cancelled.");
+        const b = fs.writeBatch(db);
+        b.update(ref, { status: "cancelled", cancelBy: me.email, cancelName: me.name, cancelAt: fs.serverTimestamp(), cancelWhy: why.value.trim() });
+        b.set(fs.doc(db, "modules", "coins", "outbox", o.id + "-x"), { code: c, kind: "cancel", orderId: o.id, day: o.day, qty: o.qty, total: o.total, by: me.email, byName: me.name, at: fs.serverTimestamp(),
+          subject: "SPAR Coin Order · CANCELLED · " + nameOf(c) + " · " + eur(o.total) + " · 9:00 " + dayShort(o.day),
+          html: emailHtml(c, o, "Coin order cancelled · " + nameOf(c), "The order of " + eur(o.total) + " for 9:00 " + dayShort(o.day) + " was cancelled by " + me.name + ": " + why.value.trim()) });
+        await b.commit();
+        SPARUI.toast("Order cancelled");
+        await loadStore(c, true); render();
+      } catch (e) { go.disabled = false; SPARUI.toast("Couldn't cancel: " + (e.code || e.message), "err"); }
+    };
+    card.appendChild(box); why.focus();
+  }
+
+  // ═════════ ORDERS ═════════
+  let openId = null;
+  function renderOrders(codes) {
+    const box = $("ordersBody"); box.innerHTML = "";
+    const all = codes.flatMap((c) => D[c].m.orders.map((o) => ({ c, o }))).sort((a, b) => b.o.day.localeCompare(a.o.day) || ms(b.o.at) - ms(a.o.at));
+    const card = E("div", { class: "card panel", style: "margin-top:0" }, [E("h2", { text: "Coin orders" }), E("p", { class: "note", style: "margin:-4px 0 10px", text: "The last " + WINDOW + " days. Deliveries are matched to the CIT delivery (yellow slip) on the safe counts. Click an order for the details." })]);
+    if (!all.length) { card.appendChild(E("p", { class: "empty", text: "No coin orders yet." })); box.appendChild(card); return; }
+    const rows = all.map(({ c, o }) => {
+      const tr = E("tr", { class: "click" + (openId === c + "/" + o.id ? " sel" : "") }, [td("9:00 " + dayShort(o.day)), single() ? null : td(nameOf(c)),
+        E("td", null, [document.createTextNode(when(ms(o.at))), E("span", { class: "sub2", text: o.byName || o.by || "" })]), td(eur(o.total), "num"), td(o.st === "cancelled" ? "–" : dayShort(o.exp)),
+        E("td", null, [E("span", { class: "tag " + ST[o.st][1], text: ST[o.st][0] })]),
+        E("td", { class: "num " + (o.st === "differs" ? "down" : ""), text: o.arr ? eur(o.arr.cit) + " · " + dayShort(o.arr.day) : "–" })].filter(Boolean));
+      tr.onclick = () => { openId = openId === c + "/" + o.id ? null : c + "/" + o.id; render(); };
+      return tr;
+    });
+    card.appendChild(table(["Order"].concat(single() ? [] : ["Store"]).concat(["Confirmed", "Total", "Expected", "Status", "Delivered (safe count)"]), rows, single() ? [2, 5] : [3, 6]));
+    box.appendChild(card);
+    const hit = openId && all.find(({ c, o }) => c + "/" + o.id === openId);
+    if (hit) {
+      const { c, o } = hit, d = E("div", { class: "card panel" });
+      d.appendChild(E("div", { class: "rowx" }, [E("h2", { text: nameOf(c) + " · order for 9:00 " + dayShort(o.day) }), E("span", { class: "tag " + ST[o.st][1], text: ST[o.st][0] })]));
+      d.appendChild(E("p", { class: "note", text: "Confirmed " + when(ms(o.at)) + " by " + (o.byName || o.by) + ". At the time: safe " + eur(o.safe || 0) + " + on the way " + eur(o.onWay || 0) + " + this order " + eur(o.total) + " = " + eur(r2((o.safe || 0) + (o.onWay || 0) + o.total)) + " of €" + int(o.cap || Q.CAP) + "." }));
+      d.appendChild(orderTable(o.qty));
+      if (o.note) d.appendChild(E("div", { class: "note2" }, [E("b", { text: "Note" }), E("div", { text: o.note })]));
+      if (o.st === "cancelled") d.appendChild(E("div", { class: "note2" }, [E("b", { text: "Cancelled " + when(ms(o.cancelAt)) + " by " + (o.cancelName || "") }), E("div", { text: o.cancelWhy || "" })]));
+      if (o.arr) d.appendChild(E("div", { class: "note2", style: o.st === "differs" ? "background:#FDECEC" : "background:#EAF6EE" }, [E("b", { text: "Delivered: " + eur(o.arr.cit) + " on the safe count of " + when(o.arr.at) + (o.arr.rc ? " · receipt " + o.arr.rc : "") }),
+        E("div", { text: o.st === "differs" ? "Difference from the order: " + sEur(r2(o.arr.cit - o.total)) : "Matches the order." })]));
+      if (o.st === "waiting" && canOrder()) d.appendChild(E("div", { class: "row", style: "margin-top:12px" }, [E("button", { class: "btn danger small", type: "button", text: "Cancel this order", onclick: (e) => cancelBox(c, o, d, e.target) })]));
+      box.appendChild(d);
+    }
+  }
+
+  // ═════════ FLAGS ═════════
+  let fLevel = "act", openRes = null;
+  function renderFlags(fl) {
+    const g = { act: fl.filter((f) => f.open && f.level === "act"), watch: fl.filter((f) => f.open && f.level === "watch"), done: fl.filter((f) => !f.open), all: fl };
+    $("fSeg").innerHTML = "";
+    [["act", "Act now"], ["watch", "Watch"], ["done", "Resolved"], ["all", "All"]].forEach(([k, t]) => $("fSeg").appendChild(E("button", { type: "button", class: fLevel === k ? "on" : "", onclick: () => { fLevel = k; render(); } }, [t, E("span", { class: "cnt", text: String(g[k].length) })])));
+    const box = $("flagList"); box.innerHTML = "";
+    if (!g[fLevel].length) { box.appendChild(E("p", { class: "empty", text: fLevel === "act" ? "Nothing to act on." : "Nothing here." })); return; }
+    g[fLevel].forEach((f) => box.appendChild(itemCard(f)));
+  }
+  function itemCard(f) {
+    const key = f.store + "|" + f.id, n = f.note || {};
+    const head = E("div", { class: "h" }, [single() ? null : E("span", { class: "tag n", text: nameOf(f.store) }), E("span", { class: "tag " + (f.level === "act" ? "r" : "a"), text: f.level === "act" ? "Act now" : "Watch" }),
+      E("b", { text: f.title }), f.date ? E("span", { class: "c", text: dayShort(f.date) }) : null, f.open ? null : E("span", { class: "tag g", text: "Resolved" })].filter(Boolean));
+    const lft = E("div", null, [head, E("div", { class: "t", text: f.text })]);
+    if (f.orderId) lft.appendChild(E("button", { class: "linklike", type: "button", style: "font-size:12.5px;margin-top:4px", text: "Open the order", onclick: () => { goStore(f.store); openId = f.store + "/" + f.orderId; showTab("orders"); } }));
+    const amt = f.amt != null && isFinite(f.amt) ? E("div", { class: "amt " + (f.amt < 0 ? "down" : ""), text: f.kind === "differs" ? sEur(f.amt) : eur(f.amt) }) : E("div");
+    const res = E("div", { class: "res" });
+    if (n.smNote) res.appendChild(E("div", { class: "note2" }, [E("b", { text: "Store Manager · " + (n.smName || "") + " · " + SPARUI.fmtDateTime(n.smAt) }), E("div", { text: n.smNote })]));
+    if (n.romNote) res.appendChild(E("div", { class: "note2" }, [E("b", { text: "ROM · " + (n.romName || "") + " · " + SPARUI.fmtDateTime(n.romAt) }), E("div", { text: n.romNote })]));
+    if (n.resolved) res.appendChild(E("div", { class: "note2", style: "background:#EAF6EE" }, [E("b", { text: "✓ Resolved by " + (n.resolvedName || "") + (n.resolvedAt ? " · " + SPARUI.fmtDateTime(n.resolvedAt) : "") })]));
+    const who = canOrder() && !isStoreLogin(f.store) ? (me.role === "rom" ? "rom" : "sm") : null;
+    if (openRes === key && who) {
+      const ta = E("input", { class: "in", type: "text", placeholder: "What happened and what was done" }); ta.value = (who === "sm" ? n.smNote : n.romNote) || "";
+      const cb = E("input", { type: "checkbox" }); cb.checked = !!n.resolved;
+      const sv = E("button", { class: "btn small", type: "button", text: "Save" });
+      sv.onclick = async () => {
+        if (!ta.value.trim()) { SPARUI.toast("Write a short note first", "err"); return; }
+        sv.disabled = true;
+        const data = who === "sm" ? { smNote: ta.value.trim(), smBy: me.email, smName: me.name, smAt: now() } : { romNote: ta.value.trim(), romBy: me.email, romName: me.name, romAt: now() };
+        Object.assign(data, { id: f.id, kind: f.kind, date: f.date || "", resolved: cb.checked });
+        if (cb.checked && !n.resolved) Object.assign(data, { resolvedBy: me.email, resolvedName: me.name, resolvedAt: now() });
+        try { await fs.setDoc(OP(f.store, "notes", docId(f.id)), data, { merge: true }); D[f.store].notes[docId(f.id)] = Object.assign({}, n, data); openRes = null; SPARUI.toast("Saved"); render(); }
+        catch (e) { sv.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      res.appendChild(E("div", { class: "form2" }, [ta, E("label", { style: "display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px" }, [cb, "Resolved"]), E("div", { class: "row" }, [sv, E("button", { class: "btn secondary small", type: "button", text: "Cancel", onclick: () => { openRes = null; render(); } })])]));
+    } else if (who) res.appendChild(E("div", { class: "row", style: "margin-top:6px" }, [E("button", { class: "btn secondary small", type: "button", text: n.resolved ? "Edit / reopen" : "Resolve / add a note", onclick: () => { openRes = key; render(); } })]));
+    return E("div", { class: "it" + (f.open ? "" : " done") }, [lft, amt, res.childNodes.length ? res : null].filter(Boolean));
+  }
+
+  render();
+  setInterval(() => { if (tab === "overview" || tab === "order") { const x = $("stamp"); const rd = Q.roundOf(now()); x.textContent = "Next order to Sales Support: 9:00 " + dayShort(rd) + " (in " + left(Q.deadline(rd)) + ")"; } }, 60000);
+</script>
+</body>
+</html>

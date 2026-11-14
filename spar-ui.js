@@ -177,7 +177,7 @@
       { group: "Sales & stock", id: "gaps", icon: "🔍", name: "Gap Check Tracker", desc: "Each store uploads its daily 1pm gap check: out of stock, stock on system, suppliers, daily brief.", who: "all", page: "gaps.html" },
       { group: "Cash", id: "cash", icon: "💶", name: "Cash Sheet Analyser", desc: "Each store uploads its cash sheet daily: unders and overs, seller codes, safe bags, daily review and weekly sign-off to accounts.", who: ["admin", "rom", "sm"], alsoIf: "cashAccess", page: "cash.html" },
       { group: "Cash", id: "safe", icon: "🔐", name: "Safe Count", desc: "Safe counts at every shift handover and the weekly SM and ROM checks, locked once saved, with the deposit bags tracked until the CIT collects them.", who: ["admin", "rom", "sm"], alsoIf: "cashAccess", page: "safe.html" },
-      { group: "Cash", id: "coins", icon: "🪙", name: "Coin Order", desc: "Order change for the store's floats and track deliveries.", who: "all" },
+      { group: "Cash", id: "coins", icon: "🪙", name: "Coin Order", desc: "Order coins by 9am, kept within the store's €12,000 coin change, and track each delivery against the safe count.", who: ["admin", "rom", "sm"], alsoIf: "cashAccess", page: "coins.html" },
       { group: "Checklists", id: "sm-checklist", icon: "✅", name: "Store Manager Weekly Checklist", desc: "Daily and weekly store tasks, ticked off with notes.", who: "all" },
       { group: "Checklists", id: "rom-checklist", icon: "🧭", name: "ROM Weekly Checklist", desc: "ROM store visits and weekly tasks across your stores.", who: ["admin", "hq", "support", "rom"] },
       { group: "Checklists", id: "deli", icon: "🧀", name: "Deli Counter Checklist", desc: "Opening, during-day and closing checks for the deli.", who: "all" },
