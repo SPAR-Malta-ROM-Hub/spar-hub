@@ -41,6 +41,18 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 .chart{width:100%;height:auto;display:block}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+.grid-2>.card{margin-top:0}
+tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}
+.chips button{appearance:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font:600 13px Arial,sans-serif;color:var(--ink);cursor:pointer;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips button:hover{border-color:var(--brand);background:var(--brandsoft)}
+.lkbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.ads{font-weight:700}
+#ovOut .grid-2 .tablewrap{max-height:none}
+.daychart{min-width:520px}
+#bar select{max-width:100%}
 </style>
 </head>
 <body>
@@ -48,7 +60,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
 
 <main class="page">
   <div class="tabs" id="tabs">
-    <button class="tab active" data-tab="lookup" type="button">Item lookup</button>
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="lookup" type="button">Item lookup</button>
     <button class="tab" data-tab="best" type="button">Best &amp; worst sellers</button>
     <button class="tab" data-tab="gaps" type="button">Zero-sales gaps</button>
     <button class="tab" data-tab="order" type="button">Ordering suggestions</button>
@@ -65,11 +78,15 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     <div class="stamp" id="stamp"></div>
   </div>
 
-  <section data-pane="lookup">
+  <section data-pane="overview">
+    <div id="ovOut"></div>
+  </section>
+
+  <section data-pane="lookup" hidden>
     <div class="card panel" style="margin-top:0">
       <div class="search"><input id="q" type="search" placeholder="Type an item code or part of its name, e.g. banana" autocomplete="off"></div>
       <div class="results" id="results" hidden></div>
-      <div id="lkOut" style="margin-top:14px"><p class="note">Search for an item to see its units by store and day.</p></div>
+      <div id="lkOut" style="margin-top:14px"></div>
     </div>
   </section>
 
@@ -280,8 +297,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const k = "t|" + (groupMode() ? lens() + "|" : "") + c + "|" + w;
     if (!(k in TOT)) {
       let m = null;
-      if (!groupMode()) { try { const v = await cachedDoc(k, totDoc(c, w), c, w); if (v) m = decodeTot(v.data); } catch (e) {} }
-      if (!m) { const full = await getWeek(c, w); if (full) { m = new Map(); full.items.forEach((q, code) => m.set(code, sum(q))); } }
+      if (!groupMode()) { try { const v = await cachedDoc(k, totDoc(c, w), c, w); if (v) { m = decodeTot(v.data); m.days = (v.has || []).filter(Boolean).length; } } catch (e) {} }
+      if (!m) { const full = await getWeek(c, w); if (full) { m = new Map(); full.items.forEach((q, code) => m.set(code, sum(q))); m.days = (full.has || []).filter(Boolean).length; } }
+      if (m && !m.days) m.days = 7;
       TOT[k] = m;
     }
     return TOT[k];
@@ -363,7 +381,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
 
   // ═════════ TABS ═════════
-  let tab = "lookup";
+  let tab = "overview";
   function showTab(name) {
     tab = name;
     document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
@@ -380,8 +398,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (tab === "upload") return renderUpload();
     const w = $("week").value, codes = scope().codes;
     $("stamp").textContent = w ? scope().label + " · " + wkLabel(w) : "";
-    if (!ITEMS.size && fullSales) { ["lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "msg warn", text: canUpload ? "Upload the item list first (Upload tab)." : "The item list hasn't been uploaded yet." })); }); return; }
-    if (!w) { ["lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "empty", text: canUpload ? "No unit sales yet. Open Upload and drop in the hourly item sales files." : "No unit sales have been uploaded yet." })); }); $("soOut").innerHTML = ""; return; }
+    if (!ITEMS.size && fullSales) { ["ovOut", "lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "msg warn", text: canUpload ? "Upload the item list first (Upload tab)." : "The item list hasn't been uploaded yet." })); }); return; }
+    if (!w) { ["ovOut", "lkOut", "bestOut", "gapOut", "ordOut", "hrOut"].forEach((id) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "empty", text: canUpload ? "No unit sales yet. Open Upload and drop in the hourly item sales files." : "No unit sales have been uploaded yet." })); }); $("soOut").innerHTML = ""; return; }
+    if (tab === "overview") return renderOverview(my, w, codes);
     if (tab === "lookup") return renderLookup(my);
     if (tab === "best") return renderBest(my, w, codes);
     if (tab === "gaps") return renderGaps(my, w, codes);
@@ -390,6 +409,111 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
   const loading = (id, txt) => { $(id).innerHTML = ""; $(id).appendChild(E("p", { class: "note", text: txt || "Loading…" })); };
   const needStore = (id, what) => { $(id).innerHTML = ""; $(id).append(E("h2", { text: what }), E("p", { class: "msg warn", text: "Choose one store in View to see " + what.toLowerCase() + "." })); };
+
+  // ── Average daily sales (ADS): units ÷ the days the store traded (days with a report), never ÷ 7 for a part week.
+  //    Across several stores: each store's ADS added up (the stores' combined units a day).
+  const adsTxt = (v) => v == null || !isFinite(v) ? "–" : v >= 100 ? Math.round(v).toLocaleString("en-GB") : v.toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  function aggTotals(docs) {
+    const A = new Map(); let units = 0, ads = 0, days = 0;
+    docs.forEach((d) => {
+      if (!d) return; const n = d.days || 7; days = Math.max(days, n);
+      d.forEach((u, code) => { if (!u || !allowed(code)) return; const o = A.get(code) || A.set(code, { code, u: 0, ads: 0, st: 0 }).get(code); o.u += u; o.ads += u / n; o.st++; units += u; ads += u / n; });
+    });
+    return { A, units, ads, days, stores: docs.filter(Boolean).length };
+  }
+  const pickItem = (code) => { picked = code; const it = itemOf(code); $("q").value = it.d; rememberItem(code); showTab("lookup"); };
+  function rememberItem(code) { try { const r = JSON.parse(localStorage.getItem("sparUnitsRecent") || "[]").filter((x) => x !== code); r.unshift(code); localStorage.setItem("sparUnitsRecent", JSON.stringify(r.slice(0, 10))); } catch (e) {} }
+  const recentItems = () => { try { return JSON.parse(localStorage.getItem("sparUnitsRecent") || "[]").filter((c) => ITEMS.has(c)); } catch (e) { return []; } };
+  function dayBars(title, cur, prev, labA, labB) {
+    const n = 7, vals = cur.concat(prev).filter((v) => v != null && isFinite(v));
+    let hi = Math.max(1, ...vals); { const raw = hi / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw) || raw; hi = Math.ceil(hi / st) * st; }
+    const Wd = 1000, Ht = 240, L = 58, B = 30, T = 12, gw = (Wd - L - 10) / n, bw = Math.min(30, gw * 0.34);
+    const y = (v) => T + (hi - v) / hi * (Ht - B - T);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", title); svg.classList.add("daychart");
+    const mk = (tag, a, t) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (t != null) nd.textContent = t; svg.appendChild(nd); return nd; };
+    for (let i = 0; i <= 4; i++) { const v = hi * i / 4; mk("line", { x1: L, x2: Wd - 10, y1: y(v), y2: y(v), stroke: "#E9EBEA" }); mk("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, v >= 1000 ? (v / 1000) + "k" : Math.round(v)); }
+    DAYN.forEach((d, i) => {
+      const cx = L + (i + 0.5) * gw;
+      [[prev[i], "#A9B7C2", -1, labB], [cur[i], "#EC1B24", 1, labA]].forEach(([v, col, side, nm2]) => {
+        if (v == null) return;
+        const r = mk("rect", { x: side < 0 ? cx - bw - 1 : cx + 1, y: y(v), width: bw, height: Math.max(1, y(0) - y(v)), rx: 3, fill: col });
+        const tt = document.createElementNS(ns, "title"); tt.textContent = d + " · " + nm2 + ": " + Math.round(v).toLocaleString("en-GB") + " units"; r.appendChild(tt);
+      });
+      mk("text", { x: cx, y: Ht - 9, "text-anchor": "middle", "font-size": 11.5, fill: "#60727a" }, d);
+    });
+    return E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 6px", text: title }),
+      E("div", { class: "legend", style: "margin:0 0 8px" }, [E("span", null, [E("i", { style: "background:#A9B7C2" }), labB]), E("span", null, [E("i", { style: "background:#EC1B24" }), labA])]),
+      E("div", { style: "overflow-x:auto" }, [svg])]);
+  }
+
+  // ── Overview: the landing page ──
+  async function renderOverview(my, w, codes) {
+    loading("ovOut", "Loading " + codes.length + " store" + (codes.length === 1 ? "" : "s") + "…");
+    const pw = addDays(w, -7);
+    const [cur, prev, hc, hp] = await Promise.all([Promise.all(codes.map((c) => getTotals(c, w))), Promise.all(codes.map((c) => getTotals(c, pw))),
+      Promise.all(codes.map((c) => getHours(c, w))), Promise.all(codes.map((c) => getHours(c, pw)))]);
+    if (my !== seq) return;
+    // this week's figures use every store with a report; changes compare only the stores with a report in both weeks
+    const both = codes.map((_, i) => !!(cur[i] && prev[i]));
+    const a = aggTotals(cur), b = aggTotals(prev.map((d, i) => both[i] ? d : null)), aM = aggTotals(cur.map((d, i) => both[i] ? d : null)), box = $("ovOut"); box.innerHTML = "";
+    const f = $("filter").value || $("grp").value, what = f ? nm(f) : lens() ? groupOf(lens()).name : "all items";
+    if (!a.units) { box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("p", { class: "empty", text: "No unit sales for " + what + " in " + wkLabel(w) + "." })])); return; }
+    // units per day, from the small hourly totals (whole store, or the group's copy)
+    const filtered = !!f || (!!lens() && !groupMode());
+    const perDay = (H, mon) => DAYN.map((_, i) => { const d = addDays(mon, i); let t = 0, any = false; H.forEach((h) => { if (h && h[d]) { any = true; t += sum(h[d]); } }); return any ? t : null; });
+    const dCur = perDay(hc, w), dPrev = perDay(hp, pw);
+    let bestI = -1; dCur.forEach((v, i) => { if (v != null && (bestI < 0 || v > dCur[bestI])) bestI = i; });
+    const ch = (x, y) => y ? x / y - 1 : null;
+    box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
+      SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: "Units sold" }), E("strong", { text: num(Math.round(a.units)) }), E("span", { class: "note", text: a.days + " trading day" + (a.days === 1 ? "" : "s") + " · " + what })]), () => showTab("best"), "Best & worst sellers"),
+      SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: "Average daily sales" }), E("strong", { text: adsTxt(a.ads) }), E("span", { class: "note" }, [E("span", { class: ch(aM.ads, b.ads) == null ? "" : ch(aM.ads, b.ads) >= 0 ? "up" : "down", text: pct(ch(aM.ads, b.ads)) }), b.stores ? " vs last week · same " + (b.stores === 1 ? "store" : b.stores + " stores") : "no report last week"])]), () => showTab("best"), "Items by average daily sales"),
+      SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: "Items sold" }), E("strong", { text: num(a.A.size) }), E("span", { class: "note", text: "different items" + (b.stores ? " · last week " + num(b.A.size) : "") })]), () => showTab("best"), "Best & worst sellers"),
+      SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: filtered ? "Stores" : "Busiest day" }), E("strong", { text: filtered ? String(a.stores) : bestI >= 0 ? DAYN[bestI] : "–" }), E("span", { class: "note", text: filtered ? "with a report this week" : bestI >= 0 ? num(Math.round(dCur[bestI])) + " units" : "" })]), filtered ? null : () => { hrDay = bestI >= 0 ? addDays(w, bestI) : ""; showTab("hours"); }, "Units by hour on the busiest day")]));
+    if (!filtered && dCur.some((v) => v != null)) box.appendChild(dayBars("Units by day · " + scope().label, dCur, dPrev, wkLabel(w), "Week before"));
+    // top items by ADS, and the biggest changes against last week
+    const rows = [...a.A.values()].sort((x, y) => y.ads - x.ads);
+    const was = (code) => (b.A.get(code) || { ads: 0 }).ads, nowM = (code) => (aM.A.get(code) || { ads: 0 }).ads;
+    const itemRow = (r, extra) => { const it = itemOf(r.code); const tr = E("tr", { class: "click", title: "Look up this item" }, [E("td", null, [E("span", { class: "code", text: r.code }), E("div", { text: it.d })]), ...extra]); tr.onclick = () => pickItem(r.code); return tr; };
+    const top = rows.slice(0, 10).map((r, i) => itemRow(r, [E("td", { class: "num ads", text: adsTxt(r.ads) }), E("td", { class: "num", text: num(Math.round(r.u)) }), E("td", { class: "num " + (was(r.code) ? (nowM(r.code) >= was(r.code) ? "up" : "down") : ""), text: !b.stores ? "–" : was(r.code) ? pct(nowM(r.code) / was(r.code) - 1) : "new" })]));
+    const moves = [...new Set([...aM.A.keys(), ...b.A.keys()])].map((code) => ({ code, ads: nowM(code), was: was(code) }))
+      .filter((r) => Math.max(r.ads, r.was) >= 1).map((r) => Object.assign(r, { d: r.ads - r.was })).filter((r) => Math.abs(r.d) >= 0.05);
+    const up = moves.filter((r) => r.d > 0).sort((x, y) => y.d - x.d).slice(0, 5), down = moves.filter((r) => r.d < 0).sort((x, y) => x.d - y.d).slice(0, 5);
+    const mvRow = (r) => itemRow(r, [E("td", { class: "num", text: adsTxt(r.was) + " → " + adsTxt(r.ads) }), E("td", { class: "num " + (r.d >= 0 ? "up" : "down"), text: (r.d >= 0 ? "+" : "−") + adsTxt(Math.abs(r.d)) })]);
+    const th = (hs, nums) => E("thead", null, [E("tr", null, hs.map((h, i) => E("th", nums.includes(i) ? { class: "num", text: h } : { text: h })))]);
+    box.appendChild(E("div", { class: "grid-2", style: "margin-top:16px" }, [
+      E("div", { class: "card panel" }, [E("div", { class: "rowx", style: "display:flex;justify-content:space-between;align-items:center;margin:0 0 10px" }, [E("h3", { style: "margin:0", text: "Top 10 by average daily sales" }), E("button", { class: "btn secondary small", type: "button", text: "All items", onclick: () => showTab("best") })]),
+        E("div", { class: "tablewrap" }, [E("table", null, [th(["Item", "ADS", "Units", "vs last week"], [1, 2, 3]), E("tbody", null, top)])])]),
+      E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 10px", text: "Biggest changes vs last week (ADS)" }),
+        up.length || down.length ? E("div", { class: "tablewrap" }, [E("table", null, [th(["Item", "ADS last → this week", "Change"], [1, 2]), E("tbody", null, up.map(mvRow).concat(down.map(mvRow)))])]) : E("p", { class: "note", text: "Nothing to compare with last week yet." })])]));
+    // departments (or categories inside a department filter)
+    const keyOfIt = (code) => { const it = itemOf(code); return /^D/.test(f || "D") && f ? (it.C || "") : (it.D || ""); };
+    const byK = (A) => { const m = new Map(); A.forEach((r) => { const k = keyOfIt(r.code); const o = m.get(k) || m.set(k, { k, u: 0, ads: 0, n: 0 }).get(k); o.u += r.u; o.ads += r.ads; o.n++; }); return m; };
+    const dA = byK(a.A), dB = byK(b.A), dM = byK(aM.A), dl = [...dA.values()].sort((x, y) => y.ads - x.ads);
+    const level = f && /^D/.test(f) ? "Category" : "Department";
+    const dRows = dl.map((r) => { const pb = (dB.get(r.k) || { ads: 0 }).ads, nm2 = (dM.get(r.k) || { ads: 0 }).ads;
+      const tr = E("tr", { class: r.k ? "click" : "", title: r.k ? "Show this " + level.toLowerCase() + "'s best and worst sellers" : "" }, [E("td", null, [E("b", { text: r.k ? nm(r.k) : "Not in the item list" }), r.k ? E("span", { class: "code", text: "  " + r.k }) : null].filter(Boolean)),
+        E("td", { class: "num", text: num(r.n) }), E("td", { class: "num", text: num(Math.round(r.u)) }), E("td", { class: "num ads", text: adsTxt(r.ads) }), E("td", { class: "num", text: (r.u / a.units * 100).toFixed(1) + "%" }),
+        E("td", { class: "num " + (pb ? (nm2 >= pb ? "up" : "down") : ""), text: pb ? pct(nm2 / pb - 1) : "–" })]);
+      if (r.k) tr.onclick = () => { $("filter").value = r.k; buildGroupPick(); showTab("best"); };
+      return tr; });
+    dRows.push(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { class: "num", text: num(a.A.size) }), E("td", { class: "num", text: num(Math.round(a.units)) }), E("td", { class: "num", text: adsTxt(a.ads) }), E("td", { class: "num", text: "100%" }), E("td", { class: "num " + (b.ads ? (aM.ads >= b.ads ? "up" : "down") : ""), text: b.ads ? pct(aM.ads / b.ads - 1) : "–" })]));
+    box.appendChild(E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 4px", text: level === "Category" ? "By category · " + nm(f) : "By department" }),
+      E("p", { class: "note", style: "margin:0 0 10px", text: "Click a line to see its best and worst sellers. ADS = average daily sales: units a day over the days traded. Changes compare the same stores both weeks." }),
+      E("div", { class: "tablewrap" }, [E("table", null, [th([level, "Items", "Units", "ADS", "Share", "ADS vs last week"], [1, 2, 3, 4, 5]), E("tbody", null, dRows)])])]));
+    // several stores: store by store
+    if (codes.length > 1) {
+      const missing = codes.filter((c, i) => !cur[i]).map((c) => (byCode[c] || {}).name || c);
+      const sRows = codes.map((c, i) => { const x = aggTotals([cur[i]]), y = aggTotals([both[i] ? prev[i] : null]); return { c, x, y }; }).filter((r) => r.x.stores).sort((p, q) => q.x.ads - p.x.ads).map(({ c, x, y }) => {
+        const tr = E("tr", { class: "click", title: "Open this store" }, [E("td", null, [E("b", { text: (byCode[c] || {}).name || c }), E("div", { class: "note", text: romOf(c) })]),
+          E("td", { class: "num", text: x.stores ? x.days + "/7" : "no report" }), E("td", { class: "num", text: num(Math.round(x.units)) }), E("td", { class: "num ads", text: x.stores ? adsTxt(x.ads) : "–" }), E("td", { class: "num", text: num(x.A.size) }),
+          E("td", { class: "num " + (y.ads && x.stores ? (x.ads >= y.ads ? "up" : "down") : ""), text: y.ads && x.stores ? pct(x.ads / y.ads - 1) : "–" })]);
+        tr.onclick = () => { const sc = scopes.find((z) => z.id === "s:" + c); if (sc) { $("scope").value = sc.id; $("scope").dispatchEvent(new Event("change")); } };
+        return tr; });
+      box.appendChild(E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 10px", text: "By store" }), E("div", { class: "tablewrap" }, [E("table", null, [th(["Store", "Days", "Units", "ADS", "Items", "ADS vs last week"], [1, 2, 3, 4, 5]), E("tbody", null, sRows)])]),
+        missing.length ? E("p", { class: "note", style: "margin:10px 0 0", text: "No report yet this week (" + missing.length + "): " + missing.sort().join(", ") }) : null].filter(Boolean)));
+    }
+  }
 
   // ── Item lookup ──
   let picked = null;
@@ -412,32 +536,46 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const runSearch = () => {
     const r = search($("q").value), box = $("results"); box.innerHTML = "";
     box.hidden = !r.length;
-    r.forEach((it) => box.appendChild(E("button", { type: "button", onclick: () => { picked = it.code; box.hidden = true; $("q").value = it.d; render(); } },
+    r.forEach((it) => box.appendChild(E("button", { type: "button", onclick: () => { picked = it.code; box.hidden = true; $("q").value = it.d; rememberItem(it.code); render(); } },
       [E("span", null, [E("span", { class: "code", text: it.code + "  " }), it.d]), E("small", { text: nm(it.C) })])));
   };
+  async function lookupLanding(my) {
+    const box = $("lkOut"); box.innerHTML = "";
+    box.appendChild(E("p", { class: "note", text: "Search for an item above to see its units and average daily sales by store and day." }));
+    const rec = recentItems();
+    if (rec.length) box.append(E("h3", { style: "margin:16px 0 4px", text: "Recently looked up" }), E("div", { class: "chips" }, rec.map((c) => E("button", { type: "button", title: c, text: itemOf(c).d, onclick: () => pickItem(c) }))));
+    const w = $("week").value; if (!w) return;
+    const a = aggTotals(await Promise.all(scope().codes.map((c) => getTotals(c, w))));
+    if (my !== seq || !a.A.size) return;
+    box.append(E("h3", { style: "margin:16px 0 4px", text: "Best sellers this week" }), E("div", { class: "chips" }, [...a.A.values()].filter((r) => ITEMS.has(r.code)).sort((x, y) => y.ads - x.ads).slice(0, 12).map((r) => E("button", { type: "button", title: r.code + " · " + adsTxt(r.ads) + " a day", text: itemOf(r.code).d, onclick: () => pickItem(r.code) }))));
+  }
+  const backToLanding = () => { picked = null; $("q").value = ""; $("results").hidden = true; render(); };
   async function renderLookup(my) {
-    if (!picked) return;
+    if (!picked) return lookupLanding(my);
     const it = itemOf(picked), codes = scope().codes, w = $("week").value;
     loading("lkOut");
-    const head = [E("h2", { text: it.d }), E("p", { class: "note", style: "margin:-6px 0 12px", text: it.code + " · " + [nm(it.D), nm(it.C), nm(it.G)].filter(Boolean).join(" › ") + " · case of " + it.k })];
+    const head = [E("div", { class: "lkbar" }, [E("button", { class: "btn secondary small", type: "button", text: "← Back", onclick: backToLanding }),
+        E("button", { class: "btn secondary small", type: "button", text: "New search", onclick: () => { backToLanding(); $("q").focus(); } })]),
+      E("h2", { text: it.d }), E("p", { class: "note", style: "margin:-6px 0 12px", text: it.code + " · " + [nm(it.D), nm(it.C), nm(it.G)].filter(Boolean).join(" › ") + " · case of " + it.k })];
     if (single()) {
       const c = codes[0], ws = weeks.slice(weeks.indexOf(w), weeks.indexOf(w) + 8);
       const docs = await Promise.all(ws.map((x) => getWeek(c, x)));
       if (my !== seq) return;
-      const tb = E("tbody"); let tot = 0, n = 0;
+      const tb = E("tbody"); let tot = 0, n = 0, dTot = 0;
       ws.forEach((x, i) => {
         const q = docs[i] ? (docs[i].items.get(picked) || [0, 0, 0, 0, 0, 0, 0]) : null;
-        if (q) { tot += sum(q); n++; }
-        tb.appendChild(E("tr", null, [E("td", { text: wkLabel(x) }), ...(q ? q.map((v) => E("td", { class: "num" + (v ? "" : " muted"), text: num(v) })) : DAYN.map(() => E("td", { class: "num muted", text: "–" }))),
-          E("td", { class: "num", style: "font-weight:700", text: q ? num(sum(q)) : "no report" })]));
+        const nd = docs[i] ? ((docs[i].has || []).filter(Boolean).length || 7) : 0;
+        if (q) { tot += sum(q); n++; dTot += nd; }
+        tb.appendChild(E("tr", null, [E("td", { text: wkLabel(x) }), ...(q ? q.map((v, j) => E("td", { class: "num" + (v ? "" : " muted"), text: (docs[i].has || [])[j] === false ? "–" : num(v) })) : DAYN.map(() => E("td", { class: "num muted", text: "–" }))),
+          E("td", { class: "num", style: "font-weight:700", text: q ? num(sum(q)) : "no report" }), E("td", { class: "num ads", text: q ? adsTxt(sum(q) / nd) : "–" })]));
       });
       $("lkOut").innerHTML = "";
       $("lkOut").append(...head, E("div", { class: "kpis", style: "margin-bottom:14px" }, [
+        kpi("Average daily sales", adsTxt(dTot ? tot / dTot : null), "units a day over " + dTot + " trading day" + (dTot === 1 ? "" : "s")),
         kpi("Average a week", num(n ? tot / n : null), "over " + n + " week" + (n === 1 ? "" : "s")),
-        kpi("Average a day", num(n ? tot / n / 7 : null), "units"),
         kpi("Cases a week", num(n ? tot / n / it.k : null), "case of " + it.k),
         kpi("This week", num(docs[0] ? sum(docs[0].items.get(picked) || []) : null), wkLabel(w))]),
-        E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Week" }), ...DAYN.map((d) => E("th", { class: "num", text: d })), E("th", { class: "num", text: "Week" })])]), tb])]),
+        E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, [E("th", { text: "Week" }), ...DAYN.map((d) => E("th", { class: "num", text: d })), E("th", { class: "num", text: "Week" }), E("th", { class: "num", text: "ADS" })])]), tb])]),
         E("div", { id: "lkHours", style: "margin-top:16px" }));
       // this item by hour: average over the week's days that have a file
       const dIn = Array.from({ length: 7 }, (_, i) => addDays(w, i)).filter((d, i) => docs[0] && (docs[0].has || [])[i]);
@@ -450,19 +588,20 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       const i0 = weeks.indexOf(w), prevW = weeks[i0 + 1];
       const [cur, prev] = await Promise.all([Promise.all(codes.map((c) => getTotals(c, w))), prevW ? Promise.all(codes.map((c) => getTotals(c, prevW))) : Promise.resolve([])]);
       if (my !== seq) return;
-      const tb = E("tbody"); let T = 0, TP = 0;
-      const rows = codes.map((c, i) => ({ c, u: cur[i] ? (cur[i].get(picked) || 0) : null, p: prev[i] ? (prev[i].get(picked) || 0) : null })).sort((a, b) => (b.u ?? -1) - (a.u ?? -1));
+      const tb = E("tbody"); let T = 0, TP = 0, TB = 0;
+      const rows = codes.map((c, i) => ({ c, u: cur[i] ? (cur[i].get(picked) || 0) : null, n: cur[i] ? cur[i].days || 7 : 7, p: prev[i] ? (prev[i].get(picked) || 0) : null })).sort((a, b) => (b.u ?? -1) - (a.u ?? -1));
+      let TA = 0;
       rows.forEach((r) => {
-        T += r.u || 0; TP += r.p || 0;
+        T += r.u || 0; TP += r.p || 0; if (r.u != null && r.p != null) TB += r.u; if (r.u != null) TA += r.u / r.n;
         tb.appendChild(E("tr", null, [E("td", null, [E("b", { text: (byCode[r.c] || {}).name || r.c }), E("div", { class: "note", text: romOf(r.c) })]),
           E("td", { class: "num" + (r.u ? "" : " muted"), style: "font-weight:700", text: r.u == null ? "no report" : num(r.u) }),
-          E("td", { class: "num", text: r.u == null ? "–" : num(r.u / 7) }), E("td", { class: "num", text: r.u == null ? "–" : num(r.u / it.k) }),
+          E("td", { class: "num ads", text: r.u == null ? "–" : adsTxt(r.u / r.n) }), E("td", { class: "num", text: r.u == null ? "–" : num(r.u / it.k) }),
           E("td", { class: "num muted", text: r.p == null ? "–" : num(r.p) }),
           E("td", { class: "num " + (r.u != null && r.p ? (r.u >= r.p ? "up" : "down") : ""), text: r.u != null && r.p ? pct(r.u / r.p - 1) : "–" })]));
       });
-      tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { class: "num", text: num(T) }), E("td", { class: "num", text: num(T / 7) }), E("td", { class: "num", text: num(T / it.k) }), E("td", { class: "num", text: num(TP) }), E("td", { class: "num", text: TP ? pct(T / TP - 1) : "–" })]));
+      tb.appendChild(E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { class: "num", text: num(T) }), E("td", { class: "num", text: adsTxt(TA) }), E("td", { class: "num", text: num(T / it.k) }), E("td", { class: "num", text: num(TP) }), E("td", { class: "num", text: TP ? pct(TB / TP - 1) : "–", title: "Same stores both weeks" })]));
       $("lkOut").innerHTML = "";
-      $("lkOut").append(...head, E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Units this week", "A day", "Cases", "Last week", "vs last week"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]),
+      $("lkOut").append(...head, E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Units this week", "ADS", "Cases", "Last week", "vs last week"].map((h, i) => E("th", { class: i ? "num" : "", text: h })))]), tb])]),
         E("p", { class: "note", style: "margin:10px 0 0", text: "Choose one store in View to see this item day by day for its last 8 weeks." }));
     }
   }
@@ -477,23 +616,23 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const A = new Map();
     docs.forEach((d) => d.forEach((t, code) => {
       if (!t || !allowed(code)) return;
-      const o = A.get(code) || A.set(code, { code, u: 0, n: 0 }).get(code); o.u += t; o.n++;
+      const o = A.get(code) || A.set(code, { code, u: 0, n: 0, ads: 0 }).get(code); o.u += t; o.n++; o.ads += t / (d.days || 7);
     }));
     bestRows = [...A.values()].sort((a, b) => b.u - a.u);
     const box = $("bestOut"); box.innerHTML = "";
     const f = $("filter").value;
     box.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [E("h2", { style: "margin:0", text: "Best & worst sellers · " + (f ? nm(f) : lens() ? groupOf(lens()).name : "all items") }),
-      E("button", { class: "btn secondary small", type: "button", text: "Download full list (Excel)", onclick: () => xl("Sellers " + wkLabel(w), [["Rank", "Item code", "Description", "Department", "Category", "Group", "Units", "Units a day", "Case size", "Cases", "Stores selling"],
-        ...bestRows.map((r, i) => { const it = itemOf(r.code); return [i + 1, r.code, it.d, nm(it.D), nm(it.C), nm(it.G), r.u, +(r.u / 7).toFixed(2), it.k, +(r.u / it.k).toFixed(2), r.n]; })]) })]),
+      E("button", { class: "btn secondary small", type: "button", text: "Download full list (Excel)", onclick: () => xl("Sellers " + wkLabel(w), [["Rank", "Item code", "Description", "Department", "Category", "Group", "Units", "Average daily sales", "Case size", "Cases", "Stores selling"],
+        ...bestRows.map((r, i) => { const it = itemOf(r.code); return [i + 1, r.code, it.d, nm(it.D), nm(it.C), nm(it.G), r.u, +r.ads.toFixed(2), it.k, +(r.u / it.k).toFixed(2), r.n]; })]) })]),
       E("p", { class: "note", style: "margin:0 0 12px", text: bestRows.length.toLocaleString("en-GB") + " items sold in " + wkLabel(w) + (docs.length < codes.length ? " · " + (codes.length - docs.length) + " store(s) have no report this week" : "") + ". Use Filter to narrow to a department, category or group." }));
     if (!bestRows.length) { box.appendChild(E("p", { class: "empty", text: "Nothing sold for this filter this week." })); return; }
     const table = (rows, title) => {
       const tb = E("tbody");
-      rows.forEach((r) => { const it = itemOf(r.code); tb.appendChild(E("tr", { style: "cursor:pointer", onclick: () => { picked = r.code; $("q").value = it.d; showTab("lookup"); } }, [
+      rows.forEach((r) => { const it = itemOf(r.code); tb.appendChild(E("tr", { style: "cursor:pointer", onclick: () => pickItem(r.code) }, [
         E("td", { class: "num", text: r.rank }), E("td", null, [E("span", { class: "code", text: r.code }), E("div", { text: it.d })]), E("td", { class: "note", text: nm(it.C) }),
-        E("td", { class: "num", style: "font-weight:700", text: num(r.u) }), E("td", { class: "num", text: num(r.u / it.k) }), codes.length > 1 ? E("td", { class: "num", text: r.n + " / " + docs.length }) : null])); });
+        E("td", { class: "num", style: "font-weight:700", text: num(r.u) }), E("td", { class: "num ads", text: adsTxt(r.ads) }), E("td", { class: "num", text: num(r.u / it.k) }), codes.length > 1 ? E("td", { class: "num", text: r.n + " / " + docs.length }) : null])); });
       return E("div", null, [E("h3", { style: "margin:14px 0 8px", text: title }), E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null,
-        ["#", "Item", "Category", "Units", "Cases", codes.length > 1 ? "Stores selling" : null].filter(Boolean).map((h, i) => E("th", { class: i === 0 || i >= 3 ? "num" : "", text: h })))]), tb])])]);
+        ["#", "Item", "Category", "Units", "ADS", "Cases", codes.length > 1 ? "Stores selling" : null].filter(Boolean).map((h, i) => E("th", { class: i === 0 || i >= 3 ? "num" : "", text: h })))]), tb])])]);
     };
     bestRows.forEach((r, i) => { r.rank = i + 1; });
     box.appendChild(table(bestRows.slice(0, TOP_N), "Top " + Math.min(TOP_N, bestRows.length) + " by units"));
@@ -539,16 +678,16 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     gapRows = rows.sort((a, b) => b.lost - a.lost);
     box.append(E("div", { class: "row", style: "justify-content:space-between;margin-bottom:8px" }, [
       E("p", { class: "note", style: "margin:0;flex:1 1 400px", text: "Items this store usually sells (in at least 3 of the last " + H.length + " weeks, " + GAP_MIN_WEEK + "+ units a week) that sold nothing all week, or nothing for 2 or more days in a row although they usually sell " + GAP_RUN_DAILY + "+ a day. Often a sign of an empty shelf, a delivery problem or a price/scan issue." }),
-      E("button", { class: "btn secondary small", type: "button", text: "Download as Excel", onclick: () => xl("Zero sales " + c + " " + wkLabel(w), [["Item code", "Description", "Category", "Usually a week", "This week", "Zero days", "When", "Units likely lost"],
-        ...gapRows.map((r) => { const it = itemOf(r.code); return [r.code, it.d, nm(it.C), +r.avgW.toFixed(1), r.week, r.days, r.when, +r.lost.toFixed(1)]; })]) })]));
+      E("button", { class: "btn secondary small", type: "button", text: "Download as Excel", onclick: () => xl("Zero sales " + c + " " + wkLabel(w), [["Item code", "Description", "Category", "Usual average daily sales", "Usually a week", "This week", "Zero days", "When", "Units likely lost"],
+        ...gapRows.map((r) => { const it = itemOf(r.code); return [r.code, it.d, nm(it.C), +(r.avgW / 7).toFixed(2), +r.avgW.toFixed(1), r.week, r.days, r.when, +r.lost.toFixed(1)]; })]) })]));
     if (!gapRows.length) { box.appendChild(E("p", { class: "msg ok", text: "No gaps found this week." })); return; }
     const tb = E("tbody");
-    gapRows.forEach((r) => { const it = itemOf(r.code); tb.appendChild(E("tr", { style: "cursor:pointer", onclick: () => { picked = r.code; $("q").value = it.d; showTab("lookup"); } }, [
+    gapRows.forEach((r) => { const it = itemOf(r.code); tb.appendChild(E("tr", { style: "cursor:pointer", onclick: () => pickItem(r.code) }, [
       E("td", null, [E("span", { class: "code", text: r.code }), E("div", { text: it.d })]), E("td", { class: "note", text: nm(it.C) }),
-      E("td", { class: "num", text: num(r.avgW) }), E("td", { class: "num" + (r.week ? "" : " zero"), text: num(r.week) }),
+      E("td", { class: "num ads", text: adsTxt(r.avgW / 7) }), E("td", { class: "num", text: num(r.avgW) }), E("td", { class: "num" + (r.week ? "" : " zero"), text: num(r.week) }),
       E("td", null, [E("span", { class: "pill " + (r.kind === "all" ? "red" : "warn"), text: r.when })]), E("td", { class: "num", style: "font-weight:700", text: num(Math.round(r.lost)) })])); });
     box.appendChild(E("p", { style: "margin:0 0 8px;font-weight:700", text: gapRows.length + " item" + (gapRows.length === 1 ? "" : "s") + " to check" }));
-    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Item", "Category", "Usually a week", "This week", "No sales", "Units likely lost"].map((h, i) => E("th", { class: i >= 2 && i !== 4 ? "num" : "", text: h })))]), tb])]));
+    box.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Item", "Category", "Usual ADS", "Usually a week", "This week", "No sales", "Units likely lost"].map((h, i) => E("th", { class: i >= 2 && i !== 5 ? "num" : "", text: h })))]), tb])]));
   }
 
   // ── Ordering suggestions ──
@@ -688,7 +827,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         ...soRows.map((r) => { const it = itemOf(r.code); return [r.code, it.d, nm(it.C), r.today, hh(r.last), +r.usualAfter.toFixed(1), +r.usualDay.toFixed(1)]; })]) })]));
     if (!soRows.length) { so.appendChild(E("p", { class: "msg ok", text: "Nothing stopped selling early." })); return; }
     const t2 = E("tbody");
-    soRows.forEach((r) => { const it = itemOf(r.code); t2.appendChild(E("tr", { style: "cursor:pointer", onclick: () => { picked = r.code; $("q").value = it.d; showTab("lookup"); } }, [
+    soRows.forEach((r) => { const it = itemOf(r.code); t2.appendChild(E("tr", { style: "cursor:pointer", onclick: () => pickItem(r.code) }, [
       E("td", null, [E("span", { class: "code", text: r.code }), E("div", { text: it.d })]), E("td", { class: "note", text: nm(it.C) }), E("td", { class: "num", text: num(r.today) }),
       E("td", null, [E("span", { class: "pill warn", text: "Last sale " + hh(r.last) })]), E("td", { class: "num", style: "font-weight:700", text: num(Math.round(r.usualAfter)) }), E("td", { class: "num", text: num(Math.round(r.usualDay)) })])); });
     so.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Item", "Category", "Sold today", "", "Usually sells after that", "Usual for the day"].map((x, i) => E("th", { class: i >= 2 && i !== 3 ? "num" : "", text: x })))]), t2])]));
