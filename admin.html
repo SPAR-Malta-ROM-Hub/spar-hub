@@ -86,14 +86,14 @@ tr.inactive td{color:var(--muted)}
             <div class="storeboxes" id="pGroups" style="margin-left:26px"></div>
           </div>
           <div class="f" id="pCashWrap" hidden>
-            <label class="checkline" style="font-weight:400"><input type="checkbox" id="pCash"> <b>Accounts team</b>: can see the Cash Sheet Analyser for every store (read only). Other Head Office and Support people don't see it.</label>
+            <label class="checkline" style="font-weight:400"><input type="checkbox" id="pCash"> <b>Accounts team</b>: also sees the Cash Sheet Analyser for every store (read only). Nobody else outside the stores and ROMs sees it.</label>
           </div>
           <div class="row" style="margin-top:6px">
             <button class="btn" id="pSave" type="submit">Add person</button>
             <button class="btn secondary" id="pCancel" type="button" hidden>Cancel</button>
           </div>
         </form>
-        <p class="roles"><b>Store Manager</b> — their own store. <b>ROM</b> — their stores. <b>Support</b> — all stores. <b>Head Office</b> — all stores, posts DAPs and sets up modules. <b>Admin</b> — everything, plus this page.</p>
+        <p class="roles"><b>Store Manager</b> — their own store. <b>ROM</b> — their stores. <b>Support</b> — all stores. <b>Head Office</b> — all stores, posts DAPs and sets up modules. <b>Admin</b> — everything, plus this page. <b>Department</b> — only posts DAP tasks for their department (e.g. Accounts, Maintenance); tick <b>Accounts team</b> for the accounts people so they also see the cash sheets.</p>
       </div>
 
       <div class="card panel">
@@ -243,7 +243,8 @@ tr.inactive td{color:var(--muted)}
     $("pStoreOne").hidden = !SINGLE(role);
     $("pStoreMany").hidden = !MULTI(role);
     $("pDeptWrap").hidden = role !== "dept";
-    $("pCashWrap").hidden = !["hq", "support"].includes(role);
+    $("pCashWrap").hidden = !["dept", "hq", "support"].includes(role);
+    $("pSalesWrap").hidden = ["admin", "dept"].includes(role);      // admins see everything; departments don't see the Sales Tracker
     const sel = $("pStore"), keep = sel.value;
     sel.innerHTML = "";
     sel.appendChild(new Option(stores.length ? "Choose a store…" : "No stores yet: add them under Stores", ""));
@@ -333,11 +334,11 @@ tr.inactive td{color:var(--muted)}
     if (SINGLE(role) && !st.length) { say("pMsg", "Choose the store this manager runs.", "err"); return; }
     if (MULTI(role) && !st.length) { say("pMsg", "Tick at least one store for this ROM.", "err"); return; }
     const dept = role === "dept" ? $("pDept").value.trim() : "";
-    const salesGroups = document.querySelector('input[name=pSales][value=groups]').checked
+    const salesGroups = !["admin", "dept"].includes(role) && document.querySelector('input[name=pSales][value=groups]').checked
       ? [...$("pGroups").querySelectorAll("input:checked")].map((x) => x.value) : [];
-    if (document.querySelector('input[name=pSales][value=groups]').checked && !salesGroups.length) { say("pMsg", "Tick at least one category group, or choose Full store figures.", "err"); return; }
+    if (!["admin", "dept"].includes(role) && document.querySelector('input[name=pSales][value=groups]').checked && !salesGroups.length) { say("pMsg", "Tick at least one category group, or choose Full store figures.", "err"); return; }
     if (role === "dept" && !dept) { say("pMsg", "Enter the department, e.g. Maintenance.", "err"); return; }
-    const cashAccess = ["hq", "support"].includes(role) && $("pCash").checked;
+    const cashAccess = ["dept", "hq", "support"].includes(role) && $("pCash").checked;
     if (editing === me.email && role !== "admin") { say("pMsg", "You can't remove your own admin role.", "err"); return; }
     $("pSave").disabled = true;
     try {

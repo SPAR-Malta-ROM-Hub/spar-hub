@@ -129,7 +129,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
 
   const me = await SPAR.ready;
-  if (!(["admin", "rom", "sm"].includes(me.role) || (me.cashAccess && ["hq", "support"].includes(me.role)))) {
+  if (!(["admin", "rom", "sm"].includes(me.role) || (me.cashAccess && ["dept", "hq", "support"].includes(me.role)))) {
     document.querySelector("main").innerHTML = '<div class="card panel"><h2>Cash Sheet Analyser</h2><p class="note">This module is for the stores, their Store Managers and ROMs, and the accounts team. Ask a hub admin if you need access.</p></div>';
     throw new Error("no cash access");
   }
@@ -149,7 +149,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const canSMSign = (c) => isSM(c) || isAdmin;                         // step 1: the Store Manager signs off the week
   const canVerify = (c) => me.role === "rom" || isAdmin;               // step 2: the ROM verifies → accounts
   const canUpload = (c) => ["sm", "rom", "admin"].includes(me.role);
-  const accountsOnly = me.cashAccess && ["hq", "support"].includes(me.role);
+  const accountsOnly = me.cashAccess && ["dept", "hq", "support"].includes(me.role);
   const ACCOUNTS = "accounts@spar.com.mt";
   const KEEP_WEEKS = 26;
 
@@ -167,13 +167,15 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const wkLabel = (m, st) => { const w = st && st.weeks && st.weeks[m]; return (w && w.label ? w.label + " · " : "") + dm(m) + " – " + dm(addDays(m, 6)); };
 
   // ── Stores ──
-  const stores = me.stores.slice();
+  // the accounts team sees every store (read only)
+  const stores = accountsOnly ? me.allStores.filter((s) => s.active !== false) : me.stores.slice();
+  const seesAllCash = me.seesAll || accountsOnly;
   const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
   function byCodeAll() { return byCode; }
   const nameOf = (c) => (byCode[c] || {}).name || c;
   const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
   const scopes = [];
-  if (me.seesAll && stores.length > 1) {
+  if (seesAllCash && stores.length > 1) {
     scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
     [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) => scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
   } else if (stores.length > 1) scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });

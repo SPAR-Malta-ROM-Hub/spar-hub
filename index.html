@@ -41,7 +41,7 @@
     var first = (me.name || "").split(" ")[0];
     document.getElementById("hi").textContent = "Hello " + first;
     var isDept = me.role === "dept";
-    document.getElementById("sub").textContent = isDept ? "You post DAP tasks for " + (me.dept || "your department") + " and see the stores' answers." : me.seesAll
+    document.getElementById("sub").textContent = isDept ? "You post DAP tasks for " + (me.dept || "your department") + " and see the stores' answers." + (me.cashAccess ? " You also see the stores' cash sheets." : "") : me.seesAll
       ? "You can see all " + me.stores.length + " stores."
       : me.stores.length === 1 ? "Your store: " + me.stores[0].name
       : me.stores.length + " stores: " + me.stores.map(function (s) { return s.name; }).join(", ");
@@ -61,7 +61,8 @@
 
     var groups = {}, order = [];
     SPARUI.MODULES.forEach(function (m) {
-      if (isDept ? m.id !== "dap" : (m.who !== "all" && m.who.indexOf(me.role) < 0 && !(m.alsoIf && me[m.alsoIf]))) return;
+      var extra = m.alsoIf && me[m.alsoIf];          // e.g. the accounts team also sees the Cash Sheet Analyser
+      if (isDept ? (m.id !== "dap" && !extra) : (m.who !== "all" && m.who.indexOf(me.role) < 0 && !extra)) return;
       if (!groups[m.group]) { groups[m.group] = []; order.push(m.group); }
       groups[m.group].push(m);
     });
