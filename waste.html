@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="waste">
+<title>Waste Tracker · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<script src="hub-reports.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
+.bar label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar select{font:700 14px Arial,sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);min-width:180px;max-width:100%}
+.bar .stamp{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right}
+.kpi .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;font-weight:700}
+.kpi.red{background:#FDECEC;border-color:#F6C9CB}.kpi.red strong{color:#C5121A}
+.kpi.green strong{color:var(--gd)}
+.up{color:var(--gd)} .down{color:var(--red)}
+td.up,td.down{font-weight:700}
+tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA}
+.sub2{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+.chart{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+.hb{display:grid;grid-template-columns:minmax(110px,180px) 1fr auto;gap:6px 10px;align-items:center;font-size:13px}
+.hb .tr{height:12px;border-radius:3px;background:#F1F2F2;position:relative;overflow:hidden}
+.hb .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.hb .v{font-weight:700;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:5px;white-space:nowrap;margin:1px 2px 1px 0}
+.tag.r{background:#FBE0E1;color:#C5121A}.tag.a{background:#FFF0D2;color:#9A6200}.tag.b{background:#E2ECFA;color:#1F4E9A}.tag.n{background:#EEF0EF;color:#55656b}.tag.g{background:#DDF1E4;color:#00703C}
+.search{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.search input{flex:1 1 280px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:14px}
+.rowx{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:0 0 10px}
+</style>
+</head>
+<body>
+<header class="top" data-title="Waste Tracker"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="depts" type="button">Departments</button>
+    <button class="tab" data-tab="items" type="button">Items</button>
+    <button class="tab" data-tab="suppliers" type="button">Suppliers</button>
+    <button class="tab" data-tab="stores" type="button" id="tabStores">Stores</button>
+    <button class="tab" data-tab="upload" type="button" id="tabUpload" hidden>Upload</button>
+  </div>
+  <div class="card bar">
+    <label>View<select id="scope"></select></label>
+    <label id="lensWrap">Category<select id="lens"></select></label>
+    <label>Period<select id="period"></select></label>
+    <div class="stamp" id="stamp"></div>
+  </div>
+  <section data-pane="overview"><div id="ovBody"></div></section>
+  <section data-pane="depts" hidden><div class="card panel" style="margin-top:0" id="depBody"></div></section>
+  <section data-pane="items" hidden><div class="card panel" style="margin-top:0" id="itemBody"></div></section>
+  <section data-pane="suppliers" hidden><div class="card panel" style="margin-top:0" id="supBody"></div></section>
+  <section data-pane="stores" hidden><div class="card panel" style="margin-top:0" id="stBody"></div></section>
+  <section data-pane="upload" hidden>
+    <div class="card panel" style="margin-top:0"><div id="upHost"></div><div id="preview"></div></div>
+    <div class="card panel"><h2>Missing days</h2><div id="missOut"></div></div>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+  const R = window.HubReports;
+
+  function fitTables() {
+    document.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.tBodies].flatMap((b) => [...b.rows]);
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot"));
+      if (rows.length <= 6) { w.style.maxHeight = "none"; return; }
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, 6).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0; const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+
+  const me = await SPAR.ready;
+  const { fs, db } = await SPAR.firebase();
+  const fullSales = !me.salesGroups.length;
+  const canUpload = ["admin", "hq", "support"].includes(me.role) && fullSales;
+
+  // ── Helpers ──
+  const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
+  const pad = (n) => (n < 10 ? "0" : "") + n;
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const today = () => iso(new Date(now()));
+  const { addDays, mondayOf } = R;
+  const money = (v) => Math.abs(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const eur = (v) => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + "€" + money(v);
+  const eur0 = (v) => v == null || !isFinite(v) ? "–" : (v < 0 ? "−" : "") + "€" + Math.round(Math.abs(v)).toLocaleString("en-GB");
+  const pct = (v, d) => v == null || !isFinite(v) ? "–" : (v * 100).toFixed(d == null ? 1 : d) + "%";
+  // changes compare the average per store-day loaded, so a part week isn't compared with a full one
+  const chg = (a, b) => { const fa = A && A.storeDays ? 1 / A.storeDays : 1, fb = B && B.storeDays ? 1 / B.storeDays : 1; return b ? (a * fa - b * fb) / (b * fb) : null; };
+  const chgTxt = (v) => v == null || !isFinite(v) ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toFixed(0) + "%";
+  const int = (n) => Math.round(n || 0).toLocaleString("en-GB");
+  const qtyTxt = (q) => Math.abs(q - Math.round(q)) < 0.005 ? int(q) : q.toLocaleString("en-GB", { maximumFractionDigits: 3 });
+  const short = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const dayLabel = (s) => new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const isoWeek = (s) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const y = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y) / 864e5 - 3 + ((y.getDay() + 6) % 7)) / 7); };
+  const td = (t, cls) => E("td", cls ? { class: cls, text: t } : { text: t });
+  const table = (heads, rows, numCols) => E("div", { class: "tablewrap" }, [E("table", null, [
+    E("thead", null, [E("tr", null, heads.map((h, i) => E("th", (numCols || []).includes(i) ? { class: "num", text: h } : { text: h })))]), E("tbody", null, rows)])]);
+  // up in waste is bad: red; down is good: green
+  const cls = (v) => v == null || !isFinite(v) || Math.abs(v) < 0.005 ? "" : v > 0 ? "down" : "up";
+  const supShort = (s) => String(s || "").replace(/^[A-Z0-9]+\s*-\s*/, "").replace(/\s*\($/, "").trim() || String(s || "").replace(/\s*-\s*$/, "").trim() || "–";
+  const REASON_COL = { "Expired": "#EC1B24", "Fresh Quality": "#E7A33E", "Damaged": "#4F7DC1" };
+  const reasonCol = (r, i) => REASON_COL[r] || ["#7A8D96", "#9B6BC0", "#2E9C8F", "#C27C4C"][i % 4];
+
+  // ── Stores, category groups, departments ──
+  const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
+  const nameOf = (c) => (byCode[c] || {}).name || c;
+  const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
+  const stores = me.stores.slice();
+  const scopes = [];
+  if (me.seesAll && stores.length > 1) {
+    scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+    [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) => scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
+  } else if (stores.length > 1) scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+  stores.forEach((s) => scopes.push({ id: "s:" + s.code, label: s.name, codes: [s.code] }));
+  if (!scopes.length) { document.querySelector("main").innerHTML = '<p class="msg warn">You haven\'t been given a store yet. Ask a hub admin.</p>'; throw new Error("no stores"); }
+  scopes.forEach((s) => $("scope").add(new Option(s.label, s.id)));
+  try { const k = localStorage.getItem("sparWasteScope"); if (scopes.some((s) => s.id === k)) $("scope").value = k; } catch (e) {}
+  const scope = () => scopes.find((s) => s.id === $("scope").value) || scopes[0];
+  const single = () => scope().codes.length === 1;
+
+  let GROUPS = [];
+  try { const qs = await fs.getDocs(fs.collection(db, "modules", "sales", "config", "groups", "list")); GROUPS = qs.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0)); } catch (e) {}
+  const myGroups = fullSales ? GROUPS : GROUPS.filter((g) => me.salesGroups.includes(g.id));
+  if (!fullSales && !myGroups.length) { document.querySelector("main").innerHTML = '<p class="msg warn">Your access hasn\'t been set up yet. Ask a hub admin.</p>'; throw new Error("no groups"); }
+  if (fullSales) $("lens").add(new Option("Whole store", ""));
+  myGroups.forEach((g) => $("lens").add(new Option(g.name, g.id)));
+  $("lensWrap").hidden = $("lens").options.length < 2;
+  try { const k = localStorage.getItem("sparSalesLens"); if ([...$("lens").options].some((o) => o.value === k)) $("lens").value = k; } catch (e) {}
+  const lens = () => $("lens").value;
+  let NAMES = {};   // department / category names, from the Unit Sales item list
+  try { const d = await fs.getDoc(fs.doc(db, "modules", "units", "config", "items-info")); if (d.exists()) NAMES = d.data().names || {}; } catch (e) {}
+  const deptName = (c) => c ? (NAMES[c] ? NAMES[c] : c) : "Not in the item list";
+  if (canUpload) $("tabUpload").hidden = false;
+
+  // ── Periods: a week, or the last 4 weeks; each compared with the one before ──
+  const thisMon = mondayOf(today());
+  for (let i = 0; i < 12; i++) { const m = addDays(thisMon, -7 * i); $("period").add(new Option((i === 0 ? "This week · " : "Wk " + isoWeek(m) + " · ") + short(m) + " – " + short(addDays(m, 6)), "w:" + m)); }
+  $("period").add(new Option("Last 4 weeks", "4w"));
+  try { const k = localStorage.getItem("sparWastePeriod"); if ([...$("period").options].some((o) => o.value === k)) $("period").value = k; } catch (e) {}
+  function period() {
+    const v = $("period").value;
+    if (v === "4w") { const end = addDays(thisMon, -1), start = addDays(thisMon, -28); return { label: "the last 4 weeks", A: [start, end], B: [addDays(start, -28), addDays(start, -1)], weeks: 4 }; }
+    const m = v.slice(2); return { label: "Wk " + isoWeek(m), A: [m, addDays(m, 6)], B: [addDays(m, -7), addDays(m, -1)], weeks: 1 };
+  }
+  const daysIn = (a, b) => { const out = []; for (let d = a; d <= b; d = addDays(d, 1)) out.push(d); return out; };
+
+  // ═════════ LOADING ═════════
+  const WK = {}, SALES = {};   // "gid|code|week" → week doc; sales per store week
+  const wPath = (g, c, w) => g ? ["modules", "waste", "groups", g, "stores", c, "wk", w] : ["modules", "waste", "stores", c, "wk", w];
+  const sPath = (g, c, w) => g ? ["modules", "sales", "groups", g, "stores", c, "weeks", w] : ["modules", "sales", "stores", c, "sum", w];
+  async function loadWeeks(codes, weeks) {
+    const g = lens(), need = [];
+    codes.forEach((c) => weeks.forEach((w) => { const k = g + "|" + c + "|" + w; if (!(k in WK)) need.push([c, w, k]); }));
+    if (need.length) $("stamp").textContent = "Loading…";
+    await Promise.all(need.map(async ([c, w, k]) => {
+      const [a, b] = await Promise.all([fs.getDoc(fs.doc(db, ...wPath(g, c, w))).catch(() => null), fs.getDoc(fs.doc(db, ...sPath(g, c, w))).catch(() => null)]);
+      WK[k] = a && a.exists() ? a.data() : null; SALES[k] = b && b.exists() ? b.data() : null;
+    }));
+  }
+  // every waste line in a date range, plus the sales on the days that have a waste report
+  function collect(codes, a, b) {
+    const g = lens(), rows = [], days = {}, sales = {};
+    codes.forEach((c) => {
+      for (let w = mondayOf(a); w <= b; w = addDays(w, 7)) {
+        const k = g + "|" + c + "|" + w, doc = WK[k], sd = SALES[k];
+        if (!doc || !doc.days) continue;
+        Object.keys(doc.days).forEach((d) => {
+          if (d < a || d > b) return;
+          const day = doc.days[d]; (days[c] = days[c] || {})[d] = day.total || 0;
+          (day.rows || []).forEach((x) => rows.push(Object.assign({ store: c, date: d }, x)));
+          if (sd && sd.days) { const i = sd.days.indexOf(d); if (i >= 0 && sd.s && sd.s[i]) sales[c] = (sales[c] || 0) + sd.s[i]; }
+        });
+      }
+    });
+    const total = rows.reduce((s, x) => s + (x.v || 0), 0), sTot = Object.values(sales).reduce((s, v) => s + v, 0);
+    const storeDays = Object.values(days).reduce((s, o) => s + Object.keys(o).length, 0);
+    return { rows, days, sales, total, sTot, storeDays, rate: sTot ? total / sTot : null };
+  }
+  const groupBy = (rows, key) => { const m = new Map(); rows.forEach((x) => { const k = key(x); const o = m.get(k) || m.set(k, { k, v: 0, q: 0, n: 0, rows: [] }).get(k); o.v += x.v || 0; o.q += x.q || 0; o.n++; o.rows.push(x); }); return m; };
+
+  // ═════════ TABS ═════════
+  let tab = "overview";
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+    render();
+  }
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
+  $("scope").onchange = () => { try { localStorage.setItem("sparWasteScope", $("scope").value); } catch (e) {} render(); };
+  $("lens").onchange = () => { try { localStorage.setItem("sparSalesLens", lens()); } catch (e) {} render(); };
+  $("period").onchange = () => { try { localStorage.setItem("sparWastePeriod", $("period").value); } catch (e) {} render(); };
+
+  let seq = 0, A = null, B = null, P = null;
+  async function render() {
+    const my = ++seq, codes = scope().codes; P = period();
+    $("tabStores").hidden = single();
+    if (tab === "stores" && single()) { tab = "overview"; return showTab("overview"); }
+    const weeks = []; for (let w = mondayOf(P.B[0]); w <= P.A[1]; w = addDays(w, 7)) weeks.push(w);
+    await loadWeeks(codes, weeks);
+    if (my !== seq) return;
+    A = collect(codes, P.A[0], P.A[1]); B = collect(codes, P.B[0], P.B[1]);
+    const possible = codes.length * daysIn(P.A[0], P.A[1] < today() ? P.A[1] : addDays(today(), -1)).length;
+    $("stamp").textContent = A.storeDays + " of " + possible + " store-days loaded" + (lens() ? " · " + (GROUPS.find((g) => g.id === lens()) || {}).name : "");
+    if (tab === "overview") return renderOverview(codes);
+    if (tab === "depts") return renderDepts();
+    if (tab === "items") return renderItems();
+    if (tab === "suppliers") return renderSuppliers();
+    if (tab === "stores") return renderStores(codes);
+    if (tab === "upload") return renderUpload();
+  }
+  const empty = (box, txt) => box.appendChild(E("p", { class: "empty", text: txt || "No waste reports for " + P.label + " yet." + (canUpload ? " They load automatically from the report emails, or upload them on the Upload tab." : "") }));
+
+  // ═════════ CHARTS ═════════
+  const COL_A = "#EC1B24", COL_B = "#A9B7C2";
+  function bars(title, labels, va, vb, labA, labB) {
+    const n = labels.length, vals = va.concat(vb).filter((v) => v != null && isFinite(v));
+    let hi = Math.max(1, ...vals); { const raw = hi / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw) || raw; hi = Math.ceil(hi / st) * st; }
+    const Wd = Math.max(1000, n * 60 + 70), Ht = 250, L = 58, Bt = 30, T = 12, gw = (Wd - L - 10) / n, bw = Math.min(26, gw * 0.36);
+    const y = (v) => T + (hi - v) / hi * (Ht - Bt - T);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht); svg.setAttribute("class", "chart"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", title);
+    const mk = (tag, a, txt) => { const nd = document.createElementNS(ns, tag); Object.entries(a).forEach(([k, v]) => nd.setAttribute(k, v)); if (txt != null) nd.textContent = txt; svg.appendChild(nd); return nd; };
+    for (let i = 0; i <= 4; i++) { const v = hi * i / 4; mk("line", { x1: L, x2: Wd - 10, y1: y(v), y2: y(v), stroke: "#E9EBEA" }); mk("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "#60727a" }, eur0(v)); }
+    labels.forEach((lb, i) => {
+      const cx = L + (i + 0.5) * gw;
+      [[vb[i], COL_B, -1, labB], [va[i], COL_A, 1, labA]].forEach(([v, col, side, nm]) => {
+        if (v == null || !isFinite(v)) return;
+        const r = mk("rect", { x: side < 0 ? cx - bw - 1 : cx + 1, y: y(v), width: bw, height: Math.max(1, y(0) - y(v)), rx: 3, fill: col });
+        const tt = document.createElementNS(ns, "title"); tt.textContent = lb + " · " + nm + ": " + eur(v); r.appendChild(tt);
+      });
+      mk("text", { x: cx, y: Ht - 10, "text-anchor": "middle", "font-size": 11, fill: "#60727a" }, lb);
+    });
+    return E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 6px", text: title }),
+      E("div", { class: "legend" }, [E("span", null, [E("i", { style: "background:" + COL_B }), labB]), E("span", null, [E("i", { style: "background:" + COL_A }), labA])]),
+      E("div", { style: "overflow-x:auto" }, [svg])]);
+  }
+  function hbars(list, max, colOf) {
+    return E("div", { class: "hb" }, list.flatMap((x, i) => [E("div", { text: x.label }), E("div", { class: "tr" }, [E("i", { style: "width:" + (max ? x.v / max * 100 : 0) + "%;background:" + (colOf ? colOf(x, i) : COL_A) })]),
+      E("div", { class: "v" }, [document.createTextNode(eur0(x.v)), x.sub ? E("span", { class: "sub2", text: x.sub }) : null].filter(Boolean))]));
+  }
+
+  // ═════════ OVERVIEW ═════════
+  function kpi(label, val, sub, c) { return E("div", { class: "card kpi " + (c || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function renderOverview(codes) {
+    const box = $("ovBody"); box.innerHTML = "";
+    if (!A.rows.length && !A.storeDays) { const c = E("div", { class: "card panel", style: "margin-top:0" }); empty(c); box.appendChild(c); return; }
+    const reasons = [...groupBy(A.rows, (x) => x.r).values()].sort((a, b) => b.v - a.v), rB = groupBy(B.rows, (x) => x.r);
+    const ch = chg(A.total, B.total);
+    box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
+      kpi("Waste", eur0(A.total), eur0(A.storeDays ? A.total / A.storeDays : 0) + " a day vs " + eur0(B.storeDays ? B.total / B.storeDays : 0) + " before (" + chgTxt(ch) + ")", ch > 0.05 ? "red" : ch < -0.05 ? "green" : ""),
+      kpi("Waste % of sales", A.rate == null ? "–" : pct(A.rate, 2), A.rate == null ? "no sales loaded for these days" : "before: " + (B.rate == null ? "–" : pct(B.rate, 2)), A.rate != null && B.rate != null && A.rate > B.rate ? "red" : ""),
+      kpi("Top reason", reasons[0] ? reasons[0].k : "–", reasons[0] ? eur0(reasons[0].v) + " · " + pct(reasons[0].v / A.total, 0) + " of the waste" : ""),
+      kpi("Lines wasted", int(A.rows.length), int(new Set(A.rows.map((x) => x.i)).size) + " different items")]));
+    // by day (a week) or by week (4 weeks)
+    if (P.weeks === 1) {
+      const dA = daysIn(P.A[0], P.A[1]), dB = daysIn(P.B[0], P.B[1]);
+      const per = (S, d) => codes.reduce((s, c) => s + ((S.days[c] || {})[d] || 0), 0);
+      box.appendChild(bars("Waste by day", dA.map((d) => dayLabel(d).replace(/ \w+$/, "")), dA.map((d) => per(A, d)), dB.map((d) => per(B, d)), "This week", "Week before"));
+    } else {
+      const wk = (S, start) => [0, 1, 2, 3].map((i) => daysIn(addDays(start, 7 * i), addDays(start, 7 * i + 6)).reduce((s, d) => s + codes.reduce((t, c) => t + ((S.days[c] || {})[d] || 0), 0), 0));
+      box.appendChild(bars("Waste by week", [1, 2, 3, 4].map((i) => "Week " + i), wk(A, P.A[0]), wk(B, P.B[0]), "Last 4 weeks", "4 weeks before"));
+    }
+    const max = Math.max(...reasons.map((x) => x.v), 1);
+    const deps = [...groupBy(A.rows, (x) => x.D || "").values()].sort((a, b) => b.v - a.v).slice(0, 8);
+    box.appendChild(E("div", { class: "grid-2" }, [
+      E("div", { class: "card panel", style: "margin-top:0" }, [E("h3", { style: "margin:0 0 12px", text: "By reason" }),
+        hbars(reasons.map((x) => ({ label: x.k, v: x.v, sub: pct(x.v / A.total, 0) + " · before " + eur0((rB.get(x.k) || { v: 0 }).v) })), max, (x, i) => reasonCol(x.label, i))]),
+      E("div", { class: "card panel", style: "margin-top:0" }, [E("h3", { style: "margin:0 0 12px", text: "Top departments" }),
+        hbars(deps.map((x) => ({ label: deptName(x.k), v: x.v, sub: pct(x.v / A.total, 0) })), Math.max(...deps.map((x) => x.v), 1)), E("p", { class: "note", style: "margin:10px 0 0", text: "All departments, with categories, on the Departments tab." })])]));
+    const top = [...groupBy(A.rows, (x) => x.i).values()].sort((a, b) => b.v - a.v).slice(0, 10);
+    box.appendChild(E("div", { class: "card panel" }, [E("h3", { style: "margin:0 0 10px", text: "Top 10 items wasted" }),
+      table(["Item", "Department", "Reason", "Qty", "Value"], top.map((x) => E("tr", null, [E("td", null, [document.createTextNode(x.rows[0].d), E("span", { class: "sub2 code", text: x.k })]), td(deptName(x.rows[0].D)), E("td", null, reasonTags(x.rows)), td(qtyTxt(x.q), "num"), td(eur(x.v), "num")])), [3, 4])]));
+  }
+  function reasonTags(rows) {
+    const m = groupBy(rows, (x) => x.r);
+    return [...m.values()].sort((a, b) => b.v - a.v).map((x) => E("span", { class: "tag " + (x.k === "Expired" ? "r" : x.k === "Fresh Quality" ? "a" : x.k === "Damaged" ? "b" : "n"), text: x.k + (m.size > 1 ? " " + eur0(x.v) : "") }));
+  }
+
+  // ═════════ DEPARTMENTS ═════════
+  const openDep = new Set();
+  function renderDepts() {
+    const box = $("depBody"); box.innerHTML = "";
+    box.appendChild(E("h2", { text: "Waste by department · " + P.label }));
+    if (!A.rows.length) return empty(box);
+    const dA = groupBy(A.rows, (x) => x.D || ""), dB = groupBy(B.rows, (x) => x.D || "");
+    const rs = [...new Set(A.rows.map((x) => x.r))].sort();
+    const list = [...dA.values()].sort((a, b) => b.v - a.v), rows = [];
+    list.forEach((x) => {
+      const b = (dB.get(x.k) || { v: 0 }).v, r = groupBy(x.rows, (y) => y.r), open = openDep.has(x.k);
+      const tr = E("tr", { class: "click" }, [E("td", null, [E("b", { text: (open ? "▾ " : "▸ ") + deptName(x.k) }), x.k ? E("span", { class: "sub2 code", text: x.k }) : null].filter(Boolean)),
+        ...rs.map((k) => td(r.get(k) ? eur0(r.get(k).v) : "–", "num")), td(eur(x.v), "num"), td(pct(x.v / A.total, 0), "num"), td(eur(b), "num"), td(chgTxt(chg(x.v, b)), "num " + cls(chg(x.v, b)))]);
+      tr.onclick = () => { open ? openDep.delete(x.k) : openDep.add(x.k); renderDepts(); };
+      rows.push(tr);
+      if (open) [...groupBy(x.rows, (y) => y.C || "").values()].sort((a, b) => b.v - a.v).forEach((c) => {
+        const r2 = groupBy(c.rows, (y) => y.r);
+        rows.push(E("tr", null, [E("td", { style: "padding-left:26px" }, [document.createTextNode(deptName(c.k)), c.k ? E("span", { class: "sub2 code", text: c.k }) : null].filter(Boolean)), ...rs.map((k) => td(r2.get(k) ? eur0(r2.get(k).v) : "–", "num")), td(eur(c.v), "num"), td(pct(c.v / A.total, 0), "num"), td(""), td("")]));
+      });
+    });
+    rows.push(E("tr", { class: "tot" }, [td("Total"), ...rs.map((k) => td(eur0(A.rows.filter((x) => x.r === k).reduce((s, x) => s + x.v, 0)), "num")), td(eur(A.total), "num"), td("100%", "num"), td(eur(B.total), "num"), td(chgTxt(chg(A.total, B.total)), "num " + cls(chg(A.total, B.total)))]));
+    box.appendChild(E("p", { class: "note", style: "margin:-4px 0 10px", text: "Click a department to see its categories. Departments come from the Unit Sales item list. Change compares the average a day, so a part week is fair against a full one." }));
+    box.appendChild(table(["Department"].concat(rs).concat(["Waste", "Share", "Before", "Change"]), rows, rs.map((_, i) => i + 1).concat([rs.length + 1, rs.length + 2, rs.length + 3, rs.length + 4])));
+  }
+
+  // ═════════ ITEMS ═════════
+  let itemQ = "", itemReason = "";
+  function renderItems() {
+    const box = $("itemBody"); box.innerHTML = "";
+    box.appendChild(E("h2", { text: "Items wasted · " + P.label }));
+    if (!A.rows.length) return empty(box);
+    const q = E("input", { type: "search", placeholder: "Find an item, code or supplier…" }); q.value = itemQ;
+    const rsel = E("select", { class: "in", style: "max-width:200px" }); rsel.add(new Option("All reasons", "")); [...new Set(A.rows.map((x) => x.r))].sort().forEach((r) => rsel.add(new Option(r, r))); rsel.value = itemReason;
+    box.appendChild(E("div", { class: "search" }, [q, rsel]));
+    const out = E("div"); box.appendChild(out);
+    const draw = () => {
+      out.innerHTML = "";
+      const t = itemQ.toLowerCase();
+      const rows = A.rows.filter((x) => (!itemReason || x.r === itemReason) && (!t || (x.d + " " + x.i + " " + x.s).toLowerCase().includes(t)));
+      const g = [...groupBy(rows, (x) => x.i).values()].sort((a, b) => b.v - a.v);
+      const multi = !single();
+      const trs = g.slice(0, 300).map((x) => {
+        const dayN = new Set(x.rows.map((y) => y.store + y.date)).size, stN = new Set(x.rows.map((y) => y.store)).size;
+        return E("tr", null, [E("td", null, [document.createTextNode(x.rows[0].d), E("span", { class: "sub2 code", text: x.k })]), td(deptName(x.rows[0].D)), E("td", null, reasonTags(x.rows)),
+          td(supShort(x.rows[0].s)), td(dayN + (multi ? " · " + stN + " store" + (stN === 1 ? "" : "s") : ""), "num" + (dayN >= 3 ? " down" : "")), td(qtyTxt(x.q), "num"), td(eur(x.v), "num")]);
+      });
+      trs.push(E("tr", { class: "tot" }, [td(g.length.toLocaleString("en-GB") + " items" + (g.length > 300 ? " (top 300 shown)" : "")), td(""), td(""), td(""), td(""), td(qtyTxt(rows.reduce((s, x) => s + x.q, 0)), "num"), td(eur(rows.reduce((s, x) => s + x.v, 0)), "num")]));
+      out.appendChild(table(["Item", "Department", "Reason", "Supplier", multi ? "Days · stores" : "Days", "Qty", "Value"], trs, [4, 5, 6]));
+      out.appendChild(E("p", { class: "note", style: "margin:8px 0 0", text: "Days in red: wasted on 3 or more days in the period. Worth looking at the order quantity or the shelf life." }));
+    };
+    let tmr; q.oninput = () => { clearTimeout(tmr); tmr = setTimeout(() => { itemQ = q.value; draw(); }, 200); };
+    rsel.onchange = () => { itemReason = rsel.value; draw(); };
+    draw();
+  }
+
+  // ═════════ SUPPLIERS ═════════
+  function renderSuppliers() {
+    const box = $("supBody"); box.innerHTML = "";
+    box.appendChild(E("h2", { text: "Waste by supplier · " + P.label }));
+    if (!A.rows.length) return empty(box);
+    const rs = [...new Set(A.rows.map((x) => x.r))].sort();
+    const sB = groupBy(B.rows, (x) => supShort(x.s));
+    const list = [...groupBy(A.rows, (x) => supShort(x.s)).values()].sort((a, b) => b.v - a.v);
+    const rows = list.map((x) => { const r = groupBy(x.rows, (y) => y.r), b = (sB.get(x.k) || { v: 0 }).v;
+      return E("tr", null, [td(x.k), td(int(new Set(x.rows.map((y) => y.i)).size), "num"), ...rs.map((k) => td(r.get(k) ? eur0(r.get(k).v) : "–", "num")), td(eur(x.v), "num"), td(pct(x.v / A.total, 0), "num"), td(chgTxt(chg(x.v, b)), "num " + cls(chg(x.v, b)))]); });
+    rows.push(E("tr", { class: "tot" }, [td(list.length + " suppliers"), td(""), ...rs.map((k) => td(eur0(A.rows.filter((x) => x.r === k).reduce((s, x) => s + x.v, 0)), "num")), td(eur(A.total), "num"), td("100%", "num"), td(chgTxt(chg(A.total, B.total)), "num " + cls(chg(A.total, B.total)))]));
+    box.appendChild(E("p", { class: "note", style: "margin:-4px 0 10px", text: "Expired and damaged stock by supplier: the starting point for credit claims and for talking to the supplier about shelf life." }));
+    box.appendChild(table(["Supplier", "Items"].concat(rs).concat(["Waste", "Share", "vs before"]), rows, [1].concat(rs.map((_, i) => i + 2)).concat([rs.length + 2, rs.length + 3, rs.length + 4])));
+  }
+
+  // ═════════ STORES ═════════
+  function renderStores(codes) {
+    const box = $("stBody"); box.innerHTML = "";
+    box.appendChild(E("h2", { text: "Waste by store · " + P.label }));
+    const rs = [...new Set(A.rows.map((x) => x.r))].sort();
+    const nDays = daysIn(P.A[0], P.A[1] < today() ? P.A[1] : addDays(today(), -1)).length;
+    const list = codes.map((c) => {
+      const ra = A.rows.filter((x) => x.store === c), rb = B.rows.filter((x) => x.store === c);
+      const v = ra.reduce((s, x) => s + x.v, 0), vb = rb.reduce((s, x) => s + x.v, 0);
+      return { c, v, vb, ra, d: Object.keys(A.days[c] || {}).length, rate: A.sales[c] ? v / A.sales[c] : null, rateB: B.sales[c] ? vb / B.sales[c] : null };
+    }).sort((a, b) => b.v - a.v);
+    const rows = list.map((x) => { const r = groupBy(x.ra, (y) => y.r);
+      const tr = E("tr", { class: "click" }, [E("td", null, [E("b", { text: nameOf(x.c) }), E("span", { class: "sub2", text: romOf(x.c) })]), td(x.d + " of " + nDays, "num" + (x.d < nDays ? " down" : "")),
+        ...rs.map((k) => td(r.get(k) ? eur0(r.get(k).v) : "–", "num")), td(eur(x.v), "num"), td(x.rate == null ? "–" : pct(x.rate, 2), "num"), td(chgTxt(chg(x.v, x.vb)), "num " + cls(chg(x.v, x.vb)))]);
+      tr.onclick = () => { const s = scopes.find((y) => y.id === "s:" + x.c); if (s) { $("scope").value = s.id; showTab("overview"); } };
+      return tr; });
+    rows.push(E("tr", { class: "tot" }, [td(codes.length + " stores"), td(""), ...rs.map((k) => td(eur0(A.rows.filter((x) => x.r === k).reduce((s, x) => s + x.v, 0)), "num")), td(eur(A.total), "num"), td(A.rate == null ? "–" : pct(A.rate, 2), "num"), td(chgTxt(chg(A.total, B.total)), "num " + cls(chg(A.total, B.total)))]));
+    box.appendChild(E("p", { class: "note", style: "margin:-4px 0 10px", text: "Click a store to open it. Waste % of sales uses the Sales Tracker for the same days." }));
+    box.appendChild(table(["Store", "Days loaded"].concat(rs).concat(["Waste", "% of sales", "vs before"]), rows, [1].concat(rs.map((_, i) => i + 2)).concat([rs.length + 2, rs.length + 3, rs.length + 4])));
+  }
+
+  // ═════════ UPLOAD (Support / Head Office / Admin): by hand, when a file didn't come in by email ═════════
+  let ITEMS = null;
+  async function loadItems() {
+    if (ITEMS) return ITEMS;
+    ITEMS = new Map();
+    try {
+      const info = (await fs.getDoc(fs.doc(db, "modules", "units", "config", "items-info"))).data();
+      if (!info) return ITEMS;
+      const parts = await Promise.all(Array.from({ length: info.chunks }, (_, i) => fs.getDoc(fs.doc(db, "modules", "units", "config", "items-" + pad(i))).then((d) => d.exists() ? d.data() : {})));
+      let rows;
+      if (info.compressed) {
+        const bin = atob(parts.map((p) => p.z || "").join("")), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        rows = JSON.parse(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+      } else rows = parts.flatMap((p) => p.data ? JSON.parse(p.data) : []);
+      rows.forEach((r) => ITEMS.set(r[0], { code: r[0], D: r[2], C: r[3] }));
+    } catch (e) { console.warn(e); }
+    return ITEMS;
+  }
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("Couldn't load the Excel reader.")); document.head.appendChild(s); });
+  }
+  if (canUpload) SPARUI.uploader("upHost", { title: "Upload Waste Reports", noun: "waste reports", button: "Upload Selected Waste Reports", accept: ".xlsx,.xls", id: "file",
+    onUpload: async (files) => {
+      const pv = $("preview"); pv.innerHTML = ""; pv.appendChild(E("p", { class: "note", text: "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…" }));
+      const X = await loadXLSX(), items = await loadItems(), res = [];
+      for (const f of files) {
+        try {
+          const p = R.parseWaste(R.readRows(X, await f.arrayBuffer(), "array"), X);
+          const code = R.matchOutlet(me.allStores, p.num, p.outlet);
+          if (!code) throw new Error("No store matches \"" + p.outlet + "\" (Manage people & stores → Report).");
+          const writes = R.wasteWrites({ code, p, file: f.name, groups: GROUPS, itemOf: (c) => items.get(c), by: me.email, at: Date.now() });
+          const b = fs.writeBatch(db); writes.forEach((w) => b.set(fs.doc(db, ...w.path), w.data, w.merge ? { merge: true } : {})); await b.commit();
+          Object.keys(WK).forEach((k) => { if (k.includes("|" + code + "|")) delete WK[k]; }); META = null;
+          res.push({ f: f.name, ok: true, txt: nameOf(code) + " · " + dayLabel(p.date) + " · " + p.rows.length + " lines · " + eur(p.total) + (items.size ? "" : " (no item list yet: departments left blank)") });
+        } catch (e) { res.push({ f: f.name, ok: false, txt: e.code || e.message }); }
+      }
+      pv.innerHTML = "";
+      pv.appendChild(table(["File", ""], res.map((x) => E("tr", null, [td(x.f), td((x.ok ? "✓ " : "Not saved: ") + x.txt, x.ok ? "up" : "down")])), []));
+      SPARUI.toast(res.filter((x) => x.ok).length + " of " + res.length + " saved");
+      renderMissing();
+    } });
+  let META = null;
+  function renderUpload() { renderMissing(); }
+  async function renderMissing() {
+    const box = $("missOut"); box.innerHTML = "";
+    const codes = me.allStores.filter((s) => s.active !== false).map((s) => s.code);
+    if (!META) { META = {}; await Promise.all(codes.map(async (c) => { try { const d = await fs.getDoc(fs.doc(db, "modules", "waste", "stores", c, "meta", "days")); META[c] = d.exists() ? (d.data().days || {}) : {}; } catch (e) { META[c] = {}; } })); }
+    const yday = addDays(today(), -1), out = [];
+    codes.forEach((c) => { const have = Object.keys(META[c] || {}).sort(); if (!have.length) return; for (let d = have[0]; d <= yday; d = addDays(d, 1)) if (!META[c][d]) out.push({ c, d }); });
+    const started = codes.filter((c) => Object.keys(META[c] || {}).length).length;
+    if (!out.length) { box.appendChild(E("p", { class: "msg ok", text: started ? "Every store with waste reports has all its days, up to " + dayLabel(yday) + "." : "No waste reports yet." })); return; }
+    box.appendChild(E("p", { class: "note", style: "margin:0 0 8px", text: out.length + " store-day" + (out.length === 1 ? "" : "s") + " missing (each store from its first report)." }));
+    box.appendChild(table(["Store", "Day"], out.slice(-300).reverse().map((x) => E("tr", null, [td(nameOf(x.c)), td(dayLabel(x.d))])), []));
+  }
+
+  render();
+</script>
+</body>
+</html>

@@ -216,10 +216,58 @@
     return out;
   }
 
+  // ═════════ WASTE TRACKER: one store's wastage report for one day ═════════
+  // Report For / Report Period, then Item Code, Reason, Item Description, Qty, Total SP2, Supplier (and a total line at the end).
+  function parseWaste(rows, X) {
+    var lab = function (r) { return String((rows[r] || [])[0] || "").trim().toLowerCase(); };
+    if (lab(0) !== "report for") throw new Error("This isn't a wastage report (no Report For line at the top).");
+    var outlet = String((rows[0] || [])[1] || "").trim();
+    var per = String((rows[1] || [])[1] == null ? "" : (rows[1] || [])[1]), ds = per.match(/\d{4}-\d{2}-\d{2}/g) || [];
+    var from = ds[0] || toISO((rows[1] || [])[1], X), to = ds[1] || from;
+    if (!from) throw new Error("The report period wasn't found.");
+    if (to !== from) throw new Error("This report covers more than one day (" + from + " to " + to + "). Use the daily report.");
+    var hr = rows.findIndex(function (r) { return String((r || [])[0] || "").trim().toLowerCase() === "item code"; });
+    if (hr < 0) throw new Error("The Item Code heading wasn't found.");
+    var H = (rows[hr] || []).map(function (v) { return String(v || "").trim().toLowerCase(); });
+    var col = function (re, dflt) { var i = H.findIndex(function (h) { return re.test(h); }); return i >= 0 ? i : dflt; };
+    var ci = { i: 0, r: col(/^reason/, 1), d: col(/desc/, 2), q: col(/^qty|quantity/, 3), v: col(/total|value|sp2/, 4), s: col(/^supplier/, 5) };
+    var out = [], total = 0;
+    for (var r = hr + 1; r < rows.length; r++) {
+      var row = rows[r] || [], code = row[ci.i];
+      if (code == null || code === "") continue;                  // the total line at the end has no item code
+      var q = Math.round((+row[ci.q] || 0) * 1000) / 1000, v = Math.round((+row[ci.v] || 0) * 100) / 100;
+      out.push({ i: String(code).trim(), r: String(row[ci.r] || "").trim() || "No reason", d: String(row[ci.d] || "").trim(), q: q, v: v, s: String(row[ci.s] || "").trim().replace(/\s+/g, " ") });
+      total += v;
+    }
+    var num0 = (outlet.match(/^(\d+)/) || [])[1];
+    return { outlet: outlet, num: num0, date: from, rows: out, total: Math.round(total * 100) / 100 };
+  }
+  /** Everything to save for one store's waste day: the store's week (every day of the week in one document), each category
+      group's own copy (only its departments and categories) and the list of days uploaded.
+      o: { code, p, file, groups, itemOf(code), by, at } */
+  function wasteWrites(o) {
+    var p = o.p, code = o.code, at = o.at, mon = mondayOf(p.date);
+    var rows = p.rows.map(function (x) { var it = o.itemOf(x.i) || {}; return Object.assign({}, x, { D: it.D || "", C: it.C || "" }); });
+    var dayOf = function (list) {
+      return { rows: list, n: list.length, total: Math.round(sum(list.map(function (x) { return x.v; })) * 100) / 100, file: o.file || "", outlet: p.outlet || "", at: at, by: o.by };
+    };
+    var one = function (list) { var dd = {}; dd[p.date] = dayOf(list); return { code: code, week: mon, at: at, days: dd }; };
+    var md = {}; md[p.date] = at;
+    var out = [
+      { path: ["modules", "waste", "stores", code, "wk", mon], data: one(rows), merge: true },
+      { path: ["modules", "waste", "stores", code, "meta", "days"], data: { days: md, at: at }, merge: true }
+    ];
+    (o.groups || []).forEach(function (g) {
+      var gl = rows.filter(function (x) { return inGroup(g, { D: x.D, C: x.C }); });
+      out.push({ path: ["modules", "waste", "groups", g.id, "stores", code, "wk", mon], data: Object.assign(one(gl), { gid: g.id }), merge: true });
+    });
+    return out;
+  }
+
   var api = { DOWFULL: DOWFULL, keyOf: keyOf, nv: nv, toISO: toISO, readRows: readRows, kindOf: kindOf,
     parseReport: parseReport, matchStore: matchStore, summaryOf: summaryOf, groupFigures: groupFigures, salesWrites: salesWrites,
     parseHourly: parseHourly, matchOutlet: matchOutlet, encode: encode, encodeTot: encodeTot, decodeTot: decodeTot, encodeDay: encodeDay, decodeDay: decodeDay, decode: decode,
-    inGroup: inGroup, hourTot: hourTot, dayTotal: dayTotal, unitsReads: unitsReads, unitsWrites: unitsWrites, mondayOf: mondayOf, addDays: addDays };
+    inGroup: inGroup, hourTot: hourTot, dayTotal: dayTotal, unitsReads: unitsReads, unitsWrites: unitsWrites, parseWaste: parseWaste, wasteWrites: wasteWrites, mondayOf: mondayOf, addDays: addDays };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.HubReports = api;
 })(this);
