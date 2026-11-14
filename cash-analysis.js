@@ -6,6 +6,7 @@
   const LIMIT = 2;            // unders / overs beyond ±€2 are flagged
   const BIG = 50;             // differences beyond ±€50 always need a look
   const COINS_MAX = 5;        // what's left out of the safe bag should be coins only (under €5)
+  const BAG_MIN = 500;        // the bank's rule: each deposit bag must hold at least €500 (tills share bags to reach it)
   const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   const pad = (n) => (n < 10 ? "0" : "") + n;
@@ -248,14 +249,22 @@
     const bagDays = {}; closes.forEach((c) => { if (!c.bag) return; const b = c.bag.toUpperCase().replace(/\s+/g, ""); (bagDays[b] = bagDays[b] || new Set()).add(c.date); });
     const bagList = {};
     closes.forEach((c) => {
-      if (c.bag) { const b = c.bag.toUpperCase().replace(/\s+/g, ""); const k = c.date + "|" + b; const x = bagList[k] = bagList[k] || { bag: b, date: c.date, wk: c.wk, n: 0, dep: 0, who: [] }; x.n++; x.dep += n0(c.dep); x.who.push(c.who); }
       if (!c.active) return;
+      if (c.bag) { const b = c.bag.toUpperCase().replace(/\s+/g, ""); const k = c.date + "|" + b; const x = bagList[k] = bagList[k] || { bag: b, date: c.date, wk: c.wk, wkNo: c.wkNo, row: c.row, n: 0, dep: 0, who: [] }; x.n++; x.dep = r2(x.dep + n0(c.dep)); x.who.push(c.who); }
       const probs = [];
       if (c.bag && modePat && pat(c.bag) !== modePat) probs.push("Bag number " + c.bag + " isn't in the usual format (" + modePat.replace(/9/g, "0") + ")");
       if (c.bag) { const b = c.bag.toUpperCase().replace(/\s+/g, ""); const other = [...bagDays[b]].filter((d) => d !== c.date).sort(); if (other.length) probs.push("Bag " + b + " is also used on " + other.map(dayShort).join(", ")); }
       if (c.dep != null && c.ac != null && c.dep > c.ac + 0.005) probs.push("Deposit " + eur(c.dep) + " is more than the actual cash " + eur(c.ac));
       if (c.ac != null && c.dep != null && r2(c.ac - c.dep) >= COINS_MAX) probs.push(eur(c.ac - c.dep) + " left out of the bag (only coins under €" + COINS_MAX + " should be)");
       if (probs.length) add(bags, Object.assign(base(c, "bag"), { kind: "bag", bag: c.bag, action: true, text: probs.join(". ") + "." }));
+    });
+
+    // the bank's minimum per bag: add up the cash deposit of every till sharing the bag that day
+    const bagMin = opts.bagMin || BAG_MIN;
+    Object.values(bagList).forEach((b) => {
+      if (!(b.dep > 0) || b.dep >= bagMin - 0.005) return;
+      add(bags, { id: "bagmin|" + b.date + "|" + b.bag, kind: "bagmin", date: b.date, wk: b.wk, wkNo: b.wkNo, row: b.row, ref: b.wk + " row " + b.row, who: "Bag " + b.bag, num: "", bag: b.bag, tags: ["UNDER €" + bagMin], action: true,
+        text: "Bag " + b.bag + " holds " + eur(b.dep) + " from " + (b.n === 1 ? "1 till (" + b.who[0] + ")" : b.n + " tills (" + b.who.join(", ") + ")") + ". The bank's minimum is €" + bagMin + " a bag, so " + eur(bagMin - b.dep) + " short: more tills should share this bag." });
     });
 
     // 5) data issues: figures that don't add up, formulas typed over, floats, totals, who closed
@@ -307,7 +316,7 @@
     // tidy the flags: one id per flag
     const seen = {}; [flags, missing, bags, issues].forEach((l) => l.forEach((f) => { if (seen[f.id]) f.id += "|" + (++seen[f.id]); else seen[f.id] = 1; }));
     return { flags, missing, bags, issues, sellers, bagList: Object.values(bagList).sort((a, b) => b.date.localeCompare(a.date) || a.bag.localeCompare(b.bag)),
-      dates, first: dates[0] || null, latest: dates[dates.length - 1] || null, limit: L, modeFloat, modeLen, modePre, closes: closes.filter((c) => c.active || c.num || c.name).length };
+      dates, first: dates[0] || null, latest: dates[dates.length - 1] || null, limit: L, bagMin, modeFloat, modeLen, modePre, closes: closes.filter((c) => c.active || c.num || c.name).length };
   }
 
   function dates0(closes, w) { const l = closes.filter((c) => (new Date(c.date + "T12:00:00").getDay() + 6) % 7 === w).map((c) => c.date).sort(); return l[l.length - 1] || null; }
@@ -319,6 +328,6 @@
     return (h >>> 0).toString(36) + "." + closes.length;
   }
 
-  const api = { LIMIT, parseBook, analyse, dayHash, mondayOf, addDays, diffDays, eur, sEur, dayShort, dm, toISO };
+  const api = { LIMIT, BAG_MIN, parseBook, analyse, dayHash, mondayOf, addDays, diffDays, eur, sEur, dayShort, dm, toISO };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CashCheck = api;
 })(typeof window !== "undefined" ? window : globalThis);

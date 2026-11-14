@@ -292,7 +292,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     if (tab === "signoff") return renderSignoff(codes);
     if (tab === "sellers") return renderSellers(codes);
     if (tab === "missing") return renderList(codes, "missing", "misBody", "Missing figures and days", "Closes with something left blank (seller number, name, actual cash or BOV, safe bag number, closed by, cash deposit) and days with no closes at all. Fill them in on the sheet and upload it again, or explain below.");
-    if (tab === "bags") { renderList(codes, "bags", "bagBody", "Safe bag problems", "Bag numbers not in the usual format, the same bag number on two different days, more deposited than the actual cash, and notes left out of the bag (only coins under €5 should stay out)."); return renderBagList(codes); }
+    if (tab === "bags") { renderList(codes, "bags", "bagBody", "Safe bag problems", "Bags holding less than the bank's €" + C.BAG_MIN + " minimum (tills under that share a bag: write the same bag number on each till's line), bag numbers not in the usual format, the same bag number on two different days, more deposited than the actual cash, and notes left out of the bag (only coins under €5 should stay out)."); return renderBagList(codes); }
     if (tab === "issues") return renderList(codes, "issues", "issBody", "Data issues", "Figures that don't add up (a formula typed over), floats that aren't the store's usual float, day totals that don't match the tills, and for information: tills closed by the cashier themself and names spelt differently.");
     if (tab === "upload") return renderUpload(codes);
   }
@@ -300,7 +300,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const needOne = (box) => { box.innerHTML = ""; box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("p", { class: "note", text: "Choose one store in View to do this." })])); };
 
   // ═════════ ITEM CARDS (Keith's layout) ═════════
-  const TAGCLS = { UNDER: "r", OUTSTANDING: "r", OVER: "g", REPAID: "g", REPAYMENT: "b", "CARD/CASH": "b", CHECK: "a", "WRONG CODE": "r", "SELLER NO.": "a" };
+  const TAGCLS = { "UNDER €500": "r", UNDER: "r", OUTSTANDING: "r", OVER: "g", REPAID: "g", REPAYMENT: "b", "CARD/CASH": "b", CHECK: "a", "WRONG CODE": "r", "SELLER NO.": "a" };
   let openRes = null;
   function itemCard(i, codes) {
     const key = i.store + "|" + i.id, n = i.note || {};
@@ -355,7 +355,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       kpi("Unders", int(unders.length), eur(-sum(unders.map((i) => i.amt))) + " beyond −€" + L, unders.length ? "" : ""),
       kpi("Overs", int(overs.length), eur(sum(overs.map((i) => i.amt))) + " beyond +€" + L, "green"),
       kpi("Missing fields", int(all.filter((i) => i.list === "missing" && isOpen(i)).length), "still open", all.some((i) => i.list === "missing" && isOpen(i)) ? "amber" : ""),
-      kpi("Safe bags", int(all.filter((i) => i.list === "bags" && isOpen(i)).length), "bag no. problems", all.some((i) => i.list === "bags" && isOpen(i)) ? "amber" : ""),
+      kpi("Safe bags", int(all.filter((i) => i.list === "bags" && isOpen(i)).length), plural(all.filter((i) => i.kind === "bagmin" && isOpen(i)).length, "bag") + " under €" + C.BAG_MIN + " open", all.some((i) => i.kind === "bagmin" && isOpen(i)) ? "red" : all.some((i) => i.list === "bags" && isOpen(i)) ? "amber" : ""),
       kpi("Data issues", int(all.filter((i) => i.list === "issues" && isOpen(i)).length), plural(all.filter((i) => i.list === "issues" && !i.action).length, "note") + " for information", all.some((i) => i.list === "issues" && isOpen(i)) ? "amber" : ""),
       kpi("Repayments", int(F.filter((i) => i.kind === "repay").length), plural(F.filter((i) => i.kind === "mix").length, "card/cash mix-up"))]));
     const t = today(), thisW = mondayOf(t), lastW = addDays(thisW, -7);
@@ -373,7 +373,7 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     }
     const rows = codes.slice().sort((a, b) => nameOf(a).localeCompare(nameOf(b))).map((c) => {
       const st = ST[c];
-      if (!st || !st.A) return E("tr", null, [E("td", null, [E("b", { text: nameOf(c) })]), E("td", { colspan: "6", class: "note", text: "No cash sheet uploaded yet" })]);
+      if (!st || !st.A) return E("tr", null, [E("td", null, [E("b", { text: nameOf(c) })]), E("td", { colspan: "7", class: "note", text: "No cash sheet uploaded yet" })]);
       const its = allItems([c]), o = its.filter((i) => (i.tags || []).includes("OUTSTANDING") && isOpen(i));
       const days = Object.keys((st.weeks[thisW] || {}).days || {}).filter((d) => dayInfo(c, d).n);
       const rev = days.filter((d) => dayStatus(c, d) === "reviewed").length, ls = signStatus(c, lastW);
@@ -381,10 +381,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         E("td", null, [dayShort(st.latest) + " ", E("span", { class: "pill" + (C.diffDays(st.latest, t) <= 1 ? "" : " warn"), text: C.diffDays(st.latest, t) <= 1 ? "up to date" : C.diffDays(st.latest, t) + " days behind" })]),
         E("td", { class: "num", text: rev + "/" + days.length }), E("td", { class: "num " + (its.filter(isOpen).length ? "down" : ""), text: int(its.filter(isOpen).length) }),
         E("td", { class: "num " + (o.length ? "down" : ""), text: o.length ? eur(-sum(o.map((i) => i.amt))) : "–" }),
+        ((n) => E("td", { class: "num " + (n ? "down" : ""), text: n ? String(n) : "–" }))(its.filter((i) => i.kind === "bagmin" && i.date >= thisW).length),
         E("td", null, [E("span", { class: "pill" + (ls === "signed" ? "" : ls === "changed" ? " red" : " warn"), text: ls === "signed" ? "Verified · sent to accounts" : ls === "confirmed" ? "SM signed off · ROM to verify" : ls === "changed" ? "Changed after sign-off" : "Waiting for SM sign-off" })])]);
     });
     box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Stores" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Click a store to open its flags, daily review and sign-off." }),
-      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Latest close", "This week reviewed", "Open issues", "Outstanding", "Last week (" + dm(lastW) + ")"].map((h, k) => E("th", { class: k >= 2 && k <= 4 ? "num" : "", text: h })))]), E("tbody", null, rows)])])]));
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Latest close", "This week reviewed", "Open issues", "Outstanding", "Bags under €" + C.BAG_MIN + " this week", "Last week (" + dm(lastW) + ")"].map((h, k) => E("th", { class: k >= 2 && k <= 5 ? "num" : "", text: h })))]), E("tbody", null, rows)])])]));
   }
   function dayChips(c, w, cur, onPick) {
     return E("div", { class: "days7" }, Array.from({ length: 7 }, (_, k) => {
@@ -426,9 +427,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const A = ST[codes[0]] && ST[codes[0]].A; if (!A) { box.hidden = true; return; }
     const w = $("week").value || mondayOf(ST[codes[0]].latest);
     const list = (A.bagList || []).filter((b) => mondayOf(b.date) === w);
-    box.append(E("h2", { text: "Safe bags · " + wkLabel(w, ST[codes[0]]) }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Each bag with the tills in it and the cash deposit written against them, to check against the bag itself." }),
-      list.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Day", "Bag", "Tills", "Deposit"].map((h, k) => E("th", { class: k >= 2 ? "num" : "", text: h })))]),
-        E("tbody", null, list.map((b) => E("tr", null, [E("td", { text: dayShort(b.date) }), E("td", { class: "mono", text: b.bag }), E("td", { class: "num", title: b.who.join(", "), text: b.n }), E("td", { class: "num", text: eur(b.dep) })])).concat([E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { text: list.length + " bags" }), E("td", { class: "num", text: sum(list.map((b) => b.n)) }), E("td", { class: "num", text: eur(sum(list.map((b) => b.dep))) })])]))])]) : E("p", { class: "note", text: "No bags this week." }));
+    const MIN = C.BAG_MIN, low = list.filter((b) => b.dep < MIN);
+    box.append(E("h2", { text: "Bank deposits · " + wkLabel(w, ST[codes[0]]) }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Each bag with the tills in it and their cash deposit added up, to check against the bag and the bank statement. " + (low.length ? low.length + " of " + list.length + " bags are under the bank's €" + MIN + " minimum." : "Every bag is at least €" + MIN + ".") }),
+      list.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Day", "Bag", "Tills", "Cashiers", "Deposit", ""].map((h, k) => E("th", { class: k === 2 || k === 4 ? "num" : "", text: h })))]),
+        E("tbody", null, list.slice().sort((a, b) => a.date.localeCompare(b.date) || a.bag.localeCompare(b.bag)).map((b) => E("tr", null, [E("td", { text: dayShort(b.date) }), E("td", { class: "mono", text: b.bag }), E("td", { class: "num", text: b.n }), E("td", { text: b.who.join(", ") }), E("td", { class: "num " + (b.dep < MIN ? "down" : ""), text: eur(b.dep) }),
+          E("td", null, [b.dep < MIN ? E("span", { class: "tag r", text: "UNDER €" + MIN }) : E("span", { class: "tag g", text: "OK" })])])).concat([E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { text: list.length + " bags" }), E("td", { class: "num", text: sum(list.map((b) => b.n)) }), E("td"), E("td", { class: "num", text: eur(sum(list.map((b) => b.dep))) }), E("td", { text: low.length ? low.length + " under" : "" })])]))])]) : E("p", { class: "note", text: "No bags this week." }));
   }
 
   // ═════════ SELLERS ═════════
@@ -481,6 +484,11 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
       E("tbody", null, rows.map((r) => { const td = r.tot; return E("tr", null, [E("td", { class: "mono", text: r.num || "–" }), E("td", { text: r.name || "–" }), E("td", { class: "num", text: r.sc == null ? "–" : eur(r.sc) }), E("td", { class: "num", text: r.ac == null ? "–" : eur(r.ac) }),
         E("td", { class: "num", text: sEur(r.cash) }), E("td", { class: "num", text: sEur(r.bov) }), E("td", { class: "num " + (td < -2 ? "down" : td > 2 ? "up" : ""), text: sEur(td) }), E("td", { class: "mono", text: r.bag || "–" }), E("td", { text: r.cl || "–" }), E("td", { style: "max-width:260px", text: r.com || "" })]); })
         .concat([E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { text: rows.length + " closes" }), E("td", { class: "num", text: eur(sum(rows.map((r) => r.sc))) }), E("td", { class: "num", text: eur(sum(rows.map((r) => r.ac))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.cash))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.bov))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.tot))) }), E("td"), E("td"), E("td")])]))])]));
+    const dbags = dayBags(rows);
+    dayCard.append(E("h3", { style: "margin:18px 0 6px", text: "Bank deposits · " + plural(dbags.length, "bag") + " · " + eur(sum(dbags.map((b) => b.dep))) }),
+      dbags.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Bag", "Tills", "Cashiers", "Deposit", ""].map((h, k) => E("th", { class: k === 1 || k === 3 ? "num" : "", text: h })))]),
+        E("tbody", null, dbags.map((b) => E("tr", null, [E("td", { class: "mono", text: b.bag }), E("td", { class: "num", text: b.n }), E("td", { text: b.who.join(", ") }), E("td", { class: "num " + (b.dep < C.BAG_MIN ? "down" : ""), text: eur(b.dep) }),
+          E("td", null, [b.dep < C.BAG_MIN ? E("span", { class: "tag r", text: "UNDER €" + C.BAG_MIN }) : E("span", { class: "tag g", text: "OK" })])])))])]) : E("p", { class: "note", text: "No bag numbers on this day." }));
     dayCard.append(E("h3", { style: "margin:18px 0 4px", text: open.length ? open.length + " to resolve or explain" : "Nothing open on this day" }));
     if (open.length) dayCard.appendChild(E("div", null, open.map((i) => itemCard(i, [c]))));
     const rest = its.filter((i) => !isOpen(i));
@@ -494,12 +502,24 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
         const data = { reviewed: true, date: d, hash: info.hash, by: me.email, byName: me.name, at: Date.now(), open: open.length };
         try {
           await fs.setDoc(SP(c, "days", d), data); DAYS[c][d] = data;
+          await sendMail(c, "daily", "SPAR Cash · " + nameOf(c) + " · " + dayShort(d) + " · daily cash sheet", dailyHtml(c, d, rows, its), { fileId: ST[c].fileId || "", fileName: ST[c].file || "" });
           await sendMail(c, "review", "SPAR Cash · " + nameOf(c) + " · " + dayShort(d) + " reviewed" + (open.length ? " · " + plural(open.length, "item") + " open" : ""), reviewHtml(c, d, rows, its));
-          SPARUI.toast("Day reviewed. The ROM is emailed."); render();
+          SPARUI.toast("Day reviewed. Accounts get the day's cash sheet; the ROM is emailed."); render();
         } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
       };
       dayCard.appendChild(E("div", { class: "row", style: "margin-top:14px" }, [btn, noNote.length ? E("span", { class: "note", text: "Resolve, or add a note to, the " + plural(noNote.length, "open item") + " above first." }) : null].filter(Boolean)));
     } else if (s !== "reviewed") dayCard.appendChild(E("p", { class: "note", style: "margin-top:12px", text: "The Store Manager or the ROM reviews the day." }));
+  }
+
+  // the day's bags: every till sharing a bag number, with their cash deposits added up
+  const tc = (x) => String(x || "").trim().toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
+  function dayBags(rows) {
+    const m = {};
+    rows.forEach((r) => { if (!r.bag || ![r.sc, r.ac, r.sb, r.ab].some((x) => x)) return; const b = String(r.bag).toUpperCase().replace(/\s+/g, ""); const x = m[b] = m[b] || { bag: b, n: 0, dep: 0, who: [] }; x.n++; x.dep = Math.round((x.dep + (r.dep || 0)) * 100) / 100; x.who.push(tc(r.name) || r.num || "?"); });
+    const noBag = rows.filter((r) => !r.bag && (r.dep || 0) > 0);
+    const list = Object.values(m).sort((a, b) => a.bag.localeCompare(b.bag));
+    if (noBag.length) list.push({ bag: "(no bag number)", n: noBag.length, dep: Math.round(sum(noBag.map((r) => r.dep)) * 100) / 100, who: noBag.map((r) => tc(r.name) || r.num || "?") });
+    return list;
   }
 
   // ═════════ WEEKLY SIGN-OFF ═════════
@@ -594,6 +614,17 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     (i.com ? '<br><span style="color:#60727a">Comment: ' + esc(i.com) + "</span>" : "") + (i.note && i.note.smNote ? '<br><span style="color:#55656b">Store Manager (' + esc(i.note.smName || "") + "): " + esc(i.note.smNote) + "</span>" : "") +
     (i.note && i.note.romNote ? '<br><span style="color:#55656b">ROM (' + esc(i.note.romName || "") + "): " + esc(i.note.romNote) + "</span>" : "") +
     (i.note && i.note.resolved ? '<br><span style="color:#00703C">Resolved by ' + esc(i.note.resolvedName || "") + "</span>" : "") + "</li>";
+  // the day for accounts: totals, the bank deposits to reconcile, what was flagged and how it was resolved; the file attached
+  function dailyHtml(c, d, rows, its) {
+    const info = dayInfo(c, d) || {}, act = its.filter((i) => i.action), bags = dayBags(rows);
+    const tr = bags.map((b) => "<tr><td>" + esc(b.bag) + '</td><td align="right">' + b.n + "</td><td>" + esc(b.who.join(", ")) + '</td><td align="right"' + (b.dep < C.BAG_MIN ? ' style="color:#C5121A;font-weight:bold"' : "") + ">" + esc(eur(b.dep)) + (b.dep < C.BAG_MIN ? " (under €" + C.BAG_MIN + ")" : "") + "</td></tr>").join("");
+    return mailWrap(nameOf(c) + " · daily cash sheet · " + dayShort(d),
+      "<p>Reviewed by " + esc(me.name) + " (" + (me.role === "rom" ? "ROM" : "Store Manager") + ") on " + esc(SPARUI.fmtDateTime(Date.now())) + "." + (ST[c].fileId ? " The cash sheet is attached." : "") + "</p>" +
+      '<table cellpadding="6" style="border-collapse:collapse;font-size:13px"><tr style="background:#F1F2F2"><th align="left">Closes</th><th align="right">Sales</th><th align="right">Cash diff</th><th align="right">BOV diff</th><th align="right">Total diff</th></tr><tr><td>' + (info.n || 0) + '</td><td align="right">' + esc(eur(info.sales || 0)) + '</td><td align="right">' + esc(sEur(info.cash || 0)) + '</td><td align="right">' + esc(sEur(info.bov || 0)) + '</td><td align="right">' + esc(sEur(info.diff || 0)) + "</td></tr></table>" +
+      "<p><b>Bank deposits (" + bags.length + " bags, " + esc(eur(sum(bags.map((b) => b.dep)))) + ")</b></p>" +
+      (bags.length ? '<table cellpadding="6" style="border-collapse:collapse;font-size:13px"><tr style="background:#F1F2F2"><th align="left">Bag</th><th align="right">Tills</th><th align="left">Cashiers</th><th align="right">Deposit</th></tr>' + tr + "</table>" : "<p>No bag numbers on this day.</p>") +
+      (act.length ? "<p><b>Flagged that day and how it was resolved (" + act.length + ")</b></p><ul>" + act.map(itemLine).join("") + "</ul>" : "<p>Nothing flagged that day.</p>"));
+  }
   function reviewHtml(c, d, rows, its) {
     const info = dayInfo(c, d) || {}, open = its.filter(isOpen), act = its.filter((i) => i.action);
     return mailWrap(nameOf(c) + " · cash review · " + dayShort(d),
