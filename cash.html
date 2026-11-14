@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#ffffff">
+<meta name="spar-page" content="module">
+<meta name="spar-tool" content="cash">
+<title>Cash Sheet Analyser · SPAR Malta Hub</title>
+<script src="firebase-config.js"></script>
+<script src="spar-runtime.js"></script>
+<script src="spar-ui.js"></script>
+<script src="cash-analysis.js"></script>
+<link rel="stylesheet" href="spar.css">
+<style>
+.bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
+.bar label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar select{font:700 14px Arial,sans-serif;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);min-width:200px;max-width:100%}
+.bar .stamp{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right}
+.kpi .sub{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;font-weight:700}
+.kpi.red{background:#FDECEC;border-color:#F6C9CB}.kpi.red strong{color:#C5121A}
+.kpi.amber{background:#FFF6E3;border-color:#F3DDA9}.kpi.amber strong{color:#9A6200}
+.kpi.green strong{color:var(--gd)}
+.up{color:var(--gd)} .down{color:var(--red)}
+tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
+.tablewrap tr.tot td{position:sticky;bottom:0;z-index:1;box-shadow:0 -2px 0 var(--line)}
+.sub2{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted)}
+.drop{border:2px dashed #C9CDCB;border-radius:14px;padding:20px;text-align:center;background:#FBFCFB}
+.drop.drag{border-color:var(--brand);background:var(--brandsoft)}
+.seg{display:inline-flex;background:#E9EBEA;border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{appearance:none;border:0;background:transparent;padding:7px 12px;border-radius:8px;font:700 13px Arial,sans-serif;color:var(--ink);cursor:pointer}
+.seg button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:#D9DCDB;font-size:11.5px;line-height:18px;text-align:center}
+.seg .on .cnt{background:#F3F4F4}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--ink);text-decoration:underline;cursor:pointer;text-align:left}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+.rowx{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:0 0 12px}
+.it{display:grid;grid-template-columns:1fr auto;gap:4px 14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.it .h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.it .h b{font-size:15px}
+.it .t{font-size:14px;line-height:1.45;margin-top:2px}
+.it .c{font-size:12.5px;color:var(--muted)}
+.it .amt{text-align:right;font-weight:800;font-size:16px;white-space:nowrap}
+.it .amt small{display:block;font:500 11.5px ui-monospace,Consolas,monospace;color:var(--muted)}
+.it .res{grid-column:1 / -1;margin-top:6px}
+.it.done{opacity:.72}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+.tag.r{background:#FBE0E1;color:#C5121A}.tag.g{background:#DDF1E4;color:#00703C}.tag.a{background:#FFF0D2;color:#9A6200}.tag.b{background:#E2ECFA;color:#1F4E9A}.tag.n{background:#EEF0EF;color:#55656b}
+.note2{background:#F7F8F8;border-radius:9px;padding:8px 10px;font-size:13px;margin-top:6px}
+.note2 b{font-size:12px}
+.form2{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-top:8px}
+@media(max-width:700px){.form2{grid-template-columns:1fr}}
+.days7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:0 0 14px}
+@media(max-width:700px){.days7{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.dchip{border:1px solid var(--line);border-radius:12px;padding:9px 10px;background:#fff;cursor:pointer;text-align:left;font:inherit}
+.dchip b{display:block;font-size:13px}.dchip span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.dchip.on{outline:2px solid var(--ink)}
+.dchip.ok{background:#EAF6EE;border-color:#BFE3CB}.dchip.wait{background:#FFF6E3;border-color:#F3DDA9}.dchip.bad{background:#FDECEC;border-color:#F6C9CB}.dchip.none{background:#F7F8F8;color:var(--muted)}
+.chk{list-style:none;margin:0 0 14px;padding:0}
+.chk li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.chk li i{font-style:normal;font-weight:800;width:22px;text-align:center}
+.chk li.y i{color:var(--gd)} .chk li.n i{color:var(--red)}
+.sbar{height:8px;border-radius:4px;background:#F1F2F2;display:flex;justify-content:space-between;overflow:hidden;margin-top:8px}
+.sbar i{display:block;height:100%}
+</style>
+</head>
+<body>
+<header class="top" data-title="Cash Sheet Analyser"></header>
+
+<main class="page">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">Overview</button>
+    <button class="tab" data-tab="flags" type="button">Flags <span class="count" id="nFlags" hidden></span></button>
+    <button class="tab" data-tab="review" type="button">Daily review <span class="count" id="nReview" hidden></span></button>
+    <button class="tab" data-tab="signoff" type="button">Weekly sign-off <span class="count" id="nSign" hidden></span></button>
+    <button class="tab" data-tab="sellers" type="button">Sellers <span class="count" id="nSellers" hidden></span></button>
+    <button class="tab" data-tab="missing" type="button">Missing <span class="count" id="nMissing" hidden></span></button>
+    <button class="tab" data-tab="bags" type="button">Safe bags <span class="count" id="nBags" hidden></span></button>
+    <button class="tab" data-tab="issues" type="button">Data issues <span class="count" id="nIssues" hidden></span></button>
+    <button class="tab" data-tab="upload" type="button">Upload</button>
+  </div>
+
+  <div class="card bar" id="bar">
+    <label>View<select id="scope"></select></label>
+    <label id="wkWrap">Week<select id="week"></select></label>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <section data-pane="overview"><div id="ovBody"></div></section>
+  <section data-pane="flags" hidden><div class="card panel" style="margin-top:0"><div class="rowx"><div class="seg" id="fSeg"></div></div><div id="flagList"></div></div></section>
+  <section data-pane="review" hidden><div id="revBody"></div></section>
+  <section data-pane="signoff" hidden><div id="signBody"></div></section>
+  <section data-pane="sellers" hidden><div class="card panel" style="margin-top:0" id="selBody"></div></section>
+  <section data-pane="missing" hidden><div class="card panel" style="margin-top:0" id="misBody"></div></section>
+  <section data-pane="bags" hidden><div class="card panel" style="margin-top:0" id="bagBody"></div><div class="card panel" id="bagList"></div></section>
+  <section data-pane="issues" hidden><div class="card panel" style="margin-top:0" id="issBody"></div></section>
+  <section data-pane="upload" hidden>
+    <div class="card panel" style="margin-top:0">
+      <h2>Upload the cash sheet</h2>
+      <p class="note" style="margin:-6px 0 12px">The store uploads its Cash Report workbook from the store PC every day once the closes are in (the whole file: every week sheet is read). The store comes from the file name, e.g. “Cash Report 2026 - ANG”. Each store can only upload and see its own sheet; the ROM sees their stores.</p>
+      <div class="drop" id="drop"><p style="margin:0 0 10px;font-weight:700">Drag the Cash Report here</p><label class="btn" for="file">Choose the Cash Report</label><input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden></div>
+      <div id="upMsg" style="margin-top:12px"></div>
+    </div>
+    <div class="card panel" id="upHist"></div>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const E = SPARUI.el;
+  const C = window.CashCheck;
+
+  // ── Tables: 6 rows on show, then scroll; header and total row stay put ──
+  function fitTables() {
+    document.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || !w.offsetParent) return;
+      const body = [...t.querySelectorAll(":scope > tbody > tr")];
+      const tot = body.filter((r) => r.classList.contains("tot")), rows = body.filter((r) => !r.classList.contains("tot"));
+      if (rows.length <= 6) { w.style.maxHeight = "none"; return; }
+      const h = (t.tHead ? t.tHead.offsetHeight : 0) + rows.slice(0, 6).reduce((s, r) => s + r.offsetHeight, 0) + tot.reduce((s, r) => s + r.offsetHeight, 0) + 2;
+      if (h > 60) w.style.maxHeight = h + "px";
+    });
+  }
+  let fitQ = 0; const fitSoon = () => { if (!fitQ) fitQ = requestAnimationFrame(() => { fitQ = 0; fitTables(); }); };
+  new MutationObserver(fitSoon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+
+  const me = await SPAR.ready;
+  if (!(["admin", "rom", "sm"].includes(me.role) || (me.cashAccess && ["hq", "support"].includes(me.role)))) {
+    document.querySelector("main").innerHTML = '<div class="card panel"><h2>Cash Sheet Analyser</h2><p class="note">This module is for the stores, their Store Managers and ROMs, and the accounts team. Ask a hub admin if you need access.</p></div>';
+    throw new Error("no cash access");
+  }
+  const fb = await SPAR.firebase();
+  const { fs, db } = fb;
+  const isHO = ["admin", "hq", "support"].includes(me.role);
+  // Who does what:
+  //  · the store uploads the cash sheet from the store PC (its own store login), or the Store Manager / ROM does;
+  //  · the next morning the Store Manager reviews the day and resolves the flags; the ROM can do the same;
+  //  · on Monday the Store Manager signs off the week, the ROM verifies it, and it's emailed to accounts;
+  //  · Head Office and Support don't see this module, except the accounts team (read only); admin can do everything.
+  const isAdmin = me.role === "admin";
+  const storeEmail = (c) => String((byCodeAll()[c] || {}).storeEmail || "").trim().toLowerCase();
+  const isStoreLogin = (c) => !!storeEmail(c) && storeEmail(c) === String(me.email || "").toLowerCase();
+  const isSM = (c) => me.role === "sm" && !isStoreLogin(c);
+  const canWork = (c) => isSM(c) || me.role === "rom" || isAdmin;       // review days, resolve flags
+  const canSMSign = (c) => isSM(c) || isAdmin;                         // step 1: the Store Manager signs off the week
+  const canVerify = (c) => me.role === "rom" || isAdmin;               // step 2: the ROM verifies → accounts
+  const canUpload = (c) => ["sm", "rom", "admin"].includes(me.role);
+  const accountsOnly = me.cashAccess && ["hq", "support"].includes(me.role);
+  const ACCOUNTS = "accounts@spar.com.mt";
+  const KEEP_WEEKS = 26;
+
+  // ── Helpers ──
+  const now = () => (window.__sparNow ? window.__sparNow() : Date.now());
+  const pad = (n) => (n < 10 ? "0" : "") + n;
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const today = () => iso(new Date(now()));
+  const { addDays, mondayOf, eur, sEur, dayShort, dm } = C;
+  const int = (v) => v == null || !isFinite(v) ? "–" : Math.round(v).toLocaleString("en-GB");
+  const plural = (n, w) => int(n) + " " + w + (n === 1 ? "" : "s");
+  const sum = (a) => a.reduce((p, v) => p + (v || 0), 0);
+  const docId = (s) => String(s).replace(/[\/.#$\[\]]/g, "_").slice(0, 400);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const wkLabel = (m, st) => { const w = st && st.weeks && st.weeks[m]; return (w && w.label ? w.label + " · " : "") + dm(m) + " – " + dm(addDays(m, 6)); };
+
+  // ── Stores ──
+  const stores = me.stores.slice();
+  const byCode = Object.fromEntries(me.allStores.map((s) => [s.code, s]));
+  function byCodeAll() { return byCode; }
+  const nameOf = (c) => (byCode[c] || {}).name || c;
+  const romOf = (c) => (byCode[c] && byCode[c].rom) || "No ROM";
+  const scopes = [];
+  if (me.seesAll && stores.length > 1) {
+    scopes.push({ id: "all", label: "All stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+    [...new Set(stores.map((s) => romOf(s.code)))].sort().forEach((r) => scopes.push({ id: "rom:" + r, label: r + "'s stores", codes: stores.filter((s) => romOf(s.code) === r).map((s) => s.code) }));
+  } else if (stores.length > 1) scopes.push({ id: "mine", label: "My stores (" + stores.length + ")", codes: stores.map((s) => s.code) });
+  stores.forEach((s) => scopes.push({ id: "s:" + s.code, label: s.name, codes: [s.code] }));
+  if (!scopes.length) { document.querySelector("main").innerHTML = '<p class="msg warn">You haven\'t been given a store yet. Ask a hub admin.</p>'; throw new Error("no stores"); }
+  scopes.forEach((s) => $("scope").add(new Option(s.label, s.id)));
+  try { const k = localStorage.getItem("sparCashScope"); if (scopes.some((s) => s.id === k)) $("scope").value = k; } catch (e) {}
+  const scope = () => scopes.find((s) => s.id === $("scope").value) || scopes[0];
+  const single = () => scope().codes.length === 1;
+
+  // ── Paths ──
+  const SP = (c, ...x) => fs.doc(db, "modules", "cash", "stores", c, ...x);
+  const col = (c, name) => fs.collection(db, "modules", "cash", "stores", c, name);
+  const outbox = (id) => fs.doc(db, "modules", "cash", "outbox", id);
+
+  // ═════════ LOADING ═════════
+  const ST = {}, NOTES = {}, DAYS = {}, SIGN = {}, WEEKROWS = {};
+  async function loadStore(c, force) {
+    if (ST[c] && !force) return;
+    const [s, n, d, g] = await Promise.all([
+      fs.getDoc(SP(c, "state", "latest")).catch(() => null),
+      fs.getDocs(col(c, "notes")).catch(() => null),
+      fs.getDocs(col(c, "days")).catch(() => null),
+      fs.getDocs(col(c, "signoff")).catch(() => null)]);
+    const st = s && s.exists() ? s.data() : null;
+    if (st && st.a) { try { st.A = JSON.parse(st.a); } catch (e) { st.A = null; } }
+    ST[c] = st; NOTES[c] = {}; DAYS[c] = {}; SIGN[c] = {};
+    if (n) n.docs.forEach((x) => { NOTES[c][x.id] = x.data(); });
+    if (d) d.docs.forEach((x) => { DAYS[c][x.id] = x.data(); });
+    if (g) g.docs.forEach((x) => { SIGN[c][x.id] = x.data(); });
+  }
+  async function weekRows(c, w) {
+    const k = c + "|" + w; if (WEEKROWS[k]) return WEEKROWS[k];
+    try { const d = await fs.getDoc(SP(c, "weeks", w)); WEEKROWS[k] = d.exists() ? JSON.parse(d.data().rows || "[]") : []; } catch (e) { WEEKROWS[k] = []; }
+    return WEEKROWS[k];
+  }
+
+  // every item (flag, missing field, bag, data issue) with its store and resolution
+  const LISTS = { flags: "flags", missing: "missing", bags: "bags", issues: "issues" };
+  function items(codes, list) {
+    const out = [];
+    codes.forEach((c) => { const A = ST[c] && ST[c].A; if (!A) return; (A[list] || []).forEach((i) => out.push({ ...i, store: c, list, note: NOTES[c][docId(i.id)] })); });
+    return out;
+  }
+  // Reviews and sign-offs start the week before the store's first upload; older history stays visible,
+  // but only money still owed (outstanding unders) from before then counts as open.
+  const startOf = (c) => (ST[c] && ST[c].startWeek) || "0000";
+  const isOpen = (i) => i.action && !(i.note && i.note.resolved) && (!i.date || i.date >= startOf(i.store) || (i.tags || []).includes("OUTSTANDING"));
+  const inWeek = (i) => { const w = $("week").value; return !w || (i.date && mondayOf(i.date) === w); };
+  const allItems = (codes) => [].concat(...Object.keys(LISTS).map((l) => items(codes, l)));
+  const dayInfo = (c, d) => { const st = ST[c]; const w = st && st.weeks && st.weeks[mondayOf(d)]; return w && w.days ? w.days[d] : null; };
+  const dayStatus = (c, d) => {
+    const info = dayInfo(c, d), rv = DAYS[c] && DAYS[c][d];
+    if (!info || !info.n) return "none";
+    if (d < startOf(c)) return "before";
+    if (rv && rv.reviewed) return rv.hash === info.hash ? "reviewed" : "changed";
+    return "waiting";
+  };
+  // none → confirmed (the store confirmed the week) → signed (the ROM signed it off and accounts were emailed);
+  // "changed" when the sheet for that week changed after either step
+  const sameHashes = (c, w, h) => { const wk = ST[c] && ST[c].weeks && ST[c].weeks[w]; return !wk || Object.keys(h || {}).every((d) => ((wk.days[d] || {}).hash || "") === h[d]); };
+  const signStatus = (c, w) => {
+    const s = SIGN[c] && SIGN[c][w]; if (!s || !s.storeAt) return "none";
+    if (s.romAt) return sameHashes(c, w, s.hashes) ? "signed" : "changed";
+    return sameHashes(c, w, s.storeHashes) ? "confirmed" : "changed";
+  };
+  const weekEnded = (w) => today() >= addDays(w, 7);          // Monday to Sunday: sign-off from the Monday after
+
+  // ═════════ TABS ═════════
+  let tab = "overview";
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll(".tab[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll("[data-pane]").forEach((p) => p.hidden = p.dataset.pane !== name);
+    render();
+  }
+  document.querySelectorAll(".tab[data-tab]").forEach((t) => t.onclick = () => showTab(t.dataset.tab));
+  $("scope").onchange = () => { try { localStorage.setItem("sparCashScope", $("scope").value); } catch (e) {} openRes = null; render(); };
+  $("week").onchange = () => render();
+
+  function fillWeeks(codes) {
+    const ws = new Set(); codes.forEach((c) => { const st = ST[c]; if (st && st.weeks) Object.keys(st.weeks).forEach((w) => ws.add(w)); });
+    const list = [...ws].sort().reverse(), cur = $("week").value;
+    $("week").innerHTML = ""; $("week").add(new Option("All weeks", ""));
+    list.forEach((w) => $("week").add(new Option(wkLabel(w, codes.length === 1 ? ST[codes[0]] : null), w)));
+    if (list.includes(cur) || cur === "") $("week").value = cur;
+  }
+  function setCount(id, n, warn) { const el = $(id); el.hidden = !n; el.textContent = n; el.style.background = warn ? "" : "#9AA5A9"; }
+  function updateCounts(codes) {
+    const all = allItems(codes);
+    setCount("nFlags", all.filter((i) => i.list === "flags" && isOpen(i)).length, true);
+    setCount("nMissing", all.filter((i) => i.list === "missing" && isOpen(i)).length, true);
+    setCount("nBags", all.filter((i) => i.list === "bags" && isOpen(i)).length, true);
+    setCount("nIssues", all.filter((i) => i.list === "issues" && isOpen(i)).length, true);
+    setCount("nSellers", sum(codes.map((c) => ((ST[c] && ST[c].A && ST[c].A.sellers) || []).filter((s) => s.tags.length).length)), false);
+    // days waiting for review / weeks waiting for sign-off
+    let waitD = 0, waitW = 0; const t = today();
+    codes.forEach((c) => { const st = ST[c]; if (!st || !st.weeks) return;
+      Object.values(st.weeks).forEach((w) => Object.keys(w.days || {}).forEach((d) => { const s = dayStatus(c, d); if (s === "waiting" || s === "changed") waitD++; }));
+      Object.keys(st.weeks).forEach((w) => { if (w >= startOf(c) && weekEnded(w) && (st.weeks[w].n || 0) && signStatus(c, w) !== "signed") waitW++; }); });
+    setCount("nReview", waitD, true); setCount("nSign", waitW, true);
+  }
+
+  let seq = 0;
+  async function render() {
+    const my = ++seq, codes = scope().codes;
+    await Promise.all(codes.map((c) => loadStore(c)));
+    if (my !== seq) return;
+    fillWeeks(codes); updateCounts(codes);
+    $("wkWrap").hidden = !["flags", "missing", "bags", "issues", "review", "signoff"].includes(tab);
+    const withData = codes.filter((c) => ST[c] && ST[c].A);
+    $("stamp").textContent = withData.length ? (single() ? "Latest close " + dayShort(ST[codes[0]].latest) + " · uploaded " + SPARUI.fmtDateTime(ST[codes[0]].at) + " by " + (ST[codes[0]].byName || "") : withData.length + " of " + codes.length + " stores have uploaded") : "No cash sheet uploaded yet";
+    if (tab === "overview") return renderOverview(codes);
+    if (tab === "flags") return renderFlags(codes);
+    if (tab === "review") return renderReview(codes);
+    if (tab === "signoff") return renderSignoff(codes);
+    if (tab === "sellers") return renderSellers(codes);
+    if (tab === "missing") return renderList(codes, "missing", "misBody", "Missing figures and days", "Closes with something left blank (seller number, name, actual cash or BOV, safe bag number, closed by, cash deposit) and days with no closes at all. Fill them in on the sheet and upload it again, or explain below.");
+    if (tab === "bags") { renderList(codes, "bags", "bagBody", "Safe bag problems", "Bag numbers not in the usual format, the same bag number on two different days, more deposited than the actual cash, and notes left out of the bag (only coins under €5 should stay out)."); return renderBagList(codes); }
+    if (tab === "issues") return renderList(codes, "issues", "issBody", "Data issues", "Figures that don't add up (a formula typed over), floats that aren't the store's usual float, day totals that don't match the tills, and for information: tills closed by the cashier themself and names spelt differently.");
+    if (tab === "upload") return renderUpload(codes);
+  }
+  const empty = (txt) => E("p", { class: "empty", text: txt || "No cash sheet uploaded for this view yet. Upload the Cash Report on the Upload tab." });
+  const needOne = (box) => { box.innerHTML = ""; box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("p", { class: "note", text: "Choose one store in View to do this." })])); };
+
+  // ═════════ ITEM CARDS (Keith's layout) ═════════
+  const TAGCLS = { UNDER: "r", OUTSTANDING: "r", OVER: "g", REPAID: "g", REPAYMENT: "b", "CARD/CASH": "b", CHECK: "a", "WRONG CODE": "r", "SELLER NO.": "a" };
+  let openRes = null;
+  function itemCard(i, codes) {
+    const key = i.store + "|" + i.id, n = i.note || {};
+    const done = i.action && n.resolved;
+    const tags = (i.tags || []).map((t) => E("span", { class: "tag " + (TAGCLS[t] || "n"), text: t }));
+    if (!i.tags && i.action) tags.push(E("span", { class: "tag a", text: i.list === "missing" ? "MISSING" : i.list === "bags" ? "SAFE BAG" : "CHECK" }));
+    if (!i.action && !i.tags) tags.push(E("span", { class: "tag n", text: "INFO" }));
+    if (done) tags.push(E("span", { class: "tag g", text: "RESOLVED" }));
+    const head = E("div", { class: "h" }, [single() ? null : E("span", { class: "tag n", text: nameOf(i.store) }), E("b", { text: i.who || "" }), i.num ? E("span", { class: "mono", text: i.num }) : null, ...tags,
+      i.date ? E("span", { class: "c", text: dayShort(i.date) + (i.wk ? " · " + i.wk.replace(/wk[_\s]*/i, "WK") : "") }) : null].filter(Boolean));
+    const left = E("div", null, [head, E("div", { class: "t", text: i.text || "" }), i.com ? E("div", { class: "c", text: "Comment: " + i.com }) : null, i.ref ? E("div", { class: "mono", text: i.ref }) : null].filter(Boolean));
+    const amt = i.amt != null ? E("div", { class: "amt " + (i.amt < 0 ? "down" : i.amt > 0 ? "up" : "") }, [sEur(i.amt), i.sub ? E("small", { text: i.sub }) : null].filter(Boolean)) : E("div");
+    const res = E("div", { class: "res" });
+    if (n.smNote) res.appendChild(E("div", { class: "note2" }, [E("b", { text: "Store Manager · " + (n.smName || "") + " · " + SPARUI.fmtDateTime(n.smAt) }), E("div", { text: n.smNote })]));
+    if (n.romNote) res.appendChild(E("div", { class: "note2" }, [E("b", { text: "ROM · " + (n.romName || "") + " · " + SPARUI.fmtDateTime(n.romAt) }), E("div", { text: n.romNote })]));
+    if (n.resolved) res.appendChild(E("div", { class: "note2", style: "background:#EAF6EE" }, [E("b", { text: "✓ Resolved by " + (n.resolvedName || "") + (n.resolvedAt ? " · " + SPARUI.fmtDateTime(n.resolvedAt) : "") })]));
+    const who = i.action && canWork(i.store) ? (me.role === "rom" ? "rom" : "sm") : null;
+    if (openRes === key && who) {
+      const ta = E("input", { class: "in", type: "text", placeholder: "What happened and what was done (e.g. repaid on…, sheet corrected, cashier spoken to)", value: (who === "sm" ? n.smNote : n.romNote) || "" });
+      const cb = E("input", { type: "checkbox" }); cb.checked = !!n.resolved;
+      const save = E("button", { class: "btn small", type: "button", text: "Save" });
+      save.onclick = async () => {
+        if (!ta.value.trim()) { SPARUI.toast("Write a short note first", "err"); return; }
+        save.disabled = true;
+        const data = who === "sm" ? { smNote: ta.value.trim(), smBy: me.email, smName: me.name, smAt: Date.now() } : { romNote: ta.value.trim(), romBy: me.email, romName: me.name, romAt: Date.now() };
+        Object.assign(data, { id: i.id, date: i.date || "", list: i.list, resolved: cb.checked });
+        if (cb.checked && !n.resolved) Object.assign(data, { resolvedBy: me.email, resolvedName: me.name, resolvedAt: Date.now() });
+        try { await fs.setDoc(SP(i.store, "notes", docId(i.id)), data, { merge: true }); NOTES[i.store][docId(i.id)] = Object.assign({}, n, data); openRes = null; SPARUI.toast("Saved"); render(); }
+        catch (e) { save.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      res.appendChild(E("div", { class: "form2" }, [ta, E("label", { style: "display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px" }, [cb, "Resolved"]), E("div", { class: "row" }, [save, E("button", { class: "btn secondary small", type: "button", text: "Cancel", onclick: () => { openRes = null; render(); } })])]));
+    } else if (who) {
+      res.appendChild(E("div", { class: "row", style: "margin-top:6px" }, [E("button", { class: "btn secondary small", type: "button", text: n.resolved ? "Edit / reopen" : "Resolve / add a note", onclick: () => { openRes = key; render(); } })]));
+    }
+    return E("div", { class: "it" + (done ? " done" : "") }, [left, amt, res.childNodes.length ? res : null].filter(Boolean));
+  }
+
+  // ═════════ OVERVIEW ═════════
+  function kpi(label, val, sub, cls) { return E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function renderOverview(codes) {
+    const box = $("ovBody"); box.innerHTML = "";
+    const withData = codes.filter((c) => ST[c] && ST[c].A);
+    if (!withData.length) { box.appendChild(empty()); return; }
+    const all = allItems(withData), F = all.filter((i) => i.list === "flags");
+    const out = F.filter((i) => (i.tags || []).includes("OUTSTANDING") && isOpen(i));
+    const toCheck = F.filter((i) => (i.tags || []).includes("CHECK") && isOpen(i));
+    const L = (ST[withData[0]].A.limit || 2);
+    const unders = F.filter((i) => i.kind === "under"), overs = F.filter((i) => i.kind === "over");
+    box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
+      kpi("Outstanding", eur(-sum(out.map((i) => i.amt))), plural(out.length, "under") + " not repaid", out.length ? "red" : ""),
+      kpi("To check", int(toCheck.length), "need a look", toCheck.length ? "amber" : ""),
+      kpi("Unders", int(unders.length), eur(-sum(unders.map((i) => i.amt))) + " beyond −€" + L, unders.length ? "" : ""),
+      kpi("Overs", int(overs.length), eur(sum(overs.map((i) => i.amt))) + " beyond +€" + L, "green"),
+      kpi("Missing fields", int(all.filter((i) => i.list === "missing" && isOpen(i)).length), "still open", all.some((i) => i.list === "missing" && isOpen(i)) ? "amber" : ""),
+      kpi("Safe bags", int(all.filter((i) => i.list === "bags" && isOpen(i)).length), "bag no. problems", all.some((i) => i.list === "bags" && isOpen(i)) ? "amber" : ""),
+      kpi("Data issues", int(all.filter((i) => i.list === "issues" && isOpen(i)).length), plural(all.filter((i) => i.list === "issues" && !i.action).length, "note") + " for information", all.some((i) => i.list === "issues" && isOpen(i)) ? "amber" : ""),
+      kpi("Repayments", int(F.filter((i) => i.kind === "repay").length), plural(F.filter((i) => i.kind === "mix").length, "card/cash mix-up"))]));
+    const t = today(), thisW = mondayOf(t), lastW = addDays(thisW, -7);
+    if (single()) {
+      const c = codes[0], st = ST[c];
+      const week = E("div", { class: "card panel" }, [E("h2", { text: "This week · " + wkLabel(thisW, st) })]);
+      week.appendChild(dayChips(c, thisW, null, (d) => { revDate = d; $("week").value = thisW; showTab("review"); }));
+      const ls = signStatus(c, lastW), lastN = st.weeks && st.weeks[lastW] ? st.weeks[lastW].n : 0;
+      week.appendChild(E("p", { class: "msg " + (ls === "signed" ? "ok" : ls === "changed" ? "err" : lastN ? "warn" : ""), text: "Last week (" + wkLabel(lastW, st) + "): " + (ls === "signed" ? "signed off by " + SIGN[c][lastW].storeName + ", verified by " + SIGN[c][lastW].romName + " " + SPARUI.fmtDateTime(SIGN[c][lastW].romAt) + "; emailed to accounts." : ls === "confirmed" ? "signed off by the Store Manager (" + SIGN[c][lastW].storeName + "), waiting for the ROM to verify." : ls === "changed" ? "the sheet changed after sign-off. It needs signing off and verifying again." : lastN ? (weekEnded(lastW) ? "waiting for the Store Manager's sign-off, then the ROM's verification." : "can be signed off from " + dayShort(addDays(lastW, 7)) + " morning.") : "no figures.") }));
+      box.appendChild(week);
+      const act = all.filter(isOpen).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 8);
+      box.appendChild(E("div", { class: "card panel" }, [E("div", { class: "rowx" }, [E("h2", { style: "margin:0", text: "Needs action" }), E("button", { class: "btn secondary small", type: "button", text: "See all flags", onclick: () => { fSel = "action"; showTab("flags"); } })]),
+        act.length ? E("div", null, act.map((i) => itemCard(i, codes))) : E("p", { class: "msg ok", text: "Nothing open. Everything flagged has been resolved." })]));
+      return;
+    }
+    const rows = codes.slice().sort((a, b) => nameOf(a).localeCompare(nameOf(b))).map((c) => {
+      const st = ST[c];
+      if (!st || !st.A) return E("tr", null, [E("td", null, [E("b", { text: nameOf(c) })]), E("td", { colspan: "6", class: "note", text: "No cash sheet uploaded yet" })]);
+      const its = allItems([c]), o = its.filter((i) => (i.tags || []).includes("OUTSTANDING") && isOpen(i));
+      const days = Object.keys((st.weeks[thisW] || {}).days || {}).filter((d) => dayInfo(c, d).n);
+      const rev = days.filter((d) => dayStatus(c, d) === "reviewed").length, ls = signStatus(c, lastW);
+      return E("tr", null, [E("td", null, [E("button", { class: "linkbtn", type: "button", text: nameOf(c), onclick: () => { $("scope").value = "s:" + c; $("scope").onchange(); } }), E("span", { class: "sub2", text: "uploaded " + SPARUI.fmtDateTime(st.at) })]),
+        E("td", null, [dayShort(st.latest) + " ", E("span", { class: "pill" + (C.diffDays(st.latest, t) <= 1 ? "" : " warn"), text: C.diffDays(st.latest, t) <= 1 ? "up to date" : C.diffDays(st.latest, t) + " days behind" })]),
+        E("td", { class: "num", text: rev + "/" + days.length }), E("td", { class: "num " + (its.filter(isOpen).length ? "down" : ""), text: int(its.filter(isOpen).length) }),
+        E("td", { class: "num " + (o.length ? "down" : ""), text: o.length ? eur(-sum(o.map((i) => i.amt))) : "–" }),
+        E("td", null, [E("span", { class: "pill" + (ls === "signed" ? "" : ls === "changed" ? " red" : " warn"), text: ls === "signed" ? "Verified · sent to accounts" : ls === "confirmed" ? "SM signed off · ROM to verify" : ls === "changed" ? "Changed after sign-off" : "Waiting for SM sign-off" })])]);
+    });
+    box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Stores" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Click a store to open its flags, daily review and sign-off." }),
+      E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Store", "Latest close", "This week reviewed", "Open issues", "Outstanding", "Last week (" + dm(lastW) + ")"].map((h, k) => E("th", { class: k >= 2 && k <= 4 ? "num" : "", text: h })))]), E("tbody", null, rows)])])]));
+  }
+  function dayChips(c, w, cur, onPick) {
+    return E("div", { class: "days7" }, Array.from({ length: 7 }, (_, k) => {
+      const d = addDays(w, k), s = dayStatus(c, d), info = dayInfo(c, d), rv = DAYS[c][d];
+      const cls = s === "reviewed" ? "ok" : s === "waiting" ? "wait" : s === "changed" ? "bad" : "none";
+      const txt = s === "before" ? "Before the hub · " + info.n + " closes" : s === "reviewed" ? "✓ Reviewed" + (rv && rv.byName ? " · " + rv.byName.split(" ")[0] : "") : s === "waiting" ? "To review · " + info.n + " closes" : s === "changed" ? "Changed after review" : d > today() ? "—" : "No figures";
+      return E("button", { type: "button", class: "dchip " + cls + (cur === d ? " on" : ""), onclick: () => onPick(d) }, [E("b", { text: dayShort(d) }), E("span", { text: txt })]);
+    }));
+  }
+
+  // ═════════ FLAGS ═════════
+  let fSel = "action";
+  const FSEL = [["action", "Needs action", (i) => isOpen(i)], ["all", "All", () => true], ["out", "Outstanding", (i) => (i.tags || []).includes("OUTSTANDING")], ["check", "Check", (i) => (i.tags || []).includes("CHECK")],
+    ["under", "Unders", (i) => i.kind === "under"], ["over", "Overs", (i) => i.kind === "over"], ["repay", "Repayments", (i) => i.kind === "repay"], ["mix", "Card/cash", (i) => i.kind === "mix"], ["code", "Seller codes", (i) => i.kind === "code"]];
+  function renderFlags(codes) {
+    const list = $("flagList"), seg = $("fSeg"); list.innerHTML = ""; seg.innerHTML = "";
+    const F = items(codes, "flags").filter(inWeek);
+    FSEL.forEach(([k, l, f]) => seg.appendChild(E("button", { type: "button", class: fSel === k ? "on" : "", onclick: () => { fSel = k; renderFlags(codes); } }, [l, E("span", { class: "cnt", text: String(F.filter(f).length) })])));
+    if (!codes.some((c) => ST[c] && ST[c].A)) { list.appendChild(empty()); return; }
+    const f = FSEL.find((x) => x[0] === fSel)[2];
+    const shown = F.filter(f).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.row || 0) - (a.row || 0));
+    if (!shown.length) { list.appendChild(E("p", { class: "msg ok", text: fSel === "action" ? "Nothing needs action. Everything flagged has been resolved." : "Nothing in this list." })); return; }
+    shown.slice(0, 400).forEach((i) => list.appendChild(itemCard(i, codes)));
+  }
+  function renderList(codes, listName, boxId, title, note) {
+    const box = $(boxId); box.innerHTML = "";
+    box.append(E("h2", { text: title }), E("p", { class: "note", style: "margin:-6px 0 12px", text: note }));
+    if (!codes.some((c) => ST[c] && ST[c].A)) { box.appendChild(empty()); return; }
+    const L = items(codes, listName).filter(inWeek).sort((a, b) => (b.action - a.action) || (b.date || "").localeCompare(a.date || ""));
+    if (!L.length) { box.appendChild(E("p", { class: "msg ok", text: "Nothing to show." })); return; }
+    const open = L.filter(isOpen), rest = L.filter((i) => !isOpen(i));
+    if (open.length) box.appendChild(E("div", null, open.slice(0, 300).map((i) => itemCard(i, codes))));
+    else box.appendChild(E("p", { class: "msg ok", text: "Nothing open." }));
+    if (rest.length) box.append(E("h3", { style: "margin:18px 0 4px", text: "Resolved and for information (" + rest.length + ")" }), E("div", null, rest.slice(0, 200).map((i) => itemCard(i, codes))));
+  }
+  function renderBagList(codes) {
+    const box = $("bagList"); box.innerHTML = "";
+    if (!single()) { box.hidden = true; return; } box.hidden = false;
+    const A = ST[codes[0]] && ST[codes[0]].A; if (!A) { box.hidden = true; return; }
+    const w = $("week").value || mondayOf(ST[codes[0]].latest);
+    const list = (A.bagList || []).filter((b) => mondayOf(b.date) === w);
+    box.append(E("h2", { text: "Safe bags · " + wkLabel(w, ST[codes[0]]) }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Each bag with the tills in it and the cash deposit written against them, to check against the bag itself." }),
+      list.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Day", "Bag", "Tills", "Deposit"].map((h, k) => E("th", { class: k >= 2 ? "num" : "", text: h })))]),
+        E("tbody", null, list.map((b) => E("tr", null, [E("td", { text: dayShort(b.date) }), E("td", { class: "mono", text: b.bag }), E("td", { class: "num", title: b.who.join(", "), text: b.n }), E("td", { class: "num", text: eur(b.dep) })])).concat([E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { text: list.length + " bags" }), E("td", { class: "num", text: sum(list.map((b) => b.n)) }), E("td", { class: "num", text: eur(sum(list.map((b) => b.dep))) })])]))])]) : E("p", { class: "note", text: "No bags this week." }));
+  }
+
+  // ═════════ SELLERS ═════════
+  function renderSellers(codes) {
+    const box = $("selBody"); box.innerHTML = "";
+    if (!single()) { box.appendChild(E("p", { class: "note", text: "Choose one store in View to see its sellers." })); return; }
+    const A = ST[codes[0]] && ST[codes[0]].A; if (!A) { box.appendChild(empty()); return; }
+    const L = A.limit || 2;
+    box.append(E("h2", { text: "Sellers" }), E("p", { class: "note", style: "margin:-6px 0 12px", text: "Every cashier on the sheet since " + dayShort(A.first) + ". On repayment days only the till's own result counts. Bar: share of closes over €0.50 (green) and under €0.50 (red). “Uses 2 numbers” and “Wrong code” show cashiers closing on someone else's seller number." }));
+    A.sellers.forEach((s) => {
+      const tags = s.tags.map((t) => E("span", { class: "tag " + (/UNDER|OUTSTANDING|WRONG/.test(t) ? "r" : /OVER/.test(t) ? "g" : "a"), text: t }));
+      box.appendChild(E("div", { class: "it" }, [
+        E("div", null, [E("div", { class: "h" }, [E("b", { text: s.who }), E("span", { class: "mono", text: s.num + (s.otherNums.length ? " (also " + s.otherNums.join(", ") + ")" : "") }), ...tags]),
+          E("div", { class: "t" }, [E("b", { text: s.closes }), " closes   ", E("b", { text: s.under }), " under −€" + L + "   ", E("b", { text: s.over }), " over +€" + L + "   worst ", E("b", { class: "down", text: sEur(s.worst) }), "   best ", E("b", { class: "up", text: sEur(s.best) })]),
+          E("div", { class: "sbar" }, [E("i", { style: "width:" + (s.pos / Math.max(1, s.closes) * 100) + "%;background:#3BB273" }), E("i", { style: "width:" + (s.neg / Math.max(1, s.closes) * 100) + "%;background:#EC5A60" })])]),
+        E("div", { class: "amt " + (s.net < 0 ? "down" : "up") }, [sEur(s.net), E("small", { text: "net" })])]));
+    });
+  }
+
+  // ═════════ DAILY REVIEW ═════════
+  let revDate = null;
+  async function renderReview(codes) {
+    const box = $("revBody");
+    if (!single()) return needOne(box);
+    const c = codes[0], st = ST[c]; box.innerHTML = "";
+    if (!st || !st.A) { box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [empty()])); return; }
+    // default: the oldest day still to review this week, else the latest day
+    const w = $("week").value || mondayOf(revDate || st.latest);
+    if (!revDate || mondayOf(revDate) !== w) {
+      const ds = Array.from({ length: 7 }, (_, k) => addDays(w, k));
+      revDate = ds.find((d) => ["waiting", "changed"].includes(dayStatus(c, d))) || ds.filter((d) => dayStatus(c, d) !== "none").pop() || w;
+    }
+    const d = revDate, s = dayStatus(c, d), info = dayInfo(c, d) || {};
+    const card = E("div", { class: "card panel", style: "margin-top:0" }, [E("h2", { text: "Daily review · " + wkLabel(w, st) }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: "The store uploads the cash sheet each day. The next morning the Store Manager (or the ROM) checks the day's closes, resolves anything flagged, then marks the day reviewed; the ROM is emailed. If the sheet is changed after a day is reviewed, the day shows red and needs reviewing again." })]);
+    card.appendChild(dayChips(c, w, d, (x) => { revDate = x; renderReview(codes); }));
+    box.appendChild(card);
+    const dayCard = E("div", { class: "card panel" });
+    box.appendChild(dayCard);
+    if (s === "none") { dayCard.appendChild(E("p", { class: "note", text: "No closes on the sheet for " + dayShort(d) + " yet." })); return; }
+    const before = s === "before";
+    const rows = (await weekRows(c, mondayOf(d))).filter((r) => r.date === d);
+    const its = allItems([c]).filter((i) => i.date === d);
+    const open = its.filter(isOpen), noNote = open.filter((i) => !(i.note && (i.note.smNote || i.note.romNote)));
+    const rv = DAYS[c][d];
+    dayCard.append(E("div", { class: "rowx" }, [E("h2", { style: "margin:0", text: dayShort(d) }),
+      E("span", { class: "pill" + (s === "reviewed" ? "" : s === "changed" ? " red" : " warn"), text: s === "reviewed" ? "Reviewed by " + rv.byName + " " + SPARUI.fmtDateTime(rv.at) : s === "changed" ? "Changed after review: review again" : "Waiting for review" })]),
+      E("p", { style: "margin:0 0 10px", text: plural(info.n, "close") + " · sales " + eur(info.sales || 0) + " · cash " + sEur(info.cash || 0) + " · BOV " + sEur(info.bov || 0) + " · total difference " + sEur(info.diff || 0) }));
+    dayCard.appendChild(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Seller", "Cashier", "Should be cash", "Actual cash", "Cash diff", "BOV diff", "Total diff", "Safe bag", "Closed by", "Comment"].map((h, k) => E("th", { class: k >= 2 && k <= 6 ? "num" : "", text: h })))]),
+      E("tbody", null, rows.map((r) => { const td = r.tot; return E("tr", null, [E("td", { class: "mono", text: r.num || "–" }), E("td", { text: r.name || "–" }), E("td", { class: "num", text: r.sc == null ? "–" : eur(r.sc) }), E("td", { class: "num", text: r.ac == null ? "–" : eur(r.ac) }),
+        E("td", { class: "num", text: sEur(r.cash) }), E("td", { class: "num", text: sEur(r.bov) }), E("td", { class: "num " + (td < -2 ? "down" : td > 2 ? "up" : ""), text: sEur(td) }), E("td", { class: "mono", text: r.bag || "–" }), E("td", { text: r.cl || "–" }), E("td", { style: "max-width:260px", text: r.com || "" })]); })
+        .concat([E("tr", { class: "tot" }, [E("td", { text: "Total" }), E("td", { text: rows.length + " closes" }), E("td", { class: "num", text: eur(sum(rows.map((r) => r.sc))) }), E("td", { class: "num", text: eur(sum(rows.map((r) => r.ac))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.cash))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.bov))) }), E("td", { class: "num", text: sEur(sum(rows.map((r) => r.tot))) }), E("td"), E("td"), E("td")])]))])]));
+    dayCard.append(E("h3", { style: "margin:18px 0 4px", text: open.length ? open.length + " to resolve or explain" : "Nothing open on this day" }));
+    if (open.length) dayCard.appendChild(E("div", null, open.map((i) => itemCard(i, [c]))));
+    const rest = its.filter((i) => !isOpen(i));
+    if (rest.length) dayCard.append(E("details", { style: "margin-top:8px" }, [E("summary", { style: "cursor:pointer;font-weight:700", text: "Also on this day (" + rest.length + ")" }), E("div", null, rest.map((i) => itemCard(i, [c])))]));
+    if (before) dayCard.appendChild(E("p", { class: "note", style: "margin-top:12px", text: "This day is from before the store started using the hub (reviews start " + dayShort(startOf(c)) + "), so it doesn't need reviewing here." }));
+    else if (canWork(c)) {
+      const btn = E("button", { class: "btn", type: "button", text: s === "reviewed" ? "Reviewed ✓" : "Mark " + dayShort(d) + " as reviewed" });
+      btn.disabled = s === "reviewed" || noNote.length > 0;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        const data = { reviewed: true, date: d, hash: info.hash, by: me.email, byName: me.name, at: Date.now(), open: open.length };
+        try {
+          await fs.setDoc(SP(c, "days", d), data); DAYS[c][d] = data;
+          await sendMail(c, "review", "SPAR Cash · " + nameOf(c) + " · " + dayShort(d) + " reviewed" + (open.length ? " · " + plural(open.length, "item") + " open" : ""), reviewHtml(c, d, rows, its));
+          SPARUI.toast("Day reviewed. The ROM is emailed."); render();
+        } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't save: " + (e.code || e.message), "err"); }
+      };
+      dayCard.appendChild(E("div", { class: "row", style: "margin-top:14px" }, [btn, noNote.length ? E("span", { class: "note", text: "Resolve, or add a note to, the " + plural(noNote.length, "open item") + " above first." }) : null].filter(Boolean)));
+    } else if (s !== "reviewed") dayCard.appendChild(E("p", { class: "note", style: "margin-top:12px", text: "The Store Manager or the ROM reviews the day." }));
+  }
+
+  // ═════════ WEEKLY SIGN-OFF ═════════
+  function renderSignoff(codes) {
+    const box = $("signBody");
+    if (!single()) return needOne(box);
+    const c = codes[0], st = ST[c]; box.innerHTML = "";
+    if (!st || !st.A) { box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [empty()])); return; }
+    const t = today(), def = (() => { const ws = Object.keys(st.weeks).filter((w) => addDays(w, 6) < t && w >= startOf(c)).sort(); return ws.find((w) => signStatus(c, w) !== "signed" && st.weeks[w].n) || ws.pop() || mondayOf(st.latest); })();
+    const w = $("week").value || def;
+    if (!$("week").value) $("week").value = w;
+    const wk = st.weeks[w] || { days: {} }, ds = Array.from({ length: 7 }, (_, k) => addDays(w, k));
+    const withFig = ds.filter((d) => (wk.days[d] || {}).n), reviewed = ds.filter((d) => dayStatus(c, d) === "reviewed");
+    const its = allItems([c]).filter((i) => i.date && mondayOf(i.date) === w), open = its.filter(isOpen);
+    const older = allItems([c]).filter((i) => i.date && i.date < w && (i.tags || []).includes("OUTSTANDING") && isOpen(i));
+    const ss = signStatus(c, w), sg = SIGN[c][w] || {};
+    const ended = weekEnded(w);
+    if (w < startOf(c)) { box.appendChild(E("div", { class: "card panel", style: "margin-top:0" }, [E("h2", { text: "Weekly sign-off · " + wkLabel(w, st) }), E("p", { class: "note", text: "This week is from before the store started using the hub (sign-offs start with " + wkLabel(startOf(c), st) + ")." })])); return; }
+    const hashes = Object.fromEntries(ds.map((d) => [d, (wk.days[d] || {}).hash || ""]));
+    const smDone = ss === "confirmed" || ss === "signed";
+    const checks = [
+      [ended, ended ? "The week has finished (Monday to Sunday)." : "The week runs Monday to Sunday, so it can be signed off from " + dayShort(addDays(w, 7)) + " morning."],
+      [withFig.length === 7, withFig.length === 7 ? "All 7 days are on the sheet." : "Days with figures: " + withFig.length + " of 7 (" + ds.filter((d) => !withFig.includes(d)).map(dayShort).join(", ") + " missing)."],
+      [reviewed.length === 7, reviewed.length === 7 ? "All 7 days are reviewed." : "Days reviewed: " + reviewed.length + " of 7. Finish them on the Daily review tab."],
+      [!open.length, !open.length ? "Every flag this week is resolved." : open.length + " flag" + (open.length === 1 ? " is" : "s are") + " still open this week (listed below)."],
+      [smDone, smDone ? "Signed off by the Store Manager: " + sg.storeName + ", " + SPARUI.fmtDateTime(sg.storeAt) + "." : "Step 1: the Store Manager signs off the week."],
+      [ss === "signed", ss === "signed" ? "Verified by the ROM: " + sg.romName + ", " + SPARUI.fmtDateTime(sg.romAt) + ". Emailed to " + ACCOUNTS + "." : "Step 2: the ROM verifies it, and the cash sheet is emailed to " + ACCOUNTS + "."]];
+    const card = E("div", { class: "card panel", style: "margin-top:0" }, [E("h2", { text: "Weekly sign-off · " + wkLabel(w, st) }),
+      E("p", { class: "note", style: "margin:-6px 0 12px", text: "On Monday, for the week just ended: 1. the Store Manager signs off the cash sheet once every day is reviewed and every flag resolved; 2. the ROM verifies it, and the cash sheet is emailed to " + ACCOUNTS + " with the ROM and the Store Manager copied (emails arrive about 30 minutes later)." }),
+      E("ul", { class: "chk" }, checks.map(([y, txt]) => E("li", { class: y ? "y" : "n" }, [E("i", { text: y ? "✓" : "✗" }), E("span", { text: txt })])))]);
+    if (ss === "changed") card.appendChild(E("p", { class: "msg err", text: "The sheet for this week changed after it was " + (sg.romAt ? "verified" : "signed off") + ". Review the changed days, then sign off and verify again so accounts get the corrected sheet." }));
+    if (older.length) card.appendChild(E("p", { class: "msg warn", text: plural(older.length, "under") + " from earlier weeks still outstanding (" + eur(-sum(older.map((i) => i.amt))) + "). They don't stop this sign-off, but follow them up." }));
+    const step1ok = ended && withFig.length === 7 && reviewed.length === 7 && !open.length;
+    const step2ok = ss === "confirmed" && !open.length;
+    let acted = false;
+    if (canSMSign(c) && (ss === "none" || ss === "changed")) {
+      acted = true;
+      const btn = E("button", { class: "btn", type: "button", text: "Sign off the week (Store Manager)" }); btn.disabled = !step1ok;
+      btn.onclick = async () => {
+        if (!confirm("Sign off " + wkLabel(w, st) + " for " + nameOf(c) + "? It then goes to the ROM to verify.")) return;
+        btn.disabled = true;
+        try {
+          const data = { week: w, storeBy: me.email, storeName: me.name, storeAt: Date.now(), storeHashes: hashes, romBy: "", romName: "", romAt: 0, hashes: {} };
+          await fs.setDoc(SP(c, "signoff", w), data); SIGN[c][w] = data;
+          await sendMail(c, "confirm", "SPAR Cash · " + nameOf(c) + " · " + wkLabel(w, st) + " · signed off by the Store Manager, please verify", confirmHtml(c, w, its));
+          SPARUI.toast("Signed off. The ROM is asked to verify."); render();
+        } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't sign off: " + (e.code || e.message), "err"); }
+      };
+      card.appendChild(E("div", { class: "row" }, [btn, !step1ok ? E("span", { class: "note", text: "The first four lines need a ✓ first." }) : null].filter(Boolean)));
+    }
+    if (canVerify(c) && ss === "confirmed") {
+      acted = true;
+      const btn = E("button", { class: "btn", type: "button", text: "Verify and send to accounts (ROM)" }); btn.disabled = !step2ok;
+      btn.onclick = async () => {
+        if (!confirm("Verify " + wkLabel(w, st) + " for " + nameOf(c) + " and email the cash sheet to " + ACCOUNTS + "?")) return;
+        btn.disabled = true;
+        try {
+          const rows = await weekRows(c, w);
+          const data = Object.assign({}, sg, { romBy: me.email, romName: me.name, romAt: Date.now(), hashes, fileUrl: st.fileUrl || "", fileId: st.fileId || "", fileName: st.file || "", resolved: its.filter((i) => i.action).length });
+          await fs.setDoc(SP(c, "signoff", w), data); SIGN[c][w] = data;
+          await sendMail(c, "signoff", "SPAR Cash Report · " + nameOf(c) + " · " + wkLabel(w, st) + " · verified", signoffHtml(c, w, rows, its, data), { fileId: st.fileId || "", fileName: st.file || "" });
+          SPARUI.toast("Verified. Accounts are emailed the cash sheet."); render();
+        } catch (e) { btn.disabled = false; SPARUI.toast("Couldn't verify: " + (e.code || e.message), "err"); }
+      };
+      card.appendChild(E("div", { class: "row" }, [btn, !step2ok ? E("span", { class: "note", text: "Resolve the open flags below first." }) : null].filter(Boolean)));
+    }
+    if (!acted && ss !== "signed") card.appendChild(E("p", { class: "note", text: ss === "confirmed" ? "Signed off by the Store Manager, waiting for the ROM to verify." : "Waiting for the Store Manager to sign off the week." }));
+    box.appendChild(card);
+    if (open.length) box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "Still open this week" }), E("div", null, open.map((i) => itemCard(i, [c])))]));
+    box.appendChild(E("div", { class: "card panel" }, [E("h2", { text: "The week day by day" }), E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["Day", "Closes", "Sales", "Cash diff", "BOV diff", "Total diff", "Review"].map((h, k) => E("th", { class: k >= 1 && k <= 5 ? "num" : "", text: h })))]),
+      E("tbody", null, ds.map((d) => { const x = wk.days[d] || {}; const s = dayStatus(c, d); return E("tr", null, [E("td", { text: dayShort(d) }), E("td", { class: "num", text: x.n || "–" }), E("td", { class: "num", text: x.n ? eur(x.sales) : "–" }), E("td", { class: "num", text: x.n ? sEur(x.cash) : "–" }), E("td", { class: "num", text: x.n ? sEur(x.bov) : "–" }), E("td", { class: "num " + ((x.diff || 0) < -2 ? "down" : ""), text: x.n ? sEur(x.diff) : "–" }),
+        E("td", null, [E("span", { class: "pill" + (s === "reviewed" ? "" : s === "none" || s === "before" ? " grey" : s === "changed" ? " red" : " warn"), text: s === "reviewed" ? "Reviewed" : s === "none" ? "No figures" : s === "before" ? "Before the hub" : s === "changed" ? "Changed" : "To review" })])]); })
+        .concat([E("tr", { class: "tot" }, [E("td", { text: "Week" }), E("td", { class: "num", text: int(sum(ds.map((d) => (wk.days[d] || {}).n))) }), E("td", { class: "num", text: eur(sum(ds.map((d) => (wk.days[d] || {}).sales))) }), E("td", { class: "num", text: sEur(sum(ds.map((d) => (wk.days[d] || {}).cash))) }), E("td", { class: "num", text: sEur(sum(ds.map((d) => (wk.days[d] || {}).bov))) }), E("td", { class: "num", text: sEur(sum(ds.map((d) => (wk.days[d] || {}).diff))) }), E("td")])]))])])]));
+  }
+
+  // ═════════ EMAILS (through the hub's email feed; the ROM, and accounts for sign-offs) ═════════
+  const hubUrl = () => location.href.split("#")[0].split("?")[0];
+  async function sendMail(c, kind, subject, html, extra) {
+    const id = c + "-" + kind + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+    await fs.setDoc(outbox(id), Object.assign({ code: c, kind, subject, html, by: me.email, byName: me.name, at: Date.now() }, extra || {}));
+  }
+  function confirmHtml(c, w, its) {
+    const open = its.filter(isOpen), act = its.filter((i) => i.action);
+    return mailWrap(nameOf(c) + " · cash week signed off · " + wkLabel(w, ST[c]),
+      "<p>" + esc(me.name) + " (Store Manager) signed off the cash sheet for " + esc(wkLabel(w, ST[c])) + ": all 7 days reviewed and every flag resolved. Please verify it in the hub; verifying emails it to accounts.</p>" +
+      (open.length ? '<p style="color:#C5121A"><b>' + open.length + " item" + (open.length === 1 ? "" : "s") + " for you to resolve first:</b></p><ul>" + open.map(itemLine).join("") + "</ul>" : "<p>Nothing is open.</p>") +
+      (act.length > open.length ? "<p>Already resolved this week: " + (act.length - open.length) + ".</p>" : ""));
+  }
+  const mailWrap = (title, body) => '<div style="font-family:Arial,sans-serif;font-size:14px;color:#10252b;max-width:760px"><div style="border-bottom:3px solid #EC1B24;padding-bottom:8px;margin-bottom:14px"><b style="font-size:18px">' + esc(title) + '</b></div>' + body +
+    '<p style="margin:20px 0"><a href="' + esc(hubUrl()) + '" style="background:#EC1B24;color:#fff;padding:11px 16px;border-radius:9px;font-weight:bold;text-decoration:none;display:inline-block">Open the Cash Sheet Analyser</a></p><p style="color:#60727a;font-size:12px">Sent by the SPAR Malta Hub.</p></div>';
+  const itemLine = (i) => "<li><b>" + esc(i.who || "") + (i.num ? " (" + esc(i.num) + ")" : "") + "</b> · " + esc(dayShort(i.date)) + (i.tags ? " · " + esc(i.tags.join(", ")) : "") + (i.amt != null ? " · " + esc(sEur(i.amt)) : "") + "<br>" + esc(i.text || "") +
+    (i.com ? '<br><span style="color:#60727a">Comment: ' + esc(i.com) + "</span>" : "") + (i.note && i.note.smNote ? '<br><span style="color:#55656b">Store Manager (' + esc(i.note.smName || "") + "): " + esc(i.note.smNote) + "</span>" : "") +
+    (i.note && i.note.romNote ? '<br><span style="color:#55656b">ROM (' + esc(i.note.romName || "") + "): " + esc(i.note.romNote) + "</span>" : "") +
+    (i.note && i.note.resolved ? '<br><span style="color:#00703C">Resolved by ' + esc(i.note.resolvedName || "") + "</span>" : "") + "</li>";
+  function reviewHtml(c, d, rows, its) {
+    const info = dayInfo(c, d) || {}, open = its.filter(isOpen), act = its.filter((i) => i.action);
+    return mailWrap(nameOf(c) + " · cash review · " + dayShort(d),
+      "<p>" + esc(me.name) + " (" + (me.role === "rom" ? "ROM" : "Store Manager") + ") reviewed " + esc(dayShort(d)) + ": " + info.n + " closes, sales " + esc(eur(info.sales || 0)) + ", total difference " + esc(sEur(info.diff || 0)) + ".</p>" +
+      (act.length ? "<p><b>Flagged that day (" + act.length + ")</b></p><ul>" + act.map(itemLine).join("") + "</ul>" : "<p>Nothing flagged that day.</p>") +
+      (open.length ? '<p style="color:#C5121A"><b>' + open.length + " still open: please resolve them in the hub.</b></p>" : ""));
+  }
+  function signoffHtml(c, w, rows, its, sg) {
+    const st = ST[c], wk = st.weeks[w], ds = Array.from({ length: 7 }, (_, k) => addDays(w, k));
+    const tr = ds.map((d) => { const x = wk.days[d] || {}; return "<tr><td>" + esc(dayShort(d)) + '</td><td align="right">' + (x.n || 0) + '</td><td align="right">' + esc(eur(x.sales || 0)) + '</td><td align="right">' + esc(sEur(x.cash || 0)) + '</td><td align="right">' + esc(sEur(x.bov || 0)) + '</td><td align="right">' + esc(sEur(x.diff || 0)) + "</td></tr>"; }).join("");
+    const act = its.filter((i) => i.action);
+    return mailWrap("Cash Report · " + nameOf(c) + " · " + wkLabel(w, st),
+      "<p>The cash sheet for <b>" + esc(nameOf(c)) + "</b>, week " + esc(wkLabel(w, st)) + ", was signed off by the Store Manager (" + esc(sg.storeName) + ", " + esc(SPARUI.fmtDateTime(sg.storeAt)) + ") and verified by the ROM, <b>" + esc(sg.romName) + "</b>, on " + esc(SPARUI.fmtDateTime(sg.romAt)) + ".</p>" +
+      (sg.fileId ? "<p>The cash sheet is attached" + (sg.fileUrl ? ' (also <a href="' + esc(sg.fileUrl) + '">on Drive</a>)' : "") + ".</p>" : sg.fileUrl ? '<p><a href="' + esc(sg.fileUrl) + '"><b>Open the cash sheet (Excel)</b></a></p>' : "<p>(The file itself wasn't saved to Drive; please ask the store for it.)</p>") +
+      '<table cellpadding="6" style="border-collapse:collapse;font-size:13px"><tr style="background:#F1F2F2"><th align="left">Day</th><th align="right">Closes</th><th align="right">Sales</th><th align="right">Cash diff</th><th align="right">BOV diff</th><th align="right">Total diff</th></tr>' + tr + "</table>" +
+      (act.length ? "<p><b>Items flagged this week and how they were resolved (" + act.length + ")</b></p><ul>" + act.map(itemLine).join("") + "</ul>" : "<p>Nothing was flagged this week.</p>"));
+  }
+
+  // ═════════ UPLOAD ═════════
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("Couldn't load the Excel reader.")); document.head.appendChild(s); });
+  }
+  function renderUpload(codes) {
+    const box = $("upHist"); box.innerHTML = "";
+    const list = []; codes.forEach((c) => ((ST[c] && ST[c].uploads) || []).forEach((u) => list.push({ ...u, c })));
+    list.sort((a, b) => b.at - a.at);
+    box.append(E("h2", { text: "Recent uploads" }), list.length ? E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["When", "Store", "File", "Latest close", "Uploaded by", "Saved to Drive"].map((h) => E("th", { text: h })))]),
+      E("tbody", null, list.slice(0, 60).map((u) => E("tr", null, [E("td", { text: SPARUI.fmtDateTime(u.at) }), E("td", { text: nameOf(u.c) }), E("td", { text: u.file }), E("td", { text: u.latest ? dayShort(u.latest) : "–" }), E("td", { text: u.byName || "" }), E("td", { text: u.drive ? "Yes" : "No" })])))])]) : E("p", { class: "note", text: "Nothing uploaded yet." }));
+  }
+  let pending = null;
+  async function takeFile(file) {
+    const box = $("upMsg"); box.innerHTML = ""; pending = null;
+    if (!file) return;
+    box.appendChild(E("p", { class: "note", text: "Reading " + file.name + "…" }));
+    let p, A;
+    try {
+      const X = await loadXLSX();
+      const wb = X.read(await file.arrayBuffer(), { type: "array", cellFormula: true });
+      p = C.parseBook(X, wb, file.name);
+    } catch (e) { box.innerHTML = ""; box.appendChild(E("p", { class: "msg err", text: "Couldn't read this file: " + (e.message || e) })); return; }
+    box.innerHTML = "";
+    if (!p.closes.length) { box.appendChild(E("p", { class: "msg err", text: "No closes found. Is this the store's Cash Report (sheets Wk_01, Wk_02… with a block per day)?" })); return; }
+    // which store: the file name says it; a single-store login can only be that store
+    let code = p.code && byCode[p.code] ? p.code : null;
+    const mine = stores.map((s) => s.code);
+    const pick = E("select", { class: "in", style: "max-width:320px" }, mine.map((m) => E("option", { value: m, text: nameOf(m) })));
+    let warn = "";
+    if (code && mine.includes(code) && !canUpload(code)) { box.appendChild(E("p", { class: "msg err", text: "The accounts team can look at the cash sheets but not upload them." })); return; }
+    if (code && !mine.includes(code)) { box.appendChild(E("p", { class: "msg err", text: "This file is for " + nameOf(code) + " (" + code + "), which isn't one of your stores. You can only upload your own store's cash sheet." })); return; }
+    if (!code) { code = single() ? scope().codes[0] : mine[0]; warn = "The file name doesn't say which store it is (it should end “- " + code + "”). Check the store below."; }
+    pick.value = code; pick.disabled = !!(p.code && byCode[p.code]);
+    A = C.analyse(p);
+    // keep the last 26 weeks
+    const cut = addDays(mondayOf(A.latest), -7 * (KEEP_WEEKS - 1));
+    const opened = [A.flags, A.missing, A.bags, A.issues].map((l) => l.filter((i) => i.action && (!i.date || i.date >= cut)).length);
+    box.append(E("div", { class: "card", style: "padding:14px 16px;background:#FBFCFB" }, [
+      warn ? E("p", { class: "msg warn", text: warn }) : null,
+      E("div", { class: "row", style: "align-items:flex-end" }, [E("label", { class: "note", style: "display:flex;flex-direction:column;gap:4px;font-weight:700" }, ["Store", pick]),
+        E("div", null, [E("b", { text: file.name }), E("span", { class: "sub2", text: plural(p.closes.length, "close") + " from " + dayShort(A.first) + " to " + dayShort(A.latest) + " · " + plural(Object.keys(p.weeks).length, "week") })])]),
+      E("p", { style: "margin:10px 0", text: "Found: " + plural(opened[0], "flag") + " needing action, " + plural(opened[1], "missing field") + ", " + plural(opened[2], "safe bag problem") + ", " + plural(opened[3], "data issue") + " (before any notes already written)." }),
+      E("div", { class: "row" }, [E("button", { class: "btn", type: "button", text: "Save and check", onclick: async (ev) => { ev.target.disabled = true; await save(pick.value, file, p, A, box); } }), E("button", { class: "btn secondary", type: "button", text: "Cancel", onclick: () => { box.innerHTML = ""; } })])].filter(Boolean)));
+  }
+  async function toB64(file) { const b = new Uint8Array(await file.arrayBuffer()); let s = ""; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return btoa(s); }
+  async function save(code, file, p, A, box) {
+    const msg = E("p", { class: "note", text: "Saving…" }); box.appendChild(msg);
+    try {
+      await loadStore(code, true);
+      const prev = ST[code], prevAct = new Set();
+      if (prev && prev.A) ["flags", "missing", "bags", "issues"].forEach((l) => (prev.A[l] || []).forEach((i) => { if (i.action) prevAct.add(i.id); }));
+      const cut = addDays(mondayOf(A.latest), -7 * (KEEP_WEEKS - 1));
+      // week documents (the closes, for the daily review) and the per-day summary
+      const byWeek = {}; A.dates.forEach(() => {});
+      const rows = p.closes.filter((c) => c.date >= cut && (c.active || c.num || c.name)).map((c) => ({ date: c.date, wk: c.wk, row: c.row, num: c.num, name: c.name, sc: c.sc, ac: c.ac, sb: c.sb, ab: c.ab, sp: c.sp, ap: c.ap, cr: c.cr, bag: c.bag, com: c.com, cl: c.cl, dep: c.dep, cash: c.cash, bov: c.bov, tot: c.tot, ts: c.ts }));
+      rows.forEach((r) => { (byWeek[mondayOf(r.date)] = byWeek[mondayOf(r.date)] || []).push(r); });
+      const weeks = {};
+      Object.entries(byWeek).forEach(([w, list]) => {
+        const days = {};
+        [...new Set(list.map((r) => r.date))].forEach((d) => { const l = list.filter((r) => r.date === d), act = l.filter((r) => [r.sc, r.ac, r.sb, r.ab, r.sp, r.ap].some((x) => x)); days[d] = { n: act.length, hash: C.dayHash(l), sales: Math.round(sum(act.map((r) => (r.sc || 0) + (r.sb || 0) + (r.sp || 0))) * 100) / 100, cash: Math.round(sum(act.map((r) => r.cash)) * 100) / 100, bov: Math.round(sum(act.map((r) => r.bov)) * 100) / 100, diff: Math.round(sum(act.map((r) => r.tot)) * 100) / 100 }; if (!act.length) delete days[d]; });
+        const sheet = list[0].wk; weeks[w] = { label: sheet.replace(/wk[_\s]*/i, "WK"), n: sum(Object.values(days).map((x) => x.n)), days };
+      });
+      // what changed since the last upload
+      const changedReviewed = [], changedSigned = [];
+      Object.entries(weeks).forEach(([w, wk]) => Object.entries(wk.days).forEach(([d, x]) => { const rv = DAYS[code][d]; if (rv && rv.reviewed && rv.hash !== x.hash) changedReviewed.push(d); }));
+      Object.keys(SIGN[code] || {}).forEach((w) => { const s = SIGN[code][w], wk = weeks[w]; if (wk && Object.keys(s.hashes || {}).some((d) => ((wk.days[d] || {}).hash || "") !== s.hashes[d])) changedSigned.push(w); });
+      // a copy of the file on Drive, for accounts (one per store per week; replaced by each upload that week)
+      let fileUrl = prev && prev.fileUrl && prev.fileWeek === mondayOf(A.latest) ? prev.fileUrl : "", fileId = prev && prev.fileWeek === mondayOf(A.latest) ? prev.fileId || "" : "", drive = false;
+      if (window.SPAR_UPLOAD_URL) {
+        try {
+          msg.textContent = "Saving a copy of the file…";
+          const idToken = fb.user && fb.user.getIdToken ? await fb.user.getIdToken() : "";
+          const r = await fetch(window.SPAR_UPLOAD_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "upload", kind: "cash", idToken, store: code, storeName: nameOf(code), week: mondayOf(A.latest), filename: file.name, mime: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: await toB64(file) }) });
+          const j = await r.json(); if (j.ok) { fileUrl = j.url; fileId = j.id || ""; drive = true; }
+        } catch (e) {}
+      }
+      msg.textContent = "Saving the checks…";
+      const trim = (l) => l.filter((i) => !i.date || i.date >= cut);
+      const stA = { flags: trim(A.flags), missing: trim(A.missing), bags: trim(A.bags), issues: trim(A.issues), sellers: A.sellers, bagList: A.bagList.filter((b) => b.date >= addDays(mondayOf(A.latest), -7 * 5)), dates: A.dates.filter((d) => d >= cut), first: A.dates.find((d) => d >= cut) || A.first, latest: A.latest, limit: A.limit };
+      const uploads = [{ at: Date.now(), by: me.email, byName: me.name, file: file.name, latest: A.latest, drive }].concat((prev && prev.uploads) || []).slice(0, 30);
+      const b = fs.writeBatch(db);
+      Object.entries(byWeek).forEach(([w, list]) => { const old = prev && prev.weeks && prev.weeks[w]; if (old && JSON.stringify(old.days) === JSON.stringify(weeks[w].days) && old.n === weeks[w].n) return; b.set(SP(code, "weeks", w), { week: w, label: weeks[w].label, rows: JSON.stringify(list), at: Date.now() }); });
+      const startWeek = (prev && prev.startWeek) || addDays(mondayOf(A.latest > today() ? today() : A.latest), -7);
+      b.set(SP(code, "state", "latest"), { a: JSON.stringify(stA), weeks, startWeek, latest: A.latest, at: Date.now(), by: me.email, byName: me.name, file: file.name, fileUrl, fileId, fileWeek: mondayOf(A.latest), uploads });
+      await b.commit();
+      Object.keys(WEEKROWS).forEach((k) => { if (k.startsWith(code + "|")) delete WEEKROWS[k]; });
+      // tell the ROM: new issues, and anything changed after review or sign-off
+      const sw = startWeek;
+      const newAct = [].concat(stA.flags, stA.missing, stA.bags, stA.issues).filter((i) => i.action && !prevAct.has(i.id) && !(NOTES[code][docId(i.id)] || {}).resolved && (!i.date || i.date >= sw));
+      if (prev && newAct.length) await sendMail(code, "issues", "SPAR Cash · " + nameOf(code) + " · " + plural(newAct.length, "new issue"), mailWrap(nameOf(code) + " · new cash sheet issues",
+        "<p>" + esc(me.name) + " uploaded the cash sheet (up to " + esc(dayShort(A.latest)) + "). New items to follow up:</p><ul>" + newAct.slice(0, 40).map(itemLine).join("") + "</ul>" + (newAct.length > 40 ? "<p>…and " + (newAct.length - 40) + " more.</p>" : "")));
+      if (changedReviewed.length || changedSigned.length) await sendMail(code, "changed", "SPAR Cash · " + nameOf(code) + " · figures changed after review", mailWrap(nameOf(code) + " · cash sheet changed",
+        "<p>" + esc(me.name) + " uploaded a cash sheet that changes figures already checked:</p><ul>" + changedReviewed.map((d) => "<li>" + esc(dayShort(d)) + " was reviewed, and has changed. It needs reviewing again.</li>").join("") +
+        changedSigned.map((w) => "<li>" + esc(wkLabel(w, { weeks })) + " was signed off and emailed to accounts, and has changed. It needs signing off again.</li>").join("") + "</ul>"));
+      await loadStore(code, true);
+      box.innerHTML = "";
+      box.appendChild(E("p", { class: "msg ok", text: "Saved and checked up to " + dayShort(A.latest) + "." + (newAct.length && prev ? " " + plural(newAct.length, "new issue") + " (the ROM is emailed)." : "") + (changedReviewed.length ? " " + plural(changedReviewed.length, "reviewed day") + " changed and need reviewing again." : "") + (drive ? "" : window.SPAR_UPLOAD_URL ? " (A copy of the file couldn't be saved to Drive; the sign-off email will have the summary only.)" : "") }));
+      $("scope").value = "s:" + code; render();
+    } catch (e) { msg.className = "msg err"; msg.textContent = "Couldn't save: " + (e.code === "permission-denied" ? "you don't have access to this store." : e.code || e.message); }
+  }
+  $("file").onchange = () => { takeFile($("file").files[0]); $("file").value = ""; };
+  ["dragenter", "dragover"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("drag"); }));
+  $("drop").addEventListener("drop", (e) => takeFile([...e.dataTransfer.files].find((f) => /\.xls[xm]?$/i.test(f.name))));
+
+  render();
+</script>
+</body>
+</html>

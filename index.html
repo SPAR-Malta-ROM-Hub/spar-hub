@@ -61,7 +61,7 @@
 
     var groups = {}, order = [];
     SPARUI.MODULES.forEach(function (m) {
-      if (isDept ? m.id !== "dap" : (m.who !== "all" && m.who.indexOf(me.role) < 0)) return;
+      if (isDept ? m.id !== "dap" : (m.who !== "all" && m.who.indexOf(me.role) < 0 && !(m.alsoIf && me[m.alsoIf]))) return;
       if (!groups[m.group]) { groups[m.group] = []; order.push(m.group); }
       groups[m.group].push(m);
     });

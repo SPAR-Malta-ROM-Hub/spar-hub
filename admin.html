@@ -85,6 +85,9 @@ tr.inactive td{color:var(--muted)}
             <label class="checkline" style="font-weight:400"><input type="radio" name="pSales" value="groups"> Only these category groups:</label>
             <div class="storeboxes" id="pGroups" style="margin-left:26px"></div>
           </div>
+          <div class="f" id="pCashWrap" hidden>
+            <label class="checkline" style="font-weight:400"><input type="checkbox" id="pCash"> <b>Accounts team</b>: can see the Cash Sheet Analyser for every store (read only). Other Head Office and Support people don't see it.</label>
+          </div>
           <div class="row" style="margin-top:6px">
             <button class="btn" id="pSave" type="submit">Add person</button>
             <button class="btn secondary" id="pCancel" type="button" hidden>Cancel</button>
@@ -240,6 +243,7 @@ tr.inactive td{color:var(--muted)}
     $("pStoreOne").hidden = !SINGLE(role);
     $("pStoreMany").hidden = !MULTI(role);
     $("pDeptWrap").hidden = role !== "dept";
+    $("pCashWrap").hidden = !["hq", "support"].includes(role);
     const sel = $("pStore"), keep = sel.value;
     sel.innerHTML = "";
     sel.appendChild(new Option(stores.length ? "Choose a store…" : "No stores yet: add them under Stores", ""));
@@ -333,14 +337,15 @@ tr.inactive td{color:var(--muted)}
       ? [...$("pGroups").querySelectorAll("input:checked")].map((x) => x.value) : [];
     if (document.querySelector('input[name=pSales][value=groups]').checked && !salesGroups.length) { say("pMsg", "Tick at least one category group, or choose Full store figures.", "err"); return; }
     if (role === "dept" && !dept) { say("pMsg", "Enter the department, e.g. Maintenance.", "err"); return; }
+    const cashAccess = ["hq", "support"].includes(role) && $("pCash").checked;
     if (editing === me.email && role !== "admin") { say("pMsg", "You can't remove your own admin role.", "err"); return; }
     $("pSave").disabled = true;
     try {
       if (editing) {
-        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, updatedAt: Date.now(), updatedBy: me.email });
+        await fs.updateDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, cashAccess, updatedAt: Date.now(), updatedBy: me.email });
         say("pMsg", `${name || email} updated.`);
       } else {
-        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, addedBy: me.email, addedAt: Date.now() });
+        await fs.setDoc(fs.doc(db, "members", email), { name, role, stores: st, dept, salesGroups, cashAccess, addedBy: me.email, addedAt: Date.now() });
         const existed = await createLogin(email);
         say("pMsg", existed
           ? `${name || email} added. They already had a login, so they can sign in now.`
@@ -364,6 +369,7 @@ tr.inactive td{color:var(--muted)}
         m.role === "dept" ? "DAP tasks for " + (m.dept || "?")
         : ["admin", "hq", "support"].includes(m.role) ? "All stores"
         : (m.stores || []).length ? m.stores.map(storeName).join(", ") : "⚠ No store assigned" });
+      if (m.cashAccess) stTd.appendChild(E("div", { class: "note", text: "Accounts team: sees the Cash Sheet Analyser" }));
       if ((m.salesGroups || []).length) stTd.appendChild(E("div", { class: "note", text: "Sales: " + m.salesGroups.map((g) => (salesGroups.find((x) => x.id === g) || { name: g }).name).join(", ") + " only" }));
       const acts = E("div", { class: "acts" });
       acts.appendChild(E("button", { class: "btn secondary small", type: "button", text: "Edit", onclick: () => startEdit(m) }));
@@ -388,6 +394,7 @@ tr.inactive td{color:var(--muted)}
     $("pDept").value = m.dept || "";
     renderStorePickers(m.stores || []);
     renderGroupPicker(m.salesGroups || []);
+    $("pCash").checked = !!m.cashAccess;
     $("pFormTitle").textContent = "Edit " + (m.name || m.email);
     $("pSave").textContent = "Save changes";
     $("pCancel").hidden = false;

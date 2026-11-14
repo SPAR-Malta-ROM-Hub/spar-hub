@@ -112,7 +112,7 @@
       { group: "Sales & stock", id: "units", icon: "📦", name: "Unit Sales", desc: "Weekly units by item: lookup, best and worst sellers, zero-sales gaps, ordering suggestions.", who: "all", page: "units.html" },
       { group: "Sales & stock", id: "waste", icon: "🗑️", name: "Waste Tracker", desc: "Log waste by department and reason; spot the trends.", who: "all" },
       { group: "Sales & stock", id: "gaps", icon: "🔍", name: "Gap Check Tracker", desc: "Each store uploads its daily 1pm gap check: out of stock, stock on system, suppliers, daily brief.", who: "all", page: "gaps.html" },
-      { group: "Cash", id: "cash", icon: "💶", name: "Cash Sheet Analyser", desc: "Weekly cash sheets, cashier unders and overs, unders check.", who: "all" },
+      { group: "Cash", id: "cash", icon: "💶", name: "Cash Sheet Analyser", desc: "Each store uploads its cash sheet daily: unders and overs, seller codes, safe bags, daily review and weekly sign-off to accounts.", who: ["admin", "rom", "sm"], alsoIf: "cashAccess", page: "cash.html" },
       { group: "Cash", id: "safe", icon: "🔐", name: "Safe Count", desc: "Daily safe counts by denomination, checked against the expected balance.", who: "all" },
       { group: "Cash", id: "coins", icon: "🪙", name: "Coin Order", desc: "Order change for the store's floats and track deliveries.", who: "all" },
       { group: "Checklists", id: "sm-checklist", icon: "✅", name: "Store Manager Weekly Checklist", desc: "Daily and weekly store tasks, ticked off with notes.", who: "all" },
