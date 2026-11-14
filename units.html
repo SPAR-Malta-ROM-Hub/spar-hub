@@ -11,6 +11,7 @@
 <script src="firebase-config.js"></script>
 <script src="spar-runtime.js"></script>
 <script src="spar-ui.js"></script>
+<script src="hub-reports.js"></script>
 <link rel="stylesheet" href="spar.css">
 <style>
 .bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
@@ -175,10 +176,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   const wkDoc = (c, w) => SP(c, "wk", w), totDoc = (c, w) => SP(c, "wtot", w), dayDoc = (c, d) => SP(c, "days", d), hrDoc = (c, w) => SP(c, "hours", w), metaDoc = (c) => SP(c, "meta", "days");
   const gwDoc = (g, c, w) => GP(g, c, "wk", w), gDayDoc = (g, c, d) => GP(g, c, "days", d), gHrDoc = (g, c, w) => GP(g, c, "hours", w), gMetaDoc = (g, c) => GP(g, c, "meta", "days");
 
-  // Item rows are saved as one compact text field per week: "code:q,q,q,q,q,q,q|code:…" (Sat → Fri)
-  const encode = (items) => [...items].map(([c, q]) => c + ":" + q.map((v) => v ? +v.toFixed(3) : "").join(",")).join("|");
-  const encodeTot = (items) => [...items].map(([c, q]) => c + ":" + +sum(q).toFixed(3)).join("|");
-  const decodeTot = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), +p.slice(i + 1)); }); return m; };
+  // Reading and saving the report files lives in hub-reports.js, shared with the automatic import from email
+  const { encode, encodeTot, decodeTot, encodeDay, decodeDay, decode, dayTotal, hourTot } = HubReports;
   // gzip + base64 for the item list (about 5x smaller)
   async function gz(str) {
     const cs = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
@@ -190,10 +189,6 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
     return await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
   }
-  // a day's hourly rows: "code:6=2,13=1|code:…" (hour=units)
-  const encodeDay = (items) => [...items].map(([c, h]) => c + ":" + Object.keys(h).map((k) => k + "=" + +h[k].toFixed(3)).join(",")).join("|");
-  const decodeDay = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); const h = {}; p.slice(i + 1).split(",").forEach((x) => { const [k, v] = x.split("="); if (k) h[+k] = +v; }); m.set(p.slice(0, i), h); }); return m; };
-  const decode = (s) => { const m = new Map(); if (!s) return m; s.split("|").forEach((p) => { const i = p.lastIndexOf(":"); m.set(p.slice(0, i), p.slice(i + 1).split(",").map((v) => v ? +v : 0)); }); return m; };
 
   // ═════════ STORES, GROUPS, ACCESS ═════════
   const stores = me.stores.slice();
@@ -711,47 +706,8 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
 
   // ═════════ UPLOAD ═════════
-  const toISO = (v, X) => {
-    if (v == null || v === "") return null;
-    if (typeof v === "number" && X) { const p = X.SSF.parse_date_code(v); return p ? p.y + "-" + pad(p.m) + "-" + pad(p.d) : null; }
-    if (v instanceof Date) return iso(v);
-    const s = String(v).trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
-    m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/); if (m) return m[3] + "-" + pad(+m[2]) + "-" + pad(+m[1]);
-    return null;
-  };
-  // One store's daily hourly file: Outlet / Report From / Report To, then Item Code, Description and one column per hour
-  function parseHourly(rows, X) {
-    const lab = (r) => String((rows[r] || [])[0] || "").trim().toLowerCase();
-    const outlet = String((rows[0] || [])[1] || "").trim();
-    if (lab(0) !== "outlet") throw new Error("This isn't an hourly item sales file (no Outlet line at the top).");
-    const from = toISO((rows[1] || [])[1], X), to = toISO((rows[2] || [])[1], X);
-    if (!from) throw new Error("The report date wasn't found.");
-    if (to && to !== from) throw new Error("This file covers more than one day (" + from + " to " + to + "). Use the daily file.");
-    const hr = rows.findIndex((r) => String((r || [])[0] || "").trim().toLowerCase() === "item code");
-    if (hr < 0) throw new Error("The Item Code heading wasn't found.");
-    const hcols = [];   // [column, hour]
-    (rows[hr] || []).forEach((v, c) => { const m = String(v || "").match(/^(\d{1,2}):\d{2}\s*>/); if (m) hcols.push([c, +m[1]]); });
-    if (!hcols.length) throw new Error("No hour columns were found.");
-    const items = new Map(), names = {}, tot = Array(24).fill(0);
-    for (let r = hr + 1; r < rows.length; r++) {
-      const row = rows[r] || [], code = row[0];
-      if (code == null || code === "") continue;   // the Totals line has no item code
-      const k = String(code).trim(), h = {};
-      hcols.forEach(([c, hour]) => { const q = +row[c] || 0; if (q) { h[hour] = Math.round(((h[hour] || 0) + q) * 1000) / 1000; tot[hour] += q; } });
-      if (!Object.keys(h).length) continue;
-      const prev = items.get(k); if (prev) Object.keys(h).forEach((x) => { prev[x] = (prev[x] || 0) + h[x]; }); else items.set(k, h);
-      if (!ITEMS.has(k) && row[1]) names[k] = String(row[1]).trim();
-    }
-    const num0 = (outlet.match(/^(\d+)/) || [])[1];
-    return { outlet, num: num0, date: from, items, names, tot: tot.map((v) => Math.round(v * 1000) / 1000), hours: hcols.map((x) => x[1]) };
-  }
-  function matchOutlet(n, outlet) {
-    const byRep = n ? me.allStores.find((s) => String(s.report || "").toLowerCase().replace(/\s/g, "") === "report-" + n) : null;
-    if (byRep) return byRep.code;
-    const t = outlet.toLowerCase().replace(/^\d+\s*-\s*/, "").replace(/[^a-z0-9]+/g, "");
-    const s = me.allStores.find((x) => x.name.toLowerCase().replace(/[^a-z0-9]+/g, "") === t);
-    return s ? s.code : "";
-  }
+  const parseHourly = (rows, X) => HubReports.parseHourly(rows, X, (k) => ITEMS.has(k));
+  const matchOutlet = (n, outlet) => HubReports.matchOutlet(me.allStores, n, outlet);
   let pending = [];
   SPARUI.uploader("upHost", { title: "Upload Hourly Item Sales", noun: "hourly sales files", button: "Upload Selected Hourly Files", accept: ".xlsx,.xls", id: "file",
     onUpload: async (files) => {
@@ -797,37 +753,15 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     pv.append(E("div", { class: "tablewrap" }, [E("table", null, [E("thead", null, [E("tr", null, ["File", "Store", "Day", "Contents", ""].map((h, i) => E("th", { class: i === 3 ? "num" : "", text: h })))]), tb])]),
       E("div", { class: "row", style: "margin-top:12px" }, [go, E("button", { class: "btn secondary", type: "button", text: "Clear", onclick: () => { pending = []; showPending(); } }), E("span", { class: "note", id: "upMsg" })]));
   }
-  // a set of items split into each category group's own copy
-  function groupItems(g, items) { const m = new Map(); items.forEach((q, code) => { if (inGroup(g, ITEMS.get(code))) m.set(code, q); }); return m; }
-  const hourTot = (items) => { const t = Array(24).fill(0); items.forEach((h) => Object.keys(h).forEach((k) => { t[k] += h[k]; })); return t.map((v) => Math.round(v * 1000) / 1000); };
-  const dayTotal = (h) => sum(Object.values(h));
   // Save one store's day, and fold it into that store's Monday–Sunday week (and each category group's copies)
   async function saveDay(code, p, file) {
-    const at = Date.now(), mon = mondayOf(p.date), di = (new Date(p.date + "T12:00:00").getDay() + 6) % 7;
-    const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
-    const [wkSnap, hrSnap, ...gHrSnaps] = await Promise.all([fs.getDoc(wkDoc(code, mon)), fs.getDoc(hrDoc(code, mon)), ...GROUPS.map((g) => fs.getDoc(gHrDoc(g.id, code, mon)))]);
-    // the week: units per item per day (Mon–Sun), with this day replaced
-    const wk = wkSnap.exists() ? decode(wkSnap.data().data) : new Map();
-    wk.forEach((q) => { q[di] = 0; });
-    p.items.forEach((h, k) => { const q = wk.get(k) || wk.set(k, [0, 0, 0, 0, 0, 0, 0]).get(k); q[di] = Math.round(dayTotal(h) * 1000) / 1000; });
-    [...wk.keys()].forEach((k) => { if (!sum(wk.get(k))) wk.delete(k); });
-    const H = hrSnap.exists() ? (hrSnap.data().h || {}) : {}; H[p.date] = p.tot;
-    const has = days.map((d) => !!H[d]);
-    const base = { code, at, by: me.email };
+    const R = HubReports.unitsReads(code, p.date, GROUPS);
+    const [wkSnap, hrSnap, ...gHrSnaps] = await Promise.all([fs.getDoc(fs.doc(db, ...R.wk)), fs.getDoc(fs.doc(db, ...R.hr)), ...R.g.map((x) => fs.getDoc(fs.doc(db, ...x)))]);
+    const at = Date.now();
+    const writes = HubReports.unitsWrites({ code, p, file, wkData: wkSnap.exists() ? wkSnap.data().data : null, H: hrSnap.exists() ? hrSnap.data().h : null,
+      gH: gHrSnaps.map((s) => s.exists() ? s.data().h : null), groups: GROUPS, itemOf: (c) => ITEMS.get(c), by: me.email, at });
     const b = fs.writeBatch(db);
-    b.set(dayDoc(code, p.date), { ...base, date: p.date, file: file || "", outlet: p.outlet || "", n: p.items.size, tot: p.tot, names: p.names || {}, data: encodeDay(p.items) });
-    b.set(wkDoc(code, mon), { ...base, week: mon, days, has, n: wk.size, data: encode(wk) });
-    b.set(totDoc(code, mon), { ...base, week: mon, days, has, n: wk.size, data: encodeTot(wk) });
-    b.set(hrDoc(code, mon), { ...base, week: mon, h: H });
-    b.set(metaDoc(code), { days: { [p.date]: at }, at }, { merge: true });
-    GROUPS.forEach((g, i) => {
-      const gd = groupItems(g, p.items), gw = groupItems(g, wk);
-      const GH = gHrSnaps[i].exists() ? (gHrSnaps[i].data().h || {}) : {}; GH[p.date] = hourTot(gd);
-      b.set(gDayDoc(g.id, code, p.date), { ...base, gid: g.id, date: p.date, n: gd.size, tot: GH[p.date], data: encodeDay(gd) });
-      b.set(gwDoc(g.id, code, mon), { ...base, gid: g.id, week: mon, days, has, n: gw.size, data: encode(gw) });
-      b.set(gHrDoc(g.id, code, mon), { ...base, gid: g.id, week: mon, h: GH });
-      b.set(gMetaDoc(g.id, code), { days: { [p.date]: at }, at }, { merge: true });
-    });
+    writes.forEach((w) => b.set(fs.doc(db, ...w.path), w.data, w.merge ? { merge: true } : {}));
     await b.commit();                     // everything for this file in one trip
     (META[code] = META[code] || {})[p.date] = at;
   }

@@ -11,6 +11,7 @@
 <script src="firebase-config.js"></script>
 <script src="spar-runtime.js"></script>
 <script src="spar-ui.js"></script>
+<script src="hub-reports.js"></script>
 <link rel="stylesheet" href="spar.css">
 <style>
 .bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:flex-end;padding:14px 18px;margin:0 0 14px}
@@ -390,24 +391,8 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   const groupOf = (id) => GROUPS.find((g) => g.id === id);
 
   // One group's figures from a parsed report (or a saved week): its lines, daily sales, share of the store, waste
-  function groupFigures(g, d) {
-    const G = new Set((g.codes || []).map((x) => String(x).toUpperCase()));
-    const lines = [], sDay = [0, 0, 0, 0, 0, 0, 0]; let ly = 0, w = null;
-    const addTo = (arr, d7) => d7.forEach((v, i) => { arr[i] = Math.round((arr[i] + (v || 0)) * 100) / 100; });
-    (d.depts || []).forEach((x) => {
-      if (!G.has(x.c)) return;
-      lines.push({ c: x.c, n: x.n, d: x.d, ly: x.ly || 0, top: 1 }); addTo(sDay, x.d); ly += x.ly || 0;
-      w = w || [0, 0, 0, 0, 0, 0, 0]; const wd = (d.waste || {})[x.c.toLowerCase()]; if (wd) addTo(w, wd);
-      (d.cats || []).filter((y) => y.p === x.c).forEach((y) => lines.push({ c: y.c, n: y.n, d: y.d, ly: y.ly || 0, p: x.c }));
-    });
-    (d.cats || []).forEach((y) => {
-      if (!G.has(y.c) || G.has(y.p)) return;
-      lines.push({ c: y.c, n: y.n, d: y.d, ly: y.ly || 0, top: 1 }); addTo(sDay, y.d); ly += y.ly || 0;
-    });
-    const storeX = (d.m && d.m.total_inc_vat) || [0, 0, 0, 0, 0, 0, 0];
-    return { gid: g.id, week: d.week, days: d.days, has: d.has, s: sDay, ly: Math.round(ly * 100) / 100,
-      share: sDay.map((v, i) => storeX[i] ? Math.round(v / storeX[i] * 10000) / 10000 : 0), w, lines };
-  }
+  const groupFigures = HubReports.groupFigures;
+
 
 
   // ═════════ DATA ═════════
@@ -2394,70 +2379,9 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     if (window.XLSX) return Promise.resolve(window.XLSX);
     return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("Couldn't load the Excel reader. Check your connection.")); document.head.appendChild(s); });
   }
-  const keyOf = (l) => String(l).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
-  const nv = (v) => { if (v == null || v === "") return 0; const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[,€\s]/g, "")); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
-  function toISO(v, X) {
-    if (v == null || v === "") return null;
-    if (typeof v === "number" && X) { const p = X.SSF.parse_date_code(v); return p ? p.y + "-" + pad(p.m) + "-" + pad(p.d) : null; }
-    if (v instanceof Date) return iso(v);
-    const s = String(v).trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
-    m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/); if (m) return m[3] + "-" + pad(+m[2]) + "-" + pad(+m[1]);
-    return null;
-  }
-  // Reads the weekly department report (the same layout for every store). Based on Keith's reader.
-  function parseReport(rows, X) {
-    const h = rows[0] || [], cols = [], dates = [];
-    for (let c = 0; c < h.length; c++) { const v = h[c]; if (typeof v === "string" && DOWFULL.includes(v.trim())) { cols.push(c); dates.push(toISO(h[c + 1], X)); } }
-    if (cols.length !== 7 || dates.some((d) => !d)) throw new Error("This doesn't look like the daily department report: the Monday to Sunday columns weren't found.");
-    if (new Date(dates[0] + "T12:00:00").getDay() !== 1) throw new Error("The first day in this report isn't a Monday.");
-    const lyCol = h.findIndex((v) => typeof v === "string" && /totals\s*ly/i.test(v));
-    const out = { title: String(h[0] || "").trim(), days: dates, depts: [], cats: [], waste: {}, m: {} };
-    let sec = "sales", cur = null, blk = null;
-    out.tob = {};
-    for (let i = 2; i < rows.length; i++) {
-      const r = rows[i] || []; const code = r[0] == null ? "" : String(r[0]).trim(), label = r[1] == null ? "" : String(r[1]).trim();
-      if (!label) continue;
-      const d = cols.map((c) => nv(r[c]));
-      if (label === "Waste") { sec = "waste"; continue; }
-      if (sec === "sales") {
-        const ly = lyCol >= 0 ? nv(r[lyCol]) : 0;
-        if (/^D\d+\w*$/.test(code)) { cur = code; if (d.some((x) => x) || ly) out.depts.push({ c: code, n: label, d, ly }); continue; }
-        if (/^C\d+\w*$/.test(code)) { if (d.some((x) => x) || ly) out.cats.push({ c: code, n: label, p: cur, d, ly }); continue; }
-        sec = "misc";
-      }
-      if (sec === "waste" && /^D\d+\w*$/.test(code)) { if (d.some((x) => x)) out.waste[code.toLowerCase()] = d; continue; }
-      if (label.startsWith("%")) continue;
-      // Tobacco comes in its own blocks (this week, previous week, previous year…), each a D030 row with its categories
-      if (sec === "misc" && /^D\d+\w*$/.test(code)) blk = keyOf(label);
-      else if (sec === "misc" && /^C\d+\w*$/.test(code) && blk) { (out.tob[blk] = out.tob[blk] || []).push({ c: code, n: label, d }); continue; }
-      else blk = null;
-      let k = keyOf(label); if (/^\d+$/.test(code)) k = "pay_" + k;
-      if (k && !out.m[k]) out.m[k] = d;
-    }
-    if (!out.m.total_inc_vat) throw new Error("The sales totals weren't found in this file.");
-    out.has = out.m.total_inc_vat.map((v, i) => v > 0 || (out.m.total_inc_vat_inc_d030 || [])[i] > 0);
-    out.week = dates[0];
-    return out;
-  }
-  const norm = (s) => String(s || "").toLowerCase().replace(/interspar|eurospar|spar|express|gourmet/g, "").replace(/[^a-z0-9]+/g, "");
-  function matchStore(fname, title) {
-    const m = String(fname).match(/report[-_ ]?(\d+)/i);
-    const byRep = m ? me.allStores.find((s) => String(s.report || "").toLowerCase().replace(/\s/g, "") === "report-" + m[1]) : null;
-    const t = norm(title);
-    const byName = t ? me.allStores.find((s) => norm(s.name) === t) || me.allStores.find((s) => norm(s.name).includes(t) || t.includes(norm(s.name))) : null;
-    return { code: (byRep || byName || {}).code || "", check: byRep && byName && byRep.code !== byName.code ? byName : null };
-  }
-  function summaryOf(p) {
-    const g = (k) => (p.m[k] || [0, 0, 0, 0, 0, 0, 0]).map((v) => v || 0);
-    const tob = g("tobacco_related_products_incl_vat"), tobLW = g("tobacco_related_products_prev_week_incl_vat"), tobLY = g("tobacco_related_products_prev_year_incl_vat");
-    const sx = g("total_inc_vat"), inc = p.m.total_inc_vat_inc_d030 ? g("total_inc_vat_inc_d030") : sx.map((v, i) => v + tob[i]);
-    const plus = (a, b) => a.map((v, i) => Math.round((v + b[i]) * 100) / 100);
-    // Sales = "Total inc VAT inc D030". The report's last week / last year exclude tobacco, so tobacco's own last week / last year are added back.
-    return { v: 2, week: p.week, days: p.days, has: p.has, s: inc, sx, t: g("target_sales"), lw: plus(g("total_prev_week_inc_vat"), tobLW), ly: plus(g("total_prev_year_inc_vat"), tobLY),
-      tobLW, tobLY,
-      c: g("customer_no_current_wk"), clw: g("customer_no_previous_wk"), w: g("total_waste"), tob, n22: g("sales_between_22_00_23_59_inc_vat"), n00: g("sales_between_00_00_06_00_inc_vat"),
-      online: g("online_sales_inc_vat") };
-  }
+  // Reading the report files lives in hub-reports.js, shared with the automatic import from email
+  const { keyOf, nv, toISO, parseReport, summaryOf } = HubReports;
+  const matchStore = (fname, title) => HubReports.matchStore(me.allStores, fname, title);
 
   function renderUpload() {}
   SPARUI.uploader("upHost", { title: "Upload Daily Sales Reports", noun: "sales files", button: "Upload Selected Sales Files", accept: ".xlsx,.xls", id: "file",
@@ -2519,13 +2443,12 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     for (const x of ok) {
       $("upMsg").textContent = "Saving " + (byCode[x.code] || {}).name + "…";
       try {
-        const at = Date.now(), base = { code: x.code, week: x.p.week, file: x.name, title: x.p.title, at, by: me.email };
+        const writes = HubReports.salesWrites(x.code, x.p, x.name, GROUPS, me.email, Date.now());
         const b = fs.writeBatch(db);
-        b.set(wkDoc(x.code, x.p.week), { ...base, v: 2, days: x.p.days, has: x.p.has, depts: x.p.depts, cats: x.p.cats, waste: x.p.waste, m: x.p.m, tob: x.p.tob });
-        b.set(sumDoc(x.code, x.p.week), { ...base, ...summaryOf(x.p) });
-        GROUPS.forEach((g) => { const f = groupFigures(g, x.p); b.set(gwDoc(g.id, x.code, x.p.week), { ...f, code: x.code, at }); delete (GG[g.id] || {})[x.code]; });
+        writes.filter((w) => !w.late).forEach((w) => b.set(fs.doc(db, ...w.path), w.data, w.merge ? { merge: true } : {}));
+        GROUPS.forEach((g) => { delete (GG[g.id] || {})[x.code]; });
         await b.commit();
-        try { await fs.setDoc(metaDoc(x.code), { weeks: { [x.p.week]: x.p.has.filter(Boolean).length }, at }, { merge: true }); } catch (e) {}
+        for (const w of writes.filter((w) => w.late)) { try { await fs.setDoc(fs.doc(db, ...w.path), w.data, { merge: true }); } catch (e) {} }
         delete MW[x.code];
         x.done = true; x.fail = null; n++;
         delete S[x.code]; delete W[x.code + "_" + x.p.week];
