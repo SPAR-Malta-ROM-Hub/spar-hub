@@ -231,7 +231,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
   const room = (c, exceptId) => { const x = D[c]; return r2(Q.CAP - (x.last ? x.last.total : 0) - Q.onWay(x.m, exceptId)); };
 
   // ═════════ OVERVIEW ═════════
-  function kpi(label, val, sub, cls) { return E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function kpi(label, val, sub, cls, go, hint) { return SPARUI.linkTile(E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]), go, hint); }
   function capPanel(c, extra) {
     const x = D[c], safe = x.last ? x.last.total : 0, way = Q.onWay(x.m, extra && extra.exceptId), add = extra ? extra.add : 0, tot = r2(safe + way + add), over = tot > Q.CAP + 0.005;
     const pct = (v) => Math.max(0, Math.min(100, v / Math.max(Q.CAP, tot) * 100)) + "%";
@@ -260,10 +260,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     const ordered = codes.filter((c) => D[c].round), totRound = r2(ordered.reduce((s, c) => s + D[c].round.total, 0));
     const way = r2(codes.reduce((s, c) => s + D[c].onWay, 0)), late = codes.flatMap((c) => D[c].m.orders.filter((o) => o.st === "late"));
     box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
-      kpi("Orders for 9:00 " + dayShort(rd), ordered.length + " of " + codes.length, "stores · " + eur(totRound), ""),
-      kpi("Coins on the way", eur(way), "ordered, not yet delivered", ""),
-      kpi("Not arrived", int(late.length), "past the " + Q.LEAD_DAYS + "-day delivery", late.length ? "red" : "green"),
-      kpi("Act now", int(act.length), "late or not matching", act.length ? "red" : "green")]));
+      kpi("Orders for 9:00 " + dayShort(rd), ordered.length + " of " + codes.length, "stores · " + eur(totRound), "", () => showTab("orders"), "Every order"),
+      kpi("Coins on the way", eur(way), "ordered, not yet delivered", "", () => showTab("orders"), "Every order"),
+      kpi("Not arrived", int(late.length), "past the " + Q.LEAD_DAYS + "-day delivery", late.length ? "red" : "green", () => { fLevel = "act"; showTab("flags"); }, "Late orders"),
+      kpi("Act now", int(act.length), "late or not matching", act.length ? "red" : "green", () => { fLevel = "act"; showTab("flags"); }, "Act now flags")]));
     const rows = codes.map((c) => {
       const x = D[c], f = fl.filter((y) => y.store === c && y.open), lastDel = x.m.orders.filter((o) => o.arr).map((o) => o.arr).sort((a, b) => b.at - a.at)[0];
       const tr = E("tr", { class: "click" }, [E("td", null, [E("b", { text: nameOf(c) }), E("span", { class: "sub2", text: romOf(c) })]),

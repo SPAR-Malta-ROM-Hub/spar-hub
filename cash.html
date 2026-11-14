@@ -339,7 +339,9 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
   }
 
   // ═════════ OVERVIEW ═════════
-  function kpi(label, val, sub, cls) { return E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function kpi(label, val, sub, cls, go, hint) { return SPARUI.linkTile(E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]), go, hint); }
+  const goFlags = (sel) => () => { fSel = sel; showTab("flags"); };
+  const goTab = (t) => () => showTab(t);
   function renderOverview(codes) {
     const box = $("ovBody"); box.innerHTML = "";
     const withData = codes.filter((c) => ST[c] && ST[c].A);
@@ -350,14 +352,14 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const L = (ST[withData[0]].A.limit || 2);
     const unders = F.filter((i) => i.kind === "under"), overs = F.filter((i) => i.kind === "over");
     box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
-      kpi("Outstanding", eur(-sum(out.map((i) => i.amt))), plural(out.length, "under") + " not repaid", out.length ? "red" : ""),
-      kpi("To check", int(toCheck.length), "need a look", toCheck.length ? "amber" : ""),
-      kpi("Unders", int(unders.length), eur(-sum(unders.map((i) => i.amt))) + " beyond −€" + L, unders.length ? "" : ""),
-      kpi("Overs", int(overs.length), eur(sum(overs.map((i) => i.amt))) + " beyond +€" + L, "green"),
-      kpi("Missing fields", int(all.filter((i) => i.list === "missing" && isOpen(i)).length), "still open", all.some((i) => i.list === "missing" && isOpen(i)) ? "amber" : ""),
-      kpi("Safe bags", int(all.filter((i) => i.list === "bags" && isOpen(i)).length), plural(all.filter((i) => i.kind === "bagmin" && isOpen(i)).length, "bag") + " under €" + C.BAG_MIN + " open", all.some((i) => i.kind === "bagmin" && isOpen(i)) ? "red" : all.some((i) => i.list === "bags" && isOpen(i)) ? "amber" : ""),
-      kpi("Data issues", int(all.filter((i) => i.list === "issues" && isOpen(i)).length), plural(all.filter((i) => i.list === "issues" && !i.action).length, "note") + " for information", all.some((i) => i.list === "issues" && isOpen(i)) ? "amber" : ""),
-      kpi("Repayments", int(F.filter((i) => i.kind === "repay").length), plural(F.filter((i) => i.kind === "mix").length, "card/cash mix-up"))]));
+      kpi("Outstanding", eur(-sum(out.map((i) => i.amt))), plural(out.length, "under") + " not repaid", out.length ? "red" : "", goFlags("out"), "The outstanding unders"),
+      kpi("To check", int(toCheck.length), "need a look", toCheck.length ? "amber" : "", goFlags("check"), "The flags to check"),
+      kpi("Unders", int(unders.length), eur(-sum(unders.map((i) => i.amt))) + " beyond −€" + L, unders.length ? "" : "", goFlags("under"), "Every under"),
+      kpi("Overs", int(overs.length), eur(sum(overs.map((i) => i.amt))) + " beyond +€" + L, "green", goFlags("over"), "Every over"),
+      kpi("Missing fields", int(all.filter((i) => i.list === "missing" && isOpen(i)).length), "still open", all.some((i) => i.list === "missing" && isOpen(i)) ? "amber" : "", goTab("missing"), "The Missing tab"),
+      kpi("Safe bags", int(all.filter((i) => i.list === "bags" && isOpen(i)).length), plural(all.filter((i) => i.kind === "bagmin" && isOpen(i)).length, "bag") + " under €" + C.BAG_MIN + " open", all.some((i) => i.kind === "bagmin" && isOpen(i)) ? "red" : all.some((i) => i.list === "bags" && isOpen(i)) ? "amber" : "", goTab("bags"), "The Safe bags tab"),
+      kpi("Data issues", int(all.filter((i) => i.list === "issues" && isOpen(i)).length), plural(all.filter((i) => i.list === "issues" && !i.action).length, "note") + " for information", all.some((i) => i.list === "issues" && isOpen(i)) ? "amber" : "", goTab("issues"), "The Data issues tab"),
+      kpi("Repayments", int(F.filter((i) => i.kind === "repay").length), plural(F.filter((i) => i.kind === "mix").length, "card/cash mix-up"), "", goFlags("repay"), "Every repayment")]));
     const t = today(), thisW = mondayOf(t), lastW = addDays(thisW, -7);
     if (single()) {
       const c = codes[0], st = ST[c];

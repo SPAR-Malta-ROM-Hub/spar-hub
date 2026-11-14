@@ -529,9 +529,13 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
   }
   let lastMissScope = null;
 
-  function kpi(label, value, sub, klass) {
-    return E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: klass || "", text: value }), sub ? E("span", { class: "sub" }, sub) : null]);
+  function kpi(label, value, sub, klass, go, hint) {
+    return SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: klass || "", text: value }), sub ? E("span", { class: "sub" }, sub) : null]), go, hint);
   }
+  // where each tile leads: the Trends chart for that measure, the heat map, or the Waste Tracker
+  const goTrend = (metric, part) => () => { if (metric) { yrMetric = metric; try { localStorage.setItem("sparSalesYrMetric", metric); } catch (e) {} } showTab("trends"); SPARUI.jump(part || "trYear"); };
+  const goHeat = (m) => () => { hmMetric = m; try { localStorage.setItem("sparSalesHeat", m); } catch (e) {} showTab("trends"); SPARUI.jump("trHeat"); };
+  const goWaste = () => { try { localStorage.setItem("sparWasteScope", $("scope").value); if ($("week").value) localStorage.setItem("sparWastePeriod", "w:" + $("week").value); } catch (e) {} location.href = "waste.html"; };
   const subLine = (txt, v, good = 1) => [E("span", { class: cls(v, good), text: pct(v) }), " " + txt];
 
   // ── Overview ──
@@ -556,12 +560,12 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const partial = (a, b) => a < b - 0.5;   // some sales have nothing to compare with
     $("kpis").innerHTML = ""; $("kpis").classList.add("five");
     $("kpis").append(
-      kpi("Sales " + pl, eur(tot.s), [...subLine("vs target " + eur(tot.t), vT(tot)), partial(tot.sT, tot.s) ? " · stores with a target" : ""], vT(tot) < 0 ? "bad" : "good"),
-      kpi("vs last year", pct(vLY(tot)), ["Last year " + eur(tot.ly) + (partial(tot.sLY, tot.s) ? " (like for like)" : "") + " · vs last week ", E("span", { class: cls(vLW(tot)), text: pct(vLW(tot)) })], cls(vLY(tot)) === "down" ? "bad" : "good"),
-      kpi("Customers", int(tot.c), [...subLine("vs last week", vC(tot)), " (" + int(tot.clw) + ")"]),
+      kpi("Sales " + pl, eur(tot.s), [...subLine("vs target " + eur(tot.t), vT(tot)), partial(tot.sT, tot.s) ? " · stores with a target" : ""], vT(tot) < 0 ? "bad" : "good", goTrend("sales"), "Sales week by week (Trends)"),
+      kpi("vs last year", pct(vLY(tot)), ["Last year " + eur(tot.ly) + (partial(tot.sLY, tot.s) ? " (like for like)" : "") + " · vs last week ", E("span", { class: cls(vLW(tot)), text: pct(vLW(tot)) })], cls(vLY(tot)) === "down" ? "bad" : "good", goHeat("ly"), "Each store against last year, week by week (heat map)"),
+      kpi("Customers", int(tot.c), [...subLine("vs last week", vC(tot)), " (" + int(tot.clw) + ")"], "", goTrend("cust"), "Customers week by week (Trends)"),
       // average basket = sales ÷ customers; last week's from last week's sales and customers
-      kpi("Average basket", eur2(tot.c ? tot.s / tot.c : null), [...subLine("vs last week", vB(tot)), " (" + eur2(tot.clw ? tot.lw / tot.clw : null) + ")"]),
-      kpi("Waste", share(tot.s ? tot.w / tot.s : null), [eur(tot.w) + " of sales"], tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
+      kpi("Average basket", eur2(tot.c ? tot.s / tot.c : null), [...subLine("vs last week", vB(tot)), " (" + eur2(tot.clw ? tot.lw / tot.clw : null) + ")"], "", goTrend("bask"), "Basket spend week by week (Trends)"),
+      kpi("Waste", share(tot.s ? tot.w / tot.s : null), [eur(tot.w) + " of sales"], tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "", goWaste, "Open the Waste Tracker")
     );
     const box = $("ovMain"); box.innerHTML = "";
     if (codes.length === 1) renderDayTable(box, codes[0], w);
@@ -663,10 +667,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     box.appendChild(E("h2", { text: monthName(upto) + " to date" }));
     const missing = codes.length > 1 ? "" : (o.days < elapsed ? " Only " + o.days + " of the " + elapsed + " days so far have a report uploaded." : "");
     box.appendChild(E("div", { class: "kpis" }, [
-      kpi("Sales " + short(first) + " – " + short(upto), eur(o.s), subLine("vs target " + eur(o.t), vT(o))),
-      kpi("vs last year", pct(vLY(o)), ["Last year " + eur(o.ly)], cls(vLY(o)) === "down" ? "bad" : "good"),
-      kpi("Month-end outlook", eur(proj), ["Month target about " + eur(monthTarget)]),
-      kpi("Customers", int(o.c), ["Basket " + eur2(o.c ? o.s / o.c : null)])
+      kpi("Sales " + short(first) + " – " + short(upto), eur(o.s), subLine("vs target " + eur(o.t), vT(o)), "", goTrend(null, "trDaily"), "The last 6 weeks day by day (Trends)"),
+      kpi("vs last year", pct(vLY(o)), ["Last year " + eur(o.ly)], cls(vLY(o)) === "down" ? "bad" : "good", goHeat("ly"), "Each store against last year (heat map)"),
+      kpi("Month-end outlook", eur(proj), ["Month target about " + eur(monthTarget)], "", goTrend("ach"), "Achievement against target week by week (Trends)"),
+      kpi("Customers", int(o.c), ["Basket " + eur2(o.c ? o.s / o.c : null)], "", goTrend("cust"), "Customers week by week (Trends)")
     ]));
     box.appendChild(E("p", { class: "note", style: "margin:12px 0 0", text: "The outlook assumes the rest of the month runs at the same pace against target as the month so far (" + pct(pace != null ? pace - 1 : null) + "). Targets for days not yet reported are estimated from this month's average daily target." + missing }));
   }
@@ -1096,10 +1100,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const tg = hasTargets(gid);
     $("kpis").innerHTML = ""; $("kpis").classList.remove("five");
     $("kpis").append(
-      kpi(g.name + " sales week to date", eur(tot.s), tg ? subLine("vs target " + eur(tot.t), ch(tot.st, tot.t)) : ["No " + g.name + " targets set yet"], tg && ch(tot.st, tot.t) < 0 ? "bad" : tg ? "good" : ""),
-      kpi("Share of store sales", share(tot.x ? tot.s / tot.x : null), ["Of the store's sales excluding tobacco"]),
-      kpi("vs last year", full && ly ? pct(ch(tot.s, ly)) : "–", [full && ly ? "Last year " + eur(ly) : "Shown once the week is complete (the report gives last year for the whole week)"], full && ly && ch(tot.s, ly) < 0 ? "bad" : ""),
-      kpi("Waste", tot.hasW ? share(tot.s ? tot.w / tot.s : null) : "–", [tot.hasW ? eur(tot.w) + " of sales" : "Not in the daily report: will come from the Waste Tracker"], tot.hasW && tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "")
+      kpi(g.name + " sales week to date", eur(tot.s), tg ? subLine("vs target " + eur(tot.t), ch(tot.st, tot.t)) : ["No " + g.name + " targets set yet"], tg && ch(tot.st, tot.t) < 0 ? "bad" : tg ? "good" : "", goTrend("sales"), "Sales week by week (Trends)"),
+      kpi("Share of store sales", share(tot.x ? tot.s / tot.x : null), ["Of the store's sales excluding tobacco"], "", goTrend("share"), "Share of store sales week by week (Trends)"),
+      kpi("vs last year", full && ly ? pct(ch(tot.s, ly)) : "–", [full && ly ? "Last year " + eur(ly) : "Shown once the week is complete (the report gives last year for the whole week)"], full && ly && ch(tot.s, ly) < 0 ? "bad" : "", goHeat("ly"), "Each store against last year (heat map)"),
+      kpi("Waste", tot.hasW ? share(tot.s ? tot.w / tot.s : null) : "–", [tot.hasW ? eur(tot.w) + " of sales" : "From the Waste Tracker"], tot.hasW && tot.s && tot.w / tot.s > WASTE_ALERT ? "bad" : "", goWaste, "Open the Waste Tracker")
     );
     const box = $("ovMain"); box.innerHTML = "";
     if (codes.length === 1) {
@@ -1167,10 +1171,10 @@ th.sort.asc:after{content:" ↑";color:var(--ink)} th.sort.desc:after{content:" 
     const proj = pace != null ? M.st + (monthT - M.t) * pace : null;
     mb.appendChild(E("h2", { text: g.name + " · " + monthName(upto) + " to date" }));
     mb.appendChild(E("div", { class: "kpis" }, [
-      kpi("Sales " + short(upto.slice(0, 8) + "01") + " – " + short(upto), eur(M.s), tg ? subLine("vs target " + eur(M.t), ch(M.st, M.t)) : ["No targets set"]),
-      kpi("Month target", tg ? eur(monthT) : "–", [tg ? share(monthT ? M.st / monthT : null) + " achieved so far" : ""]),
-      kpi("Month-end outlook", tg ? eur(proj) : "–", [tg ? "If the month keeps its pace against target (" + pct(pace != null ? pace - 1 : null) + ")" : ""]),
-      kpi("Share of store sales", share(M.x ? M.s / M.x : null), ["Month to date"])
+      kpi("Sales " + short(upto.slice(0, 8) + "01") + " – " + short(upto), eur(M.s), tg ? subLine("vs target " + eur(M.t), ch(M.st, M.t)) : ["No targets set"], "", goTrend(null, "trDaily"), "The last 6 weeks day by day (Trends)"),
+      kpi("Month target", tg ? eur(monthT) : "–", [tg ? share(monthT ? M.st / monthT : null) + " achieved so far" : ""], "", goTrend("ach"), "Achievement against target week by week (Trends)"),
+      kpi("Month-end outlook", tg ? eur(proj) : "–", [tg ? "If the month keeps its pace against target (" + pct(pace != null ? pace - 1 : null) + ")" : ""], "", goTrend("ach"), "Achievement against target week by week (Trends)"),
+      kpi("Share of store sales", share(M.x ? M.s / M.x : null), ["Month to date"], "", goTrend("share"), "Share of store sales week by week (Trends)")
     ]));
   }
 

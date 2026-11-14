@@ -430,13 +430,15 @@ tr.tot td{font-weight:700;background:#F7F8F8;border-top:2px solid var(--line)}
     const H = withData.map((c) => histOf(ST[c], ST[c].date));
     const tot = (f) => sum(H.map((h) => h[f]));
     const openInv = sum(withData.map((c) => sysRows([c]).filter((o) => o.inv && o.inv.status !== "Closed").length));
-    const kpi = (label, val, sub, cls) => E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: cls || "", text: int(val) }), E("span", { class: "sub", text: sub })]);
-    k.append(kpi("Gaps, no stock", tot("n0"), plural(tot("disc"), "discontinued line")),
-      kpi("New since last check", tot("nw"), "went to 0 stock"),
-      kpi("Back on shelf", tot("back"), "were out at the previous check", "good"),
-      kpi("Out " + LONG + "+ days", tot("out7"), "still orderable, not discontinued", tot("out7") ? "bad" : ""),
-      kpi("Gaps with stock", tot("nS"), "system shows stock, shelf empty", tot("nS") ? "warn" : ""),
-      kpi("Open investigations", openInv, "stock not found on the shelf yet"));
+    const kpi = (label, val, sub, cls, go, hint) => SPARUI.linkTile(E("div", { class: "card kpi" }, [E("label", { text: label }), E("strong", { class: cls || "", text: int(val) }), E("span", { class: "sub", text: sub })]), go, hint);
+    const goOut = (min, part) => () => { $("oMin").value = String(min || 0); showTab("out"); SPARUI.jump(part || "outList"); };
+    const goSys = () => { showTab("system"); };
+    k.append(kpi("Gaps, no stock", tot("n0"), plural(tot("disc"), "discontinued line"), "", goOut(0), "Every line out of stock"),
+      kpi("New since last check", tot("nw"), "went to 0 stock", "", goOut(0), "The out-of-stock list"),
+      kpi("Back on shelf", tot("back"), "were out at the previous check", "good", goOut(0, "backList"), "Lines back on the shelf"),
+      kpi("Out " + LONG + "+ days", tot("out7"), "still orderable, not discontinued", tot("out7") ? "bad" : "", goOut(LONG), "Lines out for " + LONG + " days or more"),
+      kpi("Gaps with stock", tot("nS"), "system shows stock, shelf empty", tot("nS") ? "warn" : "", goSys, "Stock on system"),
+      kpi("Open investigations", openInv, "stock not found on the shelf yet", "", goSys, "Stock on system: investigations"));
     // stores at their latest check
     const t = today(), from14 = addDays(t, -13);
     const rows = codes.slice().sort((a, b) => (ST[b] && ST[b].date ? 1 : 0) - (ST[a] && ST[a].date ? 1 : 0) || nameOf(a).localeCompare(nameOf(b))).map((c) => {

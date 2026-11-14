@@ -58,7 +58,18 @@ header.top .brand-title h1 .mod{color:var(--muted);font-weight:600;font-size:.7e
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .kpi{padding:16px 18px;display:flex;flex-direction:column}
 .kpi label{display:block;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;line-height:1.25}
-.kpi strong{display:block;font-size:28px;margin-top:auto;padding-top:7px;line-height:1.1}
+.kpi strong{display:block;font-size:28px;margin-top:0;padding-top:8px;line-height:1.1}
+/* every tile in a row shares the same three rows (label / figure / note), so the figures always line up */
+.kpis>.kpi{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0;align-content:start}
+.kpis>.kpi>*{align-self:start}
+/* tiles that open the detail behind them */
+.kpi.go{cursor:pointer;position:relative;transition:box-shadow .15s,border-color .15s,transform .15s}
+.kpi.go label{padding-right:18px}
+.kpi.go::after{content:"›";position:absolute;top:10px;right:14px;font:700 22px/1 Arial,sans-serif;color:#B8C0C3}
+.kpi.go:hover,.kpi.go:focus-visible{border-color:var(--brand);box-shadow:0 4px 14px rgba(0,0,0,.08);transform:translateY(-1px);outline:none}
+.kpi.go:hover::after,.kpi.go:focus-visible::after{color:var(--brand)}
+.flash{animation:sparflash 1.4s ease}
+@keyframes sparflash{0%{box-shadow:0 0 0 3px var(--brand)}100%{box-shadow:0 0 0 0 rgba(236,27,36,0)}}
 .kpi strong.good{color:var(--gd)} .kpi strong.bad{color:var(--red)}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 

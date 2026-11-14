@@ -263,17 +263,17 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA}
   }
 
   // ═════════ OVERVIEW ═════════
-  function kpi(label, val, sub, c) { return E("div", { class: "card kpi " + (c || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function kpi(label, val, sub, c, go, hint) { return SPARUI.linkTile(E("div", { class: "card kpi " + (c || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]), go, hint); }
   function renderOverview(codes) {
     const box = $("ovBody"); box.innerHTML = "";
     if (!A.rows.length && !A.storeDays) { const c = E("div", { class: "card panel", style: "margin-top:0" }); empty(c); box.appendChild(c); return; }
     const reasons = [...groupBy(A.rows, (x) => x.r).values()].sort((a, b) => b.v - a.v), rB = groupBy(B.rows, (x) => x.r);
     const ch = chg(A.total, B.total);
     box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
-      kpi("Waste", eur0(A.total), eur0(A.storeDays ? A.total / A.storeDays : 0) + " a day vs " + eur0(B.storeDays ? B.total / B.storeDays : 0) + " before (" + chgTxt(ch) + ")", ch > 0.05 ? "red" : ch < -0.05 ? "green" : ""),
-      kpi("Waste % of sales", A.rate == null ? "–" : pct(A.rate, 2), A.rate == null ? "no sales loaded for these days" : "before: " + (B.rate == null ? "–" : pct(B.rate, 2)), A.rate != null && B.rate != null && A.rate > B.rate ? "red" : ""),
-      kpi("Top reason", reasons[0] ? reasons[0].k : "–", reasons[0] ? eur0(reasons[0].v) + " · " + pct(reasons[0].v / A.total, 0) + " of the waste" : ""),
-      kpi("Lines wasted", int(A.rows.length), int(new Set(A.rows.map((x) => x.i)).size) + " different items")]));
+      kpi("Waste", eur0(A.total), eur0(A.storeDays ? A.total / A.storeDays : 0) + " a day vs " + eur0(B.storeDays ? B.total / B.storeDays : 0) + " before (" + chgTxt(ch) + ")", ch > 0.05 ? "red" : ch < -0.05 ? "green" : "", () => showTab(single() ? "depts" : "stores"), single() ? "Waste by department" : "Waste by store"),
+      kpi("Waste % of sales", A.rate == null ? "–" : pct(A.rate, 2), A.rate == null ? "no sales loaded for these days" : "before: " + (B.rate == null ? "–" : pct(B.rate, 2)), A.rate != null && B.rate != null && A.rate > B.rate ? "red" : "", () => showTab(single() ? "depts" : "stores"), single() ? "Waste by department" : "Waste by store"),
+      kpi("Top reason", reasons[0] ? reasons[0].k : "–", reasons[0] ? eur0(reasons[0].v) + " · " + pct(reasons[0].v / A.total, 0) + " of the waste" : "", "", () => { itemReason = reasons[0] ? reasons[0].k : ""; showTab("items"); }, "The items wasted for this reason"),
+      kpi("Lines wasted", int(A.rows.length), int(new Set(A.rows.map((x) => x.i)).size) + " different items", "", () => { itemReason = ""; showTab("items"); }, "Every item wasted")]));
     // by day (a week) or by week (4 weeks)
     if (P.weeks === 1) {
       const dA = daysIn(P.A[0], P.A[1]), dB = daysIn(P.B[0], P.B[1]);

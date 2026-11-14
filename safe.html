@@ -264,7 +264,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
   const goStore = (c) => { const s = scopes.find((x) => x.id === "s:" + c); if (s) { $("scope").value = s.id; try { localStorage.setItem("sparSafeScope", s.id); } catch (e) {} } };
 
   // ═════════ OVERVIEW ═════════
-  function kpi(label, val, sub, cls) { return E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]); }
+  function kpi(label, val, sub, cls, go, hint) { return SPARUI.linkTile(E("div", { class: "card kpi " + (cls || "") }, [E("label", { text: label }), E("strong", { text: val }), E("span", { class: "sub", text: sub })]), go, hint); }
+  const goLast = (c) => () => { const L = D[c] && D[c].last; openId = L ? c + "/" + L.id : null; showTab("history"); };
+  const goBags = () => { bagF = "in"; showTab("bags"); };
+  const goFlags = (lv) => () => { fLevel = lv; showTab("flags"); };
   function weekChecks(c) {
     const w = K.mondayOf(today()), rows = D[c].rows.filter((r) => r.day >= w);
     return { sm: rows.some((r) => r.c.type === "sm"), rom: rows.some((r) => r.c.type === "rom") };
@@ -280,16 +283,16 @@ tr.click{cursor:pointer} tr.click:hover td{background:#FAFBFA} tr.sel td{backgro
     if (single()) {
       const c = codes[0], L = D[c].last, w = weekChecks(c);
       box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
-        kpi("Cash in the safe", L ? eur(L.s.total) : "–", L ? "at the count of " + when(L.at) : "No count yet"),
-        kpi("Last difference", L && L.diff != null ? sEur(L.diff) : "–", L && L.expected != null ? "expected " + eur(L.expected) : "first count", L && L.diff != null && Math.abs(L.diff) >= 0.005 ? "red" : L ? "green" : ""),
-        kpi("Deposit bags in the safe", int(inSafe.length), inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length ? plural(inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length, "bag") + " over " + K.BAG_DAYS + " days" : "waiting for the CIT", inSafe.some((x) => x.daysIn > K.BAG_DAYS) ? "amber" : ""),
-        kpi("This week's checks", (w.sm ? "SM ✓" : "SM ✗") + "  " + (w.rom ? "ROM ✓" : "ROM ✗"), act.length ? plural(act.length, "flag") + " to act on now" : "weekly Store Manager and ROM counts", w.sm && w.rom ? "green" : "amber")]));
+        kpi("Cash in the safe", L ? eur(L.s.total) : "–", L ? "at the count of " + when(L.at) : "No count yet", "", goLast(c), "Open the last count"),
+        kpi("Last difference", L && L.diff != null ? sEur(L.diff) : "–", L && L.expected != null ? "expected " + eur(L.expected) : "first count", L && L.diff != null && Math.abs(L.diff) >= 0.005 ? "red" : L ? "green" : "", goLast(c), "Open the last count"),
+        kpi("Deposit bags in the safe", int(inSafe.length), inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length ? plural(inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length, "bag") + " over " + K.BAG_DAYS + " days" : "waiting for the CIT", inSafe.some((x) => x.daysIn > K.BAG_DAYS) ? "amber" : "", goBags, "The deposit bags"),
+        kpi("This week's checks", (w.sm ? "SM ✓" : "SM ✗") + "  " + (w.rom ? "ROM ✓" : "ROM ✗"), act.length ? plural(act.length, "flag") + " to act on now" : "weekly Store Manager and ROM counts", w.sm && w.rom ? "green" : "amber", () => showTab("history"), "Every count")]));
     } else {
       box.appendChild(E("div", { class: "kpis", style: "margin-bottom:14px" }, [
-        kpi("Counted today", counted.length + " of " + codes.length, "stores with a safe count today", counted.length === codes.length ? "green" : "amber"),
-        kpi("Counts with a difference", int(diffs.length), "last 7 days · net " + sEur(r2(diffs.reduce((s, r) => s + r.diff, 0))), diffs.length ? "red" : "green"),
-        kpi("Deposit bags in safes", int(inSafe.length), plural(inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length, "bag") + " over " + K.BAG_DAYS + " days", inSafe.some((x) => x.daysIn > K.BAG_DAYS) ? "amber" : ""),
-        kpi("Act now", int(act.length), plural(watch.length, "early warning"), act.length ? "red" : "green")]));
+        kpi("Counted today", counted.length + " of " + codes.length, "stores with a safe count today", counted.length === codes.length ? "green" : "amber", () => showTab("history"), "Every count"),
+        kpi("Counts with a difference", int(diffs.length), "last 7 days · net " + sEur(r2(diffs.reduce((s, r) => s + r.diff, 0))), diffs.length ? "red" : "green", goFlags("all"), "The flags"),
+        kpi("Deposit bags in safes", int(inSafe.length), plural(inSafe.filter((x) => x.daysIn > K.BAG_DAYS).length, "bag") + " over " + K.BAG_DAYS + " days", inSafe.some((x) => x.daysIn > K.BAG_DAYS) ? "amber" : "", goBags, "The deposit bags"),
+        kpi("Act now", int(act.length), plural(watch.length, "early warning"), act.length ? "red" : "green", goFlags("act"), "Act now flags")]));
     }
     if (!anyData) {
       box.appendChild(E("div", { class: "card panel" }, [E("p", { class: "empty", text: "No safe counts yet. " + (canCount() ? "Start with the New count tab." : "They'll show here once the stores start counting.") })]));

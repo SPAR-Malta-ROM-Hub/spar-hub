@@ -166,8 +166,31 @@
     return { el: wrap, out: out, input: input, clear: function () { files = []; try { input.value = ""; } catch (x) {} show(); } };
   }
 
+  /* Makes a headline tile open the detail behind it: click (or Enter) runs go(). */
+  function linkTile(node, go, hint) {
+    if (!go) return node;
+    node.classList.add("go"); node.setAttribute("tabindex", "0"); node.setAttribute("role", "button");
+    node.setAttribute("title", hint || "Open the detail");
+    node.addEventListener("click", go);
+    node.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    return node;
+  }
+  /* Scrolls to a section once it has been drawn (pages draw after switching tab) and flashes it. */
+  function jump(target) {
+    var t0 = Date.now();
+    (function tick() {
+      var n = typeof target === "string" ? document.getElementById(target) : target;
+      if (n && n.offsetParent && n.childNodes.length) {
+        n.scrollIntoView({ behavior: "smooth", block: "start" });
+        n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash");
+        return;
+      }
+      if (Date.now() - t0 < 5000) setTimeout(tick, 120);
+    })();
+  }
+
   window.SPARUI = {
-    el: el, isoDate: isoDate, fmtDate: fmtDate, fmtDateTime: fmtDateTime, uid: uid, toast: toast, uploader: uploader,
+    el: el, isoDate: isoDate, fmtDate: fmtDate, fmtDateTime: fmtDateTime, uid: uid, toast: toast, uploader: uploader, linkTile: linkTile, jump: jump,
     // The modules list, used by the hub. "page" set = built; otherwise "coming soon".
     // who: which roles see the tile.
     MODULES: [
